@@ -19,6 +19,8 @@ export interface EditorInput {
   /** null for a new pipeline. */
   pipeline: EditorPipeline | null;
   sharedOnly?: SharedPipelineOnly | undefined;
+  /** Only a preview: every field is disabled and nothing is written. */
+  locked?: boolean | undefined;
   onDirty: (dirty: boolean) => void;
 }
 
@@ -84,7 +86,7 @@ export function useEditorFeedback() {
 
 /** What follows from the fields: the file of the level, the value to write, the dirty flag. */
 export function useEditorDerived(
-  { pipeline, sharedOnly, onDirty }: EditorInput,
+  { pipeline, sharedOnly, locked, onDirty }: EditorInput,
   { level, draft, newId }: ReturnType<typeof useEditorFields>,
 ) {
   const file = levelFile(pipeline, level);
@@ -101,7 +103,7 @@ export function useEditorDerived(
     dirty,
     id: pipeline?.id ?? newId,
     // a shared pipeline is view only on the project page; settings are where it is changed
-    readOnly: Boolean(pipeline) && level === 'global' && !sharedOnly,
+    readOnly: Boolean(locked) || (Boolean(pipeline) && level === 'global' && !sharedOnly),
   };
 }
 

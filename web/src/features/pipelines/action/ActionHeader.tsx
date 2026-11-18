@@ -9,7 +9,16 @@ import type { useActionEditor } from './useActionEditor.ts';
 type Editor = ReturnType<typeof useActionEditor>;
 
 /** The sticky head of the form: the name, the level, the file and the buttons. */
-export function ActionHeader({ action, editor }: { action: ActionEntry | null; editor: Editor }) {
+export function ActionHeader({
+  action,
+  editor,
+  locked = false,
+}: {
+  action: ActionEntry | null;
+  editor: Editor;
+  /** Only a preview: no buttons that write. */
+  locked?: boolean;
+}) {
   const { t } = useTranslation();
   const { level, busy, dirty, source } = editor;
   const title = action
@@ -30,21 +39,23 @@ export function ActionHeader({ action, editor }: { action: ActionEntry | null; e
         <Badge variant="outline">{t(`settings.editor.levels.${level}`)}</Badge>
       </div>
       {file ? <FilePath variant="line" path={file} /> : null}
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={busy || (!action && !editor.newId)} onClick={() => void editor.save()}>
-          {t('settings.editor.save')}
-        </Button>
-        {dirty ? (
-          <Button variant="outline" disabled={busy} onClick={editor.reset}>
-            {t('settingsPage.discard')}
+      {locked ? null : (
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={busy || (!action && !editor.newId)} onClick={() => void editor.save()}>
+            {t('settings.editor.save')}
           </Button>
-        ) : null}
-        {action && source ? (
-          <Button variant="destructive" disabled={busy} onClick={() => void editor.remove()}>
-            {t('settings.editor.remove')}
-          </Button>
-        ) : null}
-      </div>
+          {dirty ? (
+            <Button variant="outline" disabled={busy} onClick={editor.reset}>
+              {t('settingsPage.discard')}
+            </Button>
+          ) : null}
+          {action && source ? (
+            <Button variant="destructive" disabled={busy} onClick={() => void editor.remove()}>
+              {t('settings.editor.remove')}
+            </Button>
+          ) : null}
+        </div>
+      )}
     </header>
   );
 }

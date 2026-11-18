@@ -716,6 +716,7 @@ export const es: Dictionary = {
     overrides: 'Proyecto · sustituye al compartido',
     shared: 'Compartido',
     choose: 'Configuración que se muestra',
+    search: 'Buscar proyecto…',
   },
   queue: {
     settings: {

@@ -68,8 +68,8 @@ function ActionNotices({
   );
 }
 
-export function ActionForm(props: ActionEditorInput & { notice: string | null }) {
-  const { view, action, notice } = props;
+export function ActionForm(props: ActionEditorInput & { notice: string | null; locked?: boolean }) {
+  const { view, action, notice, locked = false } = props;
   const { t } = useTranslation();
   const editor = useActionEditor(props);
   const { level, draft, busy } = editor;
@@ -88,27 +88,33 @@ export function ActionForm(props: ActionEditorInput & { notice: string | null })
         id: editor.id || t('pipeline.actions.newName'),
       })}
     >
-      <ActionHeader action={action} editor={editor} />
+      <ActionHeader action={action} editor={editor} locked={locked} />
       <ActionNotices editor={editor} view={view} notice={notice} />
-      <ToggleGroup
-        type="single"
-        value={level}
-        aria-label={t('settings.editor.level')}
-        onValueChange={(next) => {
-          if (next) void editor.switchLevel(next as 'project' | 'global');
-        }}
-      >
-        <ToggleGroupItem value="project">{t('settings.editor.project')}</ToggleGroupItem>
-        <ToggleGroupItem value="global">{t('settings.editor.global')}</ToggleGroupItem>
-      </ToggleGroup>
-      <p className="text-sm text-muted-foreground">
-        {level === 'global' ? t('settings.editor.globalHint') : t('pipeline.actions.projectHint')}
-      </p>
+      {locked ? null : (
+        <>
+          <ToggleGroup
+            type="single"
+            value={level}
+            aria-label={t('settings.editor.level')}
+            onValueChange={(next) => {
+              if (next) void editor.switchLevel(next as 'project' | 'global');
+            }}
+          >
+            <ToggleGroupItem value="project">{t('settings.editor.project')}</ToggleGroupItem>
+            <ToggleGroupItem value="global">{t('settings.editor.global')}</ToggleGroupItem>
+          </ToggleGroup>
+          <p className="text-sm text-muted-foreground">
+            {level === 'global'
+              ? t('settings.editor.globalHint')
+              : t('pipeline.actions.projectHint')}
+          </p>
+        </>
+      )}
       <div className="@container">
         <div className="grid items-start gap-3 @3xl:grid-cols-2">
           <ActionFields
             draft={draft}
-            disabled={busy}
+            disabled={busy || locked}
             update={update}
             errorsOf={errorsOf}
             options={editor.options}

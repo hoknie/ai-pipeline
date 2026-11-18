@@ -692,6 +692,7 @@ export const zh: Dictionary = {
     overrides: '项目 · 覆盖共享',
     shared: '共享',
     choose: '显示的配置',
+    search: '搜索项目…',
   },
   queue: {
     settings: {

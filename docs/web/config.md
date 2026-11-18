@@ -92,8 +92,8 @@ With "All projects" chosen in the repository picker, "Specialists", "Chains", "P
 
 A project whose configuration cannot be read shows its error, and the others stay.
 
-- The view changes nothing: no "New" or "Import", and a form only as a preview with disabled fields. For a pipeline, an action or a provider, choosing a row opens an overview on the right: one line per project that has the entry, with the button "Open in project", which leaves the mode, selects that project and opens the entry in its form.
-- A specialist or a chain opens with a switch on top: "Shared" first (when there is a shared file), then each project with its own entry or an override. Below it is the chosen configuration in the same form with disabled fields and no buttons that write.
+- The view changes nothing: no "New" or "Import", and a form only as a preview with disabled fields. For a provider, choosing a row opens an overview on the right: one line per project that has it, with the button "Open in project", which leaves the mode, selects that project and opens the entry in its form.
+- A specialist, a chain, a pipeline or an action opens with a dropdown with a search on top, made for many projects: "Shared" is pinned first (when there is a shared file), then each project with its own entry or an override, by name. Below it is the chosen configuration in the same form with disabled fields and no buttons that write.
 - The preview has no "Project / Shared" toggle: the switch on top decides which file is shown. "Open in project" opens it in that project (for "Shared", in a project that uses it as it is).
 - The filter "Project" (the shared entries and each project, with the number of rows) narrows the list; a row stays when any of its projects is chosen. It is remembered per tab.
 - The address of a row is `#specialists/<slug>` (the same for `#pipelines/…` and `#providers/<slug>`). An old address with `?project=<project slug>` opens the same row and marks or chooses that project; an unknown project shows "Project not found".

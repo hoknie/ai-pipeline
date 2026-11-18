@@ -58,6 +58,18 @@ const choices = () =>
   );
 const choice = (value: string) =>
   document.querySelector<HTMLElement>(`[data-config-choice="${value}"]`);
+const picker = () => document.querySelector<HTMLElement>('[data-config-picker]');
+/** What the picker shows as chosen. */
+const picked = () => picker()?.textContent ?? '';
+async function openPicker() {
+  await waitFor(() => expect(picker()).not.toBeNull());
+  if (picker()!.getAttribute('aria-expanded') !== 'true') fireEvent.click(picker()!);
+  await waitFor(() => expect(document.querySelector('[data-config-choice]')).not.toBeNull());
+}
+async function pick(value: string) {
+  await openPicker();
+  fireEvent.click(choice(value)!);
+}
 
 type Setup = {
   configs?: Record<string, ConfigEditorResponse | Error>;
@@ -215,7 +227,7 @@ describe('addresses in the mode', () => {
     modeOn();
     window.location.hash = '#specialists/docs?project=lib';
     mount();
-    await waitFor(() => expect(choice('lib')?.getAttribute('data-state')).toBe('on'));
+    await waitFor(() => expect(picked()).toBe('lib'));
     expect(label()).toBe('Repository: All projects');
   });
 
@@ -319,8 +331,9 @@ describe('specialists in the mode', () => {
     window.location.hash = '#specialists/tester';
     mount({ configs: twoTesters });
     const overview = await screen.findByRole('region', { name: 'Tester app' });
+    await openPicker();
     expect(choices()).toEqual(['app', 'lib']);
-    expect(choice('app')?.textContent).toBe('app');
+    expect(picked()).toBe('app');
     const preview = await waitFor(() => {
       const found = overview.querySelector('[data-entry-preview]');
       expect(found).toBeTruthy();
@@ -342,8 +355,9 @@ describe('specialists in the mode', () => {
       },
     });
     await screen.findByRole('region', { name: 'CODER' });
+    await openPicker();
     expect(choices()).toEqual([SHARED]);
-    expect(choice(SHARED)?.textContent).toBe('Shared');
+    expect(picked()).toBe('Shared');
   });
 
   it('puts the shared configuration first, then the projects that override it', async () => {
@@ -369,9 +383,10 @@ describe('specialists in the mode', () => {
         [LIB]: configView({ repository: LIB, specialists: [shared('coder', 'Coder shared')] }),
       },
     });
-    await waitFor(() => expect(choices()).toEqual([SHARED, 'app']));
-    expect(choice(SHARED)?.getAttribute('data-state')).toBe('on');
-    expect(choice('app')?.getAttribute('title')).toBe('Project · overrides shared');
+    await openPicker();
+    expect(choices()).toEqual([SHARED, 'app']);
+    expect(picked()).toBe('Shared');
+    expect(choice('app')?.textContent).toContain('Project · overrides shared');
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder shared'),
     );
@@ -379,6 +394,7 @@ describe('specialists in the mode', () => {
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder app'),
     );
+    expect(picked()).toBe('app');
   });
 
   it('hides the level switch in the preview', async () => {
@@ -410,7 +426,8 @@ describe('specialists in the mode', () => {
         [LIB]: configView({ repository: LIB, specialists: [shared('coder', 'Coder shared')] }),
       },
     });
-    await waitFor(() => expect(choices()).toEqual([SHARED, 'app']));
+    await openPicker();
+    expect(choices()).toEqual([SHARED, 'app']);
     const level = () => {
       const preview = document.querySelector<HTMLElement>('[data-entry-preview]');
       expect(preview).not.toBeNull();
@@ -426,7 +443,7 @@ describe('specialists in the mode', () => {
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder app'),
     );
     expect(level()).toBeNull();
-    fireEvent.click(choice(SHARED)!);
+    await pick(SHARED);
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder shared'),
     );
@@ -476,11 +493,11 @@ describe('specialists in the mode', () => {
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester app'),
     );
-    fireEvent.click(choice('lib')!);
+    await pick('lib');
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester lib'),
     );
-    expect(choice('lib')?.getAttribute('data-state')).toBe('on');
+    expect(picked()).toBe('lib');
     expect(label()).toBe('Repository: All projects');
     expect(window.location.hash).toBe('#specialists/tester');
     expect(enabledFields().map((f) => f.outerHTML)).toEqual([]);
@@ -493,7 +510,7 @@ describe('specialists in the mode', () => {
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester lib'),
     );
-    expect(choice('lib')?.getAttribute('data-state')).toBe('on');
+    expect(picked()).toBe('lib');
   });
 
   it('changes nothing in the mode: no enabled fields, no writes', async () => {
@@ -586,15 +603,147 @@ describe('pipelines in the mode', () => {
     expect(screen.queryByRole('button', { name: /New pipeline/ })).toBeNull();
     fireEvent.click(row.querySelector('button, a') ?? row);
     const overview = await screen.findByRole('region', { name: 'Feature app' });
-    expect(overview.querySelectorAll('[data-overview-project]')).toHaveLength(2);
-    fireEvent.click(
-      within(overview.querySelector<HTMLElement>('[data-overview-project="lib"]')!).getByRole(
-        'button',
-        { name: /Open in project/ },
-      ),
-    );
+    await openPicker();
+    expect(choices()).toEqual(['app', 'lib']);
+    await pick('lib');
+    fireEvent.click(within(overview).getByRole('button', { name: /Open in project/ }));
     await waitFor(() => expect(label()).toBe('Repository: lib'));
     expect(window.location.hash).toBe('#pipelines/feature');
+  });
+
+  const withShared = (id: string, own: string | null, file = '/shared/epic.yaml') => ({
+    ...pipeline(
+      id,
+      own === null ? 'global' : ('project_over_global' as never),
+      own ?? 'Epic shared',
+    ),
+    file: own === null ? file : `/x/${id}.yaml`,
+    sources: {
+      global: {
+        file,
+        revision: 'g',
+        raw: { name: 'Epic shared', steps: [{ id: 'code', specialist: 'coder' }] },
+      },
+    },
+  });
+  const locked = () => {
+    const overview = document.querySelector<HTMLElement>('[data-entry-overview]')!;
+    const inputs = Array.from(overview.querySelectorAll<HTMLInputElement>('input, textarea'));
+    expect(inputs.length).toBeGreaterThan(0);
+    expect(inputs.filter((field) => !field.disabled)).toEqual([]);
+    for (const name of [/^Save/, /^Override/, /^Make shared/, /^Delete/, /^Edit in settings/]) {
+      expect(within(overview).queryByRole('button', { name })).toBeNull();
+    }
+    expect(within(overview).queryByRole('radio', { name: 'Global' })).toBeNull();
+    expect(within(overview).queryByRole('radio', { name: 'Project' })).toBeNull();
+  };
+
+  it('previews a shared pipeline of every project first, read only', async () => {
+    modeOn();
+    window.location.hash = '#pipelines/epic';
+    const { calls } = mount({
+      configs: {
+        [APP]: configView({ repository: APP, pipelines: [withShared('epic', null) as never] }),
+        [LIB]: configView({ repository: LIB, pipelines: [withShared('epic', null) as never] }),
+      },
+    });
+    await screen.findByRole('region', { name: 'Epic shared' });
+    await waitFor(() => expect(picked()).toBe('Shared'));
+    await waitFor(() =>
+      expect(document.querySelector('[data-entry-preview="*shared"]')).toBeTruthy(),
+    );
+    expect(screen.getByText('/shared/epic.yaml')).toBeTruthy();
+    locked();
+    await openPicker();
+    expect(choices()).toEqual([SHARED]);
+    expect(calls.filter(([name]) => /^(write|delete)/i.test(name))).toEqual([]);
+  });
+
+  it('puts the shared pipeline first, then the project that overrides it', async () => {
+    modeOn();
+    window.location.hash = '#pipelines/epic';
+    mount({
+      configs: {
+        [APP]: configView({
+          repository: APP,
+          pipelines: [withShared('epic', 'Epic app') as never],
+        }),
+        [LIB]: configView({ repository: LIB, pipelines: [withShared('epic', null) as never] }),
+      },
+    });
+    await screen.findByRole('region', { name: 'Epic shared' });
+    await openPicker();
+    expect(choices()).toEqual([SHARED, 'app']);
+    expect(picked()).toBe('Shared');
+    await pick('app');
+    await waitFor(() => expect(screen.getByText('/x/epic.yaml')).toBeTruthy());
+    expect(picked()).toBe('app');
+    locked();
+  });
+
+  it('starts on the shared configuration again when another pipeline is opened', async () => {
+    modeOn();
+    window.location.hash = '#pipelines/first';
+    mount({
+      configs: {
+        [APP]: configView({
+          repository: APP,
+          pipelines: [
+            withShared('first', 'First app', '/shared/first.yaml') as never,
+            withShared('epic', 'Epic app') as never,
+          ],
+        }),
+        [LIB]: configView({
+          repository: LIB,
+          pipelines: [
+            withShared('first', null, '/shared/first.yaml') as never,
+            withShared('epic', null) as never,
+          ],
+        }),
+      },
+    });
+    await waitFor(() => expect(picked()).toBe('Shared'));
+    await openPicker();
+    await pick('app');
+    await waitFor(() => expect(picked()).toBe('app'));
+    window.location.hash = '#pipelines/epic';
+    await waitFor(() => expect(picked()).toBe('Shared'));
+  });
+
+  it('has no shared choice for a pipeline only in the projects, and follows the address', async () => {
+    modeOn();
+    window.location.hash = '#pipelines/feature';
+    mount({
+      configs: {
+        [APP]: configView({
+          repository: APP,
+          pipelines: [pipeline('feature', 'project', 'Feature app') as never],
+        }),
+        [LIB]: configView({
+          repository: LIB,
+          pipelines: [pipeline('feature', 'project', 'Feature lib') as never],
+        }),
+      },
+    });
+    await screen.findByRole('region', { name: 'Feature app' });
+    await openPicker();
+    expect(choices()).toEqual(['app', 'lib']);
+    expect(picked()).toBe('app');
+    cleanup();
+    window.location.hash = '#pipelines/feature?project=lib';
+    mount({
+      configs: {
+        [APP]: configView({
+          repository: APP,
+          pipelines: [pipeline('feature', 'project', 'Feature app') as never],
+        }),
+        [LIB]: configView({
+          repository: LIB,
+          pipelines: [pipeline('feature', 'project', 'Feature lib') as never],
+        }),
+      },
+    });
+    await waitFor(() => expect(picked()).toBe('lib'));
   });
 
   it('offers the project in the topology and keeps the mode', async () => {
@@ -638,7 +787,7 @@ describe('chains and actions in the mode', () => {
     fireEvent.click(row.querySelector('button, a') ?? row);
     await waitFor(() => expect(window.location.hash).toBe('#specialists/chains/fast'));
     const overview = await screen.findByRole('region', { name: 'Fast app' });
-    fireEvent.click(choice('lib')!);
+    await pick('lib');
     fireEvent.click(within(overview).getByRole('button', { name: /Open in project/ }));
     await waitFor(() => expect(label()).toBe('Repository: lib'));
     expect(window.location.hash).toBe('#specialists/chains/fast');
@@ -665,20 +814,30 @@ describe('chains and actions in the mode', () => {
     }
   });
 
-  it('shows an action as an overview', async () => {
+  it('previews an action read only and opens it in the project', async () => {
     modeOn();
     window.location.hash = '#pipelines/actions/notify';
     const action = actionEntry('notify', { name: 'Notify', command: 'echo hi' });
-    mount({
+    const { calls } = mount({
       configs: {
         [APP]: configView({ repository: APP, actions: [action] }),
         [LIB]: configView({ repository: LIB, actions: [action] }),
       },
     });
     const overview = await screen.findByRole('region', { name: 'Notify' });
-    expect(overview.querySelectorAll('[data-overview-project]')).toHaveLength(2);
-    expect(within(overview).getAllByText('command: echo hi').length).toBe(2);
+    await waitFor(() => expect(overview.querySelector('[data-entry-preview]')).toBeTruthy());
+    const fields = Array.from(overview.querySelectorAll<HTMLInputElement>('input, textarea'));
+    expect(fields.length).toBeGreaterThan(0);
+    expect(fields.filter((field) => !field.disabled)).toEqual([]);
+    for (const name of [/^Save/, /^Reset/, /^Delete$/, /^Remove$/]) {
+      expect(within(overview).queryByRole('button', { name })).toBeNull();
+    }
+    expect(within(overview).queryByRole('radio', { name: 'Global' })).toBeNull();
     expect(screen.queryByRole('button', { name: /New action/ })).toBeNull();
+    expect(calls.filter(([name]) => /write|delete/i.test(name))).toEqual([]);
+    fireEvent.click(within(overview).getByRole('button', { name: /Open in project/ }));
+    await waitFor(() => expect(label()).toMatch(/^Repository: (app|lib)$/));
+    expect(window.location.hash).toBe('#pipelines/actions/notify');
   });
 });
 

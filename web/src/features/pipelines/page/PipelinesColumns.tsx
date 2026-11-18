@@ -93,21 +93,41 @@ export function PipelinesColumns(props: {
 
 /** The open pipeline or action of the mode «All projects»: an overview instead of a form. */
 function Overview(props: {
+  api: Api;
   data: PipelinesData;
   selected: string | null;
   section: BodyProps['section'];
   projects: ProjectsMode;
   onOpenInProject?: ((path: string, entry: string, section?: string | null) => void) | undefined;
 }) {
-  const { data, selected, section, projects } = props;
+  const { api, data, selected, section, projects } = props;
   const { view } = data;
+  const all = data.projects ?? [];
   const open = (path: string) => props.onOpenInProject?.(path, selected ?? '', section);
   if (view === null || selected === null) return null;
   if (section === null) {
     const row = (view.pipelines as Grouped<EditorPipeline>[]).find((item) => item.id === selected);
-    return row ? <PipelineOverview row={row} highlight={projects.project} onOpen={open} /> : null;
+    return row ? (
+      <PipelineOverview
+        key={`pipeline:${selected}`}
+        api={api}
+        projects={all}
+        row={row}
+        highlight={projects.project}
+        onOpen={open}
+      />
+    ) : null;
   }
   if (section !== 'actions') return null;
   const row = (actionsOf(view) as Grouped<ActionEntry>[]).find((item) => item.id === selected);
-  return row ? <ActionOverview row={row} highlight={projects.project} onOpen={open} /> : null;
+  return row ? (
+    <ActionOverview
+      key={`action:${selected}`}
+      api={api}
+      projects={all}
+      row={row}
+      highlight={projects.project}
+      onOpen={open}
+    />
+  ) : null;
 }

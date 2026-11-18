@@ -42,6 +42,8 @@ interface PipelineFormProps {
   onDeleted: () => Promise<void>;
   /** Edits a shared pipeline at the shared level only, with the usage by the projects. */
   sharedOnly?: SharedPipelineOnly;
+  /** Only a preview: disabled fields, no level switch, no buttons that write. */
+  locked?: boolean;
 }
 
 /** The errors of the preview or of a write, by the part of the form they belong to. */
@@ -155,6 +157,16 @@ function EditorTabs({
   );
 }
 
+/** What of the chrome around the fields the form shows: a preview shows none of the writing. */
+function chromeOf(locked: boolean | undefined, readOnly: boolean, canSwitch: boolean) {
+  return {
+    readOnlyHint: readOnly && !locked,
+    levelToggle: canSwitch && !locked,
+    levelHint: !locked,
+    buttons: !locked,
+  };
+}
+
 export function PipelineForm(props: PipelineFormProps) {
   const { view, pipeline, notice, sharedOnly } = props;
   const { t } = useTranslation();
@@ -164,6 +176,7 @@ export function PipelineForm(props: PipelineFormProps) {
   const shown = draft.variants.find((variant) => variant.key === editor.variant) ?? null;
   const places = errorsByPlace(editor.errors, id, draft.split !== null, shown?.id ?? null);
   const copyOnly = pipeline !== null && !sharedOnly;
+  const chrome = chromeOf(props.locked, readOnly, copyOnly && editor.bothLevels);
   const names = useMemo(() => specialistNames(view.specialists), [view.specialists]);
   return (
     <SpecialistNames.Provider value={names}>
@@ -172,7 +185,7 @@ export function PipelineForm(props: PipelineFormProps) {
         aria-label={t('pipelines.section', { id: id || t('pipelines.newName') })}
       >
         <FormHeading pipeline={pipeline} file={source?.file} />
-        {readOnly ? <Alert role="status">{t('pipelines.sharedReadOnly')}</Alert> : null}
+        {chrome.readOnlyHint ? <Alert role="status">{t('pipelines.sharedReadOnly')}</Alert> : null}
         <PipelineNotices
           view={view}
           notice={notice}
@@ -186,15 +199,17 @@ export function PipelineForm(props: PipelineFormProps) {
           <p className="text-sm text-muted-foreground">{t('pipelines.sharedOnlyHint')}</p>
         ) : null}
         {sharedOnly && pipeline ? <UsageBlock shared={sharedOnly} view={view} /> : null}
-        {copyOnly && editor.bothLevels ? (
+        {chrome.levelToggle ? (
           <LevelToggle level={level} onChange={(next) => void editor.switchLevel(next)} />
         ) : null}
-        <LevelHint
-          global={level === 'global'}
-          sharedOnly={Boolean(sharedOnly)}
-          projectFile={Boolean(sources.project)}
-          globalFile={sources.global?.file ?? null}
-        />
+        {chrome.levelHint ? (
+          <LevelHint
+            global={level === 'global'}
+            sharedOnly={Boolean(sharedOnly)}
+            projectFile={Boolean(sources.project)}
+            globalFile={sources.global?.file ?? null}
+          />
+        ) : null}
         <EditorTabs
           editor={editor}
           view={view}
@@ -203,24 +218,28 @@ export function PipelineForm(props: PipelineFormProps) {
           places={places}
           disabled={disabled}
         />
-        <PipelineButtons
-          pipeline={pipeline}
-          readOnly={readOnly}
-          busy={busy}
-          canSave={(Boolean(pipeline) || editor.newId !== '') && !hasDuplicateIds(draft.variants)}
-          overrideInProject={copyOnly && Boolean(sources.global) && !sources.project}
-          makeGlobal={pipeline !== null && Boolean(sources.project) && !sources.global && !readOnly}
-          canRemove={Boolean(pipeline && source) && !readOnly}
-          removeBlocked={editor.removeBlocked}
-          removeBlockedReason={editor.removeBlockedReason}
-          removeLabel={editor.removeLabel}
-          saveAs={editor.saveAs}
-          onSave={() => void editor.save()}
-          onCopyTo={(target) => void editor.copyTo(target)}
-          onSaveAs={editor.setSaveAs}
-          onSaveCopy={() => void editor.saveCopy()}
-          onRemove={() => void editor.remove()}
-        />
+        {chrome.buttons ? (
+          <PipelineButtons
+            pipeline={pipeline}
+            readOnly={readOnly}
+            busy={busy}
+            canSave={(Boolean(pipeline) || editor.newId !== '') && !hasDuplicateIds(draft.variants)}
+            overrideInProject={copyOnly && Boolean(sources.global) && !sources.project}
+            makeGlobal={
+              pipeline !== null && Boolean(sources.project) && !sources.global && !readOnly
+            }
+            canRemove={Boolean(pipeline && source) && !readOnly}
+            removeBlocked={editor.removeBlocked}
+            removeBlockedReason={editor.removeBlockedReason}
+            removeLabel={editor.removeLabel}
+            saveAs={editor.saveAs}
+            onSave={() => void editor.save()}
+            onCopyTo={(target) => void editor.copyTo(target)}
+            onSaveAs={editor.setSaveAs}
+            onSaveCopy={() => void editor.saveCopy()}
+            onRemove={() => void editor.remove()}
+          />
+        ) : null}
       </section>
     </SpecialistNames.Provider>
   );

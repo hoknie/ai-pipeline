@@ -703,6 +703,7 @@ export const en = {
     overrides: 'Project · overrides shared',
     shared: 'Shared',
     choose: 'Configuration to show',
+    search: 'Search projects…',
   },
   queue: {
     settings: {

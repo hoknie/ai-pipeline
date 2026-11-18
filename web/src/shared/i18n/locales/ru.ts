@@ -713,6 +713,7 @@ export const ru: Dictionary = {
     overrides: 'Проект · переопределяет общий',
     shared: 'Общий',
     choose: 'Какую конфигурацию показать',
+    search: 'Найти проект…',
   },
   queue: {
     settings: {

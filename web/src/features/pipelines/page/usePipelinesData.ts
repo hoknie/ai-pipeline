@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
+import type { ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
 import type { SystemStagesResponse } from '../../../shared/lib/pipeline/pipelineEntries.ts';
 
 /** The configuration of the repository and its system stages, with the loading failures. */
@@ -46,4 +47,7 @@ export function usePipelinesData(api: Api) {
   return { view, failure, stages, stagesFailure, load, reload, reloadAll };
 }
 
-export type PipelinesData = ReturnType<typeof usePipelinesData>;
+export type PipelinesData = ReturnType<typeof usePipelinesData> & {
+  /** The configuration of each project, in the mode "All projects" only. */
+  projects?: { project: ProjectRef; view: ConfigEditorResponse | null }[];
+};

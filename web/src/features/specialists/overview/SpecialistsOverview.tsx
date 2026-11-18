@@ -6,18 +6,18 @@ import type { Grouped } from '../../../shared/lib/catalog/projectRows.ts';
 import { specialistName } from '../../../shared/lib/catalog/specialists.ts';
 import { useMediaQuery } from '../../../shared/lib/browser/media.ts';
 import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
-import type { ProjectsMode } from '../../repositories/index.ts';
-import { ChainsList } from '../chains/index.ts';
-import { SpecialistsList } from '../page/SpecialistsList.tsx';
-import type { SpecialistsSource } from '../page/useAllSpecialistsData.ts';
-import { useSpecialistSearch } from '../page/useSpecialistSearch.tsx';
 import {
-  ConfigSwitch,
+  ConfigPicker,
   SHARED_CHOICE,
   configChoices,
   initialChoice,
   sharedView,
-} from './ConfigSwitch.tsx';
+  type ProjectsMode,
+} from '../../repositories/index.ts';
+import { ChainsList } from '../chains/index.ts';
+import { SpecialistsList } from '../page/SpecialistsList.tsx';
+import type { SpecialistsSource } from '../page/useAllSpecialistsData.ts';
+import { useSpecialistSearch } from '../page/useSpecialistSearch.tsx';
 import { EntryPreview } from './EntryPreview.tsx';
 import { Problems, UnknownProject } from './Problems.tsx';
 
@@ -130,7 +130,7 @@ function Detail({
         <p className="text-xs text-muted-foreground">{row.slug}</p>
       </header>
       {active ? (
-        <ConfigSwitch choices={choices} active={active} onChoose={setChosen} onOpen={onOpen} />
+        <ConfigPicker choices={choices} active={active} onChoose={setChosen} onOpen={onOpen} />
       ) : null}
       {source?.view && active ? (
         <EntryPreview
@@ -141,7 +141,7 @@ function Detail({
           choice={active.value}
           view={
             active.value === SHARED_CHOICE
-              ? sharedView(source.view, row.slug, isChains)
+              ? sharedView(source.view, isChains ? 'chains' : 'specialists', row.slug)
               : source.view
           }
           slug={row.slug}

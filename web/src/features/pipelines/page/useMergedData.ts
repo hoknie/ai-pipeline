@@ -47,6 +47,10 @@ export function useMergedData(
   return {
     ...single,
     view,
+    projects: (configs ?? []).map(({ project, view: projectView }) => ({
+      project,
+      view: projectView,
+    })),
     failure,
     load: async () => {
       await reload();

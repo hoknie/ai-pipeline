@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { EditorChain } from '../src/shared/api/types.ts';
+import type { EditorChain, EditorPipeline } from '../src/shared/api/types.ts';
 import { ChainForm } from '../src/features/specialists/chains/ChainForm.tsx';
+import { ActionForm } from '../src/features/pipelines/ActionForm.tsx';
+import { PipelineForm } from '../src/features/pipelines/form/PipelineForm.tsx';
 import { SpecialistForm } from '../src/features/specialists/form/SpecialistForm.tsx';
-import { configView, fakeApi, specialistEntry } from './fixtures.ts';
+import { actionEntry, configView, fakeApi, specialistEntry } from './fixtures.ts';
 import { cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
 
 afterEach(cleanup);
@@ -121,5 +123,121 @@ describe('the form of a chain with locked', () => {
   it('stays editable without locked', () => {
     chainForm('project');
     expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+  });
+});
+
+const globalSource = {
+  file: '/g/epic.yaml',
+  revision: 'g1',
+  raw: { name: 'Epic shared', steps: [{ id: 'code', specialist: 'coder' }] },
+};
+const projectSource = {
+  file: '/x/epic.yaml',
+  revision: 'p1',
+  raw: { name: 'Epic app', steps: [{ id: 'code', specialist: 'coder' }] },
+};
+const pipelineOf = (level: 'project' | 'global' | 'project_over_global'): EditorPipeline => ({
+  id: 'epic',
+  level,
+  file: level === 'global' ? '/g/epic.yaml' : '/x/epic.yaml',
+  revision: 'p1',
+  raw: level === 'global' ? globalSource.raw : projectSource.raw,
+  shared_tags: [],
+  own_tags: [],
+  sources: {
+    ...(level !== 'global' ? { project: projectSource } : {}),
+    ...(level !== 'project' ? { global: globalSource } : {}),
+  },
+});
+
+function pipelineForm(level: Parameters<typeof pipelineOf>[0], locked?: boolean) {
+  const api = fakeApi();
+  render(
+    <PipelineForm
+      api={api}
+      view={configView({ specialists: [specialistEntry('coder', {}, { name: 'Coder' })] })}
+      pipeline={pipelineOf(level)}
+      activeRuns={0}
+      notice={null}
+      onDirty={vi.fn()}
+      onReload={vi.fn(async () => undefined)}
+      onSaved={vi.fn(async () => undefined)}
+      onDeleted={vi.fn(async () => undefined)}
+      {...(locked === undefined ? {} : { locked })}
+    />,
+  );
+  return api;
+}
+
+const PIPELINE_CHROME = [...WRITES, /^Edit in settings/, /^Override in project/];
+
+describe('the form of a pipeline with locked', () => {
+  it.each(['project', 'global', 'project_over_global'] as const)(
+    'is view only for a %s pipeline: no level switch, no hints, no writes',
+    (level) => {
+      const api = pipelineForm(level, true);
+      expect(fields().length).toBeGreaterThan(0);
+      expect(fields().filter((field) => !field.disabled)).toEqual([]);
+      for (const name of PIPELINE_CHROME) expect(screen.queryByRole('button', { name })).toBeNull();
+      expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
+      expect(screen.queryByRole('radio', { name: 'Project' })).toBeNull();
+      expect(screen.queryByText(/it is view only/)).toBeNull();
+      expect(screen.getByRole('tab', { name: 'Form' })).toBeTruthy();
+      expect(screen.getByRole('tab', { name: /Diagram/ })).toBeTruthy();
+      expect(api.writePipeline).not.toHaveBeenCalled();
+      expect(api.deletePipeline).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps the file of the level', () => {
+    pipelineForm('project', true);
+    expect(screen.getByText('/x/epic.yaml')).toBeTruthy();
+  });
+
+  it('has the level switch and the buttons without locked when both levels exist', () => {
+    pipelineForm('project_over_global');
+    expect(screen.getByRole('radio', { name: 'Global' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Project' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+  });
+});
+
+describe('the form of an action with locked', () => {
+  const action = actionEntry('notify', { name: 'Notify', command: 'echo hi' });
+  const mountAction = (locked?: boolean) => {
+    const api = fakeApi();
+    render(
+      <ActionForm
+        api={api}
+        view={configView({})}
+        action={action}
+        notice={null}
+        onDirty={vi.fn()}
+        onReload={vi.fn(async () => undefined)}
+        onSaved={vi.fn(async () => undefined)}
+        onDeleted={vi.fn(async () => undefined)}
+        {...(locked === undefined ? {} : { locked })}
+      />,
+    );
+    return api;
+  };
+
+  it('is view only: disabled fields, no level switch, no buttons, the file stays', () => {
+    const api = mountAction(true);
+    expect(fields().length).toBeGreaterThan(0);
+    expect(fields().filter((field) => !field.disabled)).toEqual([]);
+    for (const name of WRITES) expect(screen.queryByRole('button', { name })).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Project' })).toBeNull();
+    expect(screen.getByText(action.file)).toBeTruthy();
+    expect(screen.getByText('project')).toBeTruthy();
+    expect(api.writeAction).not.toHaveBeenCalled();
+    expect(api.deleteAction).not.toHaveBeenCalled();
+  });
+
+  it('stays editable without locked', () => {
+    mountAction();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Global' })).toBeTruthy();
   });
 });
