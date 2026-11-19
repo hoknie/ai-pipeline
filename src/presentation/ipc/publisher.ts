@@ -11,6 +11,7 @@ import type { RunState } from '../../feature/runs/types/index.ts';
 import type { ConfigChangedPort } from '../../feature/swarm-edit/ports/index.ts';
 import type { TagsPublishPort } from '../../feature/tags/ports/index.ts';
 import type { GlobalQueueView, QueueView } from './contract/index.ts';
+import { LogSignals } from './log-signals.ts';
 import type { DaemonServices } from './services.ts';
 import type { Snapshots } from './snapshots.ts';
 import { catalogView } from './views/index.ts';
@@ -74,10 +75,12 @@ export class Publisher {
   private globalSeen = 'project';
   private repositoriesJson = '';
   private observersJson = '';
+  private readonly logs: LogSignals;
 
   constructor(services: DaemonServices, snapshots: Snapshots) {
     this.services = services;
     this.snapshots = snapshots;
+    this.logs = new LogSignals(services.now, () => (this.seq += 1));
   }
 
   /** The ports of the features, each a view of this publisher. */
@@ -97,6 +100,7 @@ export class Publisher {
           }
           if (this.services.queue.store.scope() === 'global') this.globalQueue(false);
         },
+        logGrew: (attempt) => this.logs.grew(attempt),
       },
       queue: {
         queueSaved: (queue) => this.queue(queue),
@@ -144,9 +148,10 @@ export class Publisher {
 
   /**
    * A new subscriber gets the snapshot of the runs, queues, repositories and tags, then the last
-   * list of background processes, then every event. Returns the function that unsubscribes.
+   * list of background processes, then every event; with `logs` also the `log` events of the
+   * attempts. Returns the function that unsubscribes.
    */
-  subscribe(send: (line: string) => void): () => void {
+  subscribe(send: (line: string) => void, logs = false): () => void {
     this.seq += 1;
     const runs = this.snapshots.recentRuns();
     const queues = this.snapshots.activeQueues();
@@ -173,7 +178,9 @@ export class Publisher {
     }
     this.subscribers.add(send);
     this.services.processes.watch();
+    const dropLogs = logs ? this.logs.add(send) : null;
     return () => {
+      dropLogs?.();
       this.subscribers.delete(send);
       if (this.subscribers.size === 0) this.services.processes.unwatch();
     };
@@ -183,6 +190,7 @@ export class Publisher {
   run(state: RunState): void {
     if (this.subscribers.size === 0) return;
     this.send('run', { run: this.snapshots.run(state) });
+    this.logs.runChanged(state);
     // The queues of other projects that wait for this run show its new state.
     for (const waiting of this.services.queue.store.lines.waitingFor(
       state.run.id,

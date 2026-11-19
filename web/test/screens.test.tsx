@@ -8,7 +8,7 @@ import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
 import { DiffStat } from '../src/features/runs/files/DiffStat.tsx';
 import { RunHeader } from '../src/features/runs/header/RunHeader.tsx';
 
-import { FakeEventSource, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
+import { FakeSocket, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
 import { setWindowWidth } from './media.ts';
 import { act, cleanup, fireEvent, openTab, render, screen, waitFor, within } from './render.tsx';
 
@@ -24,7 +24,7 @@ afterEach(() => {
 function mount(runs = [runView()], extra: Parameters<typeof fakeApi>[0] = {}) {
   const api = fakeApi({ group: vi.fn(async () => groupView()), ...extra });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs }));
   return api;
 }
 
@@ -108,7 +108,7 @@ describe('group screen', () => {
     openTab(/^Changes/);
     expect(await screen.findByText('old.ts')).toBeTruthy();
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'run',
         seq: 2,
         run: runView({
@@ -703,12 +703,12 @@ describe('structured questions', () => {
       runView({ state: 'needs_human', waiting: 1, groups: [row, other] }),
     ];
     mountAsking({}, askingMany());
-    FakeEventSource.last!.send({ event: 'snapshot', seq: 2, runs: runs(askingMany()) });
+    FakeSocket.last!.send({ event: 'snapshot', seq: 2, runs: runs(askingMany()) });
     fireEvent.change(await screen.findByLabelText('answer to question 2'), {
       target: { value: 'in a file' },
     });
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'run',
         seq: 3,
         run: runs(askingMany({ durationMs: 99_000 }))[0]!,
@@ -744,7 +744,7 @@ describe('structured questions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
     await expectOneNotice('Answer sent');
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'run',
         seq: 5,
         run: runView({
@@ -991,7 +991,7 @@ describe('notification centre in the panel', () => {
       group: vi.fn(async () => groupView({ runId: 'b', slug: 'ask', status: 'needs_human' })),
     });
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
-    act(() => FakeEventSource.last!.send({ event: 'run', seq: 2, run: other('needs_human') }));
+    act(() => FakeSocket.last!.send({ event: 'run', seq: 2, run: other('needs_human') }));
     const bell = screen.getByRole('button', { name: 'Notifications, 1 unread' });
     expect(bell.textContent).toBe('1');
     fireEvent.click(bell);

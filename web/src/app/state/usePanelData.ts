@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 
 import type { Api } from '../../shared/api/api.ts';
-import type { EventSourceFactory } from '../../shared/api/stream.ts';
+import type { SocketFactory } from '../../shared/api/stream.ts';
 import { useRuns } from '../../shared/api/runs/useRuns.ts';
 import { notifyError } from '../../shared/lib/browser/notify.ts';
 import { usePreference } from '../../shared/lib/browser/preferences.ts';
@@ -12,7 +12,7 @@ import { useRouteEffects } from './useRouteEffects.ts';
 import { useRouteState } from './routeState.ts';
 
 /** What the panel reads: preferences, the route, the stream of runs and the state of the chrome. */
-export function usePanelData(api: Api, openStream: EventSourceFactory) {
+export function usePanelData(api: Api, openStream: SocketFactory) {
   const [chosen, rememberProject] = usePreference<string | null>('repository', null);
   const [allChosen, setAllChosen] = usePreference('projects.all', false);
   const [onlyReplies, setOnlyReplies] = usePreference('onlyReplies', false);

@@ -10,13 +10,33 @@ The [web panel](README.md) works through this API, served at its address. With `
 
 ## Events
 
-`/api/events` is a one-way stream of server-sent events (`text/event-stream`), not a WebSocket; commands go as the requests below. Besides runs and queues it carries:
+`/api/ws` is a WebSocket; every message is one JSON object. It needs the same access as the requests: the token in the cookie or in the `x-aip-token` header, and the `Host` and `Origin` of the panel. Commands go as the requests below.
 
+After the connection opens the server sends `snapshot` (runs, queues, repositories, tags), then an event for every change:
+
+- `run`, `queue`, `globalQueue`, `tags`: the changed run, queue or tag list;
 - `repositories`: the list of repositories and its changes;
 - `observers`: the [observers](settings.md#observers) after a change: the same object as the answer of `GET /api/observers`, in the field `observers`;
 - `processes`: the background processes of the agents. The daemon looks at them every 2 seconds while someone is subscribed and sends the list when it changes.
 
-The panel asks `GET /api/processes` once on opening and then every 3 seconds only while the page is visible and the stream is down or has sent no list.
+The panel asks `GET /api/processes` once on opening and then every 3 seconds only while the page is visible and the connection is down or has sent no list.
+
+### Subscriptions
+
+A client asks for the data of an open screen with `{"op": "subscribe", "id": "<any string>", "topic": {…}}` and stops with `{"op": "unsubscribe", "id": "…"}`; `{"op": "refresh", "id": "…"}` asks to read the data again now. The server answers `{"event": "topic", "id", "data"}` at once and again whenever the data changes; `data` is the answer of the matching request.
+
+A failed read gives `{"event": "topic_error", "id", "error", "code"}` and the subscription stays. One connection holds at most 64 subscriptions, and a message is at most 4 KiB.
+
+| Topic | Same data as | Sent again |
+|---|---|---|
+| `{"kind": "transcript", "runId", "group", "seq", "after"}` | `GET …/transcript`, entries after line `after` | New entries as the log grows; the message with `running: false` is the last one |
+| `{"kind": "group", "runId", "group"}` | `GET /api/runs/<id>/groups/<slug>?tail=200` | When the run changes |
+| `{"kind": "group_spec", "runId", "group", "watch"}` | `GET …/spec` | When the run changes; with `watch: true` also while the log of the group grows, at most every 5 seconds |
+| `{"kind": "providers", "repository", "level"}` | `GET /api/config/providers` | After changes of runs, at most every 5 seconds |
+
+While the connection is down the panel reads the same data with the requests, every 3 seconds.
+
+A reverse proxy in front of the panel must pass WebSocket upgrades. `aip events --json` prints the same events in a terminal.
 
 ## Runs
 

@@ -5,7 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { App } from '../src/app/App.tsx';
 import { forgetPreference, usePreference } from '../src/shared/lib/browser/preferences.ts';
 
-import { FakeEventSource, fakeApi, groupView, openFake, runView } from './fixtures.ts';
+import { FakeSocket, fakeApi, groupView, openFake, runView } from './fixtures.ts';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -125,7 +125,7 @@ describe('answers-only switch of the run screen', () => {
         openStream={openFake}
       />,
     );
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     return utils;
   }
 

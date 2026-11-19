@@ -41,6 +41,8 @@ export interface WebOptions {
   stateDirectory?: string;
   /** Where failures after a response go (the daemon log); dropped by default. */
   log?: (line: string) => void;
+  /** Intervals of the live connection: its ping and, in server mode, the check of the access. */
+  live?: { pingMs?: number; recheckMs?: number };
 }
 
 export interface SystemHooks {

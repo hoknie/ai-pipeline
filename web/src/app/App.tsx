@@ -6,7 +6,7 @@ import { DaemonBanner } from './shell/DaemonBanner.tsx';
 import { StatusBar } from './shell/status/StatusBar.tsx';
 import { ConfirmProvider } from '../shared/ui/overlays/confirm.tsx';
 import { sectionLabel } from './sections.ts';
-import { browserEventSource, type EventSourceFactory } from '../shared/api/stream.ts';
+import { browserSocket, type SocketFactory } from '../shared/api/stream.ts';
 import { TagsProvider } from '../shared/lib/catalog/tags.tsx';
 import { Overlays } from './pages/Overlays.tsx';
 import { PageSwitch } from './pages/PageSwitch.tsx';
@@ -16,7 +16,7 @@ import { usePanelNav } from './state/usePanelNav.ts';
 import { useRepositoryActions } from './state/useRepositoryActions.ts';
 
 /** The panel: the confirmation dialog wraps it, so a repository switch can ask first. */
-export function App(props: { api: Api; openStream?: EventSourceFactory }) {
+export function App(props: { api: Api; openStream?: SocketFactory }) {
   return (
     <ConfirmProvider>
       <Panel {...props} />
@@ -24,13 +24,7 @@ export function App(props: { api: Api; openStream?: EventSourceFactory }) {
   );
 }
 
-function Panel({
-  api,
-  openStream = browserEventSource,
-}: {
-  api: Api;
-  openStream?: EventSourceFactory;
-}) {
+function Panel({ api, openStream = browserSocket }: { api: Api; openStream?: SocketFactory }) {
   const { t } = useTranslation();
   const panel = usePanelData(api, openStream);
   const { state, route, setRoute } = panel;

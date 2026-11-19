@@ -22,7 +22,7 @@ import { statusInfo } from '../src/shared/lib/status.ts';
 import type { RunView } from '../src/shared/api/types.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   configView,
   fakeApi,
   groupRow,
@@ -104,13 +104,13 @@ describe('the observers as the panel reads them', () => {
     const api = fakeApi({ runs: vi.fn(async () => []) });
     render(<App api={api} openStream={openFake} />);
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'snapshot',
         seq: 1,
         runs: [runView({ title: 'First task' })],
       }),
     );
-    act(() => FakeEventSource.last!.send({ event: 'mystery', payload: { run: 1 } }));
+    act(() => FakeSocket.last!.send({ event: 'mystery', payload: { run: 1 } }));
     expect(screen.getAllByText('First task').length).toBeGreaterThan(0);
   });
 });
@@ -121,7 +121,7 @@ describe('settings of the observers', () => {
     const api = fakeApi({ config: vi.fn(async () => configView()), ...overrides });
     render(<App api={api} openStream={openFake} />);
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'snapshot',
         seq: 1,
         runs: [],
@@ -364,7 +364,7 @@ describe('settings of the observers', () => {
     await open('#settings/global/observers');
     const workers = await screen.findByLabelText<HTMLInputElement>('Workers');
     const next = observersView({ settings: { workers: 7 }, waiting: 4 });
-    act(() => FakeEventSource.last!.send({ event: 'observers', observers: next }));
+    act(() => FakeSocket.last!.send({ event: 'observers', observers: next }));
     await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>('Workers').value).toBe('7'));
     fireEvent.change(workers, { target: { value: '9' } });
     const later = observersView({ settings: { workers: 11 }, waiting: 5 });
@@ -375,7 +375,7 @@ describe('settings of the observers', () => {
         incident: { key: 'k', kind: 'failed', group: 'g', detail: 'd' },
       },
     ];
-    act(() => FakeEventSource.last!.send({ event: 'observers', observers: later }));
+    act(() => FakeSocket.last!.send({ event: 'observers', observers: later }));
     await waitFor(() => expect(screen.getByTestId('observers-waiting').textContent).toContain('5'));
     expect(screen.getByLabelText<HTMLInputElement>('Workers').value).toBe('9');
     expect(within(screen.getByTestId('observers-running')).getByText(/run9/)).toBeTruthy();

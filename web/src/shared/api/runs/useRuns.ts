@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 
 import type { Api } from '../api.ts';
 import type { ObserversView } from '../observerTypes.ts';
-import { browserEventSource, type Connection, type EventSourceFactory } from '../stream.ts';
+import { browserSocket, type Connection, type SocketFactory } from '../stream.ts';
 import type {
   DaemonMismatch,
   GlobalQueueView,
@@ -72,7 +72,7 @@ export interface RunsResult {
 /** Runs kept up to date from the event stream, with polling while the stream is down. */
 export function useRuns(
   api: Api,
-  openStream: EventSourceFactory = browserEventSource,
+  openStream: SocketFactory = browserSocket,
   /** The repository the person chose, if any; it is used only when the panel knows it. */
   wanted: string | null = null,
   /** The run of the address, if any: when the list lacks it, it is fetched by id. */

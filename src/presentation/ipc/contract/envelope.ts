@@ -165,6 +165,14 @@ export const streamEventSchema = z.discriminatedUnion('event', [
     }),
   }),
   z.object({ event: z.literal('network'), seq: z.number().int(), network: networkStatusSchema }),
+  /** The log of an attempt has new lines or the attempt ended; never the text of the log. */
+  z.strictObject({
+    event: z.literal('log'),
+    seq: z.number().int(),
+    runId: z.string(),
+    group: z.string(),
+    attempt: z.number().int(),
+  }),
   z.object({
     event: z.literal('processes'),
     seq: z.number().int(),

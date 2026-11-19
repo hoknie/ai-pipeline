@@ -7,7 +7,7 @@ import type { QueueView, RunView } from '../src/shared/api/types.ts';
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   openFake,
   pipelineOf,
@@ -72,7 +72,7 @@ function mount(
   render(<App api={api as Api} openStream={openFake} />);
   if (!options.noSnapshot)
     act(() => {
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'snapshot',
         seq: 1,
         runs: options.runs ?? [runView({ id: 'a1', repository: APP })],
@@ -205,12 +205,12 @@ describe('page of a new task', () => {
     const field = await ready();
     fireEvent.change(field, { target: { value: 'stay' } });
     act(() => {
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'queue',
         seq: 2,
         queue: queueOf({ repository: APP, items: [] }),
       });
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'run',
         seq: 3,
         run: runView({ id: 'a1', repository: APP, title: 'changed' }),

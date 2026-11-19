@@ -28,7 +28,7 @@ import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 import { setWindowWidth } from './media.ts';
 import { providersView, providerView } from './providerFixtures.ts';
 import {
-  FakeEventSource,
+  FakeSocket,
   dependency,
   fakeApi,
   openFake,
@@ -78,8 +78,8 @@ function labels(): string[] {
     .map((item) => item.getAttribute('aria-label') ?? '');
 }
 
-function stream(): FakeEventSource {
-  const source = FakeEventSource.last;
+function stream(): FakeSocket {
+  const source = FakeSocket.last;
   if (!source) throw new Error('no event source');
   return source;
 }
@@ -3417,7 +3417,7 @@ describe('parent task in the form', () => {
     queueOf({ items, runs: [queueRun('run1', { title: 'Parent', number: 12 })] });
   /** The runs the panel knows, as the first snapshot of the stream brings them. */
   const sendRuns = async (...runs: Parameters<typeof runView>[0][]) => {
-    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
     act(() => {
       stream().send({ event: 'snapshot', seq: 1, runs: runs.map((run) => runView(run)) });
     });

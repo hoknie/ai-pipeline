@@ -7,7 +7,7 @@ import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
 import { defaultEntry, orderEntries } from '../src/shared/lib/order.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   groupRow,
   groupView,
@@ -32,7 +32,7 @@ afterEach(() => {
 function mount(runs: ReturnType<typeof runView>[], extra: Parameters<typeof fakeApi>[0] = {}) {
   const api = fakeApi({ group: vi.fn(async () => groupView()), ...extra });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs }));
   return api;
 }
 
@@ -314,7 +314,7 @@ describe('opening a split from the topology', () => {
     });
     window.location.hash = '#pipelines/topology/feature';
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [run] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [run] }));
     fireEvent.click(await screen.findByTestId('stage-split'));
     fireEvent.click(
       within(await screen.findByRole('complementary', { name: /^node/ })).getByRole('button', {
@@ -569,7 +569,7 @@ describe('the outcome of a delivery started in the panel', () => {
     return api;
   };
   const send = (run: ReturnType<typeof runView>, seq: number) =>
-    act(() => FakeEventSource.last!.send({ event: 'run', seq, run }));
+    act(() => FakeSocket.last!.send({ event: 'run', seq, run }));
   const toasts = () => [
     ...new Set(
       Array.from(document.querySelectorAll('[data-sonner-toast]')).map((node) => node.textContent),

@@ -74,7 +74,7 @@ export interface Application {
   readonly database: Database;
   readonly services: DaemonServices;
   handle(request: Request, actor?: string): Promise<unknown>;
-  subscribe(send: (line: string) => void): () => void;
+  subscribe(send: (line: string) => void, logs?: boolean): () => void;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -275,7 +275,7 @@ export function createApplication(options: ApplicationOptions): Application {
     database,
     services,
     handle: (request, actorId) => handle(request, { ...ipc, actor: actorOfRequest(actorId) }),
-    subscribe: (send) => publisher.subscribe(send),
+    subscribe: (send, logs) => publisher.subscribe(send, logs),
     start: () => lifecycle.start(),
     stop: () => lifecycle.stop(),
   };

@@ -9,7 +9,7 @@ import { CHAIN_TAG_COLOR, TAG_COLORS } from '../../src/feature/tags/types/index.
 
 import { act, cleanup, choose, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   openFake,
   queueOf,
@@ -26,8 +26,8 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-function stream(): FakeEventSource {
-  const source = FakeEventSource.last;
+function stream(): FakeSocket {
+  const source = FakeSocket.last;
   if (!source) throw new Error('no event source');
   return source;
 }

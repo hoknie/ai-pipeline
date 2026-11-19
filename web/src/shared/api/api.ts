@@ -26,11 +26,14 @@ export interface Api
    * `repository=<path>`. `null` is the repository `aip web` runs in.
    */
   forRepository(repository: string | null): Api;
+  /** The repository this API is bound to; `null` is the repository `aip web` runs in. */
+  repository?: string | null;
 }
 
 function bound(repository: string | null): Api {
   const api: Api = {
     forRepository: (next) => (next === repository ? api : bound(next)),
+    repository,
     ...runsApi(),
     ...runActionsApi(),
     ...queueApi((path) => withRepository(path, repository)),

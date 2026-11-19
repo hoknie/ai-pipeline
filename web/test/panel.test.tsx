@@ -11,6 +11,7 @@ import {
   within,
 } from './render.tsx';
 import i18next from 'i18next';
+import { liveTopics } from '../src/shared/api/live/topics.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
@@ -24,7 +25,8 @@ import { sortRuns } from '../src/shared/api/runs/runsState.ts';
 import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 
 import {
-  FakeEventSource,
+  attachLive,
+  FakeSocket,
   fakeApi,
   groupRow,
   groupView,
@@ -42,6 +44,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  liveTopics.detach();
+  FakeSocket.answers = true;
   vi.useRealTimers();
 });
 
@@ -64,8 +68,8 @@ function list(runs: Parameters<typeof RunList>[0]['runs'], props: ListProps = {}
   return <RunList runs={runs} {...base} {...props} />;
 }
 
-function stream(): FakeEventSource {
-  const source = FakeEventSource.last;
+function stream(): FakeSocket {
+  const source = FakeSocket.last;
   if (!source) throw new Error('no event source');
   return source;
 }
@@ -523,6 +527,41 @@ describe('attempts and transcript', () => {
     await waitFor(() => expect(api.transcript).toHaveBeenCalledWith('run1', 'login', 1, 0));
   });
 
+  it('takes the group and the log from the connection, without requests, and drops a folded log', async () => {
+    FakeSocket.answers = false;
+    const api = fakeApi();
+    const socket = attachLive();
+    panel(api);
+    const running = attempt(1, { status: 'running', verdict: null });
+    act(() => socket.topic('group', groupView({ attempts: [running] })));
+    await screen.findByRole('button', { name: /^attempt 1/ });
+    const part = (cursor: number, isRunning: boolean, text: string) => ({
+      runId: 'run1',
+      group: 'login',
+      seq: 1,
+      cursor,
+      running: isRunning,
+      entries: [{ kind: 'text', text }],
+    });
+    act(() => socket.topic('transcript', part(2, true, 'first entry')));
+    act(() => socket.topic('transcript', part(3, true, 'second entry')));
+    expect(screen.getByText('first entry')).toBeTruthy();
+    expect(screen.getByText('second entry')).toBeTruthy();
+    // the run changed: the server sends the group again
+    const second = attempt(2, { status: 'running', verdict: null });
+    act(() => socket.topic('group', groupView({ attempts: [attempt(1), second] })));
+    await screen.findByRole('button', { name: /^attempt 2/ });
+    expect(api.group).not.toHaveBeenCalled();
+    expect(api.transcript).not.toHaveBeenCalled();
+    // a folded attempt holds no subscription
+    const held = () => socket.subscriptions('transcript').map((message) => message.topic?.seq);
+    expect(held()).toEqual([1, 2]);
+    fireEvent.click(screen.getByRole('button', { name: /^attempt 1/ }));
+    expect(held()).toEqual([2]);
+    fireEvent.click(screen.getByRole('button', { name: /^attempt 1/ }));
+    expect(socket.subscriptions('transcript').at(-1)?.topic).toMatchObject({ seq: 1, after: 3 });
+  });
+
   it('shows refused commands with patterns and a hint for the group', async () => {
     const command = `cd /very/long/worktree/path/${'x'.repeat(200)} && claude plugin test integrations/claude-code`;
     const api = fakeApi({
@@ -688,11 +727,22 @@ describe('attempts and transcript', () => {
         running: false,
         entries: [{ kind: 'text', text: 'second entry' }],
       });
+    const socket = attachLive();
     panel(fakeApi({ transcript }));
     expect(await screen.findByText('first entry')).toBeTruthy();
+    expect(socket.subscriptions('transcript')[0]?.topic).toMatchObject({ seq: 1, after: 0 });
+    // no request on a timer: the next part comes when the server sends it
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1600);
     });
+    expect(transcript).toHaveBeenCalledTimes(1);
+    // the connection breaks and comes back: the log goes on from the cursor
+    let next: FakeSocket | null = null;
+    act(() => {
+      liveTopics.down();
+      next = attachLive();
+    });
+    expect(next!.subscriptions('transcript')[0]?.topic).toMatchObject({ seq: 1, after: 2 });
     expect(await screen.findByText('second entry')).toBeTruthy();
     expect(screen.getByText('first entry')).toBeTruthy();
     expect(transcript).toHaveBeenLastCalledWith('run1', 'login', 1, 2);
@@ -1085,7 +1135,7 @@ describe('daemon build', () => {
 describe('useRuns stability', () => {
   it('keeps the same array without events and on a repeated event, and old objects on a change', () => {
     const { result, rerender } = renderHook(() => useRuns(fakeApi(), openFake));
-    const source = FakeEventSource.last!;
+    const source = FakeSocket.last!;
     const a = runView({ id: 'a' });
     const b = runView({ id: 'b' });
     act(() => source.send({ event: 'snapshot', seq: 1, runs: [a, b] }));

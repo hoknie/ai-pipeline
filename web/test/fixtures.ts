@@ -6,7 +6,8 @@ import type {
   ActionEntry,
   SystemStagesResponse,
 } from '../src/shared/lib/pipeline/pipelineEntries.ts';
-import type { EventSourceLike } from '../src/shared/api/stream.ts';
+import type { SocketLike } from '../src/shared/api/stream.ts';
+import { liveTopics } from '../src/shared/api/live/topics.ts';
 import type {
   BackgroundProcessView,
   ConfigCatalogResponse,
@@ -1008,7 +1009,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
   };
   /** Methods that record the repository they were bound to, then call the shared mock. */
   const bind = (repository: string | null): Api => {
-    const scoped: Record<string, unknown> = { forRepository: bind };
+    const scoped: Record<string, unknown> = { forRepository: bind, repository };
     for (const [name, fn] of Object.entries(base)) {
       scoped[name] = (...args: unknown[]) => {
         calls.push([name, repository]);
@@ -1017,38 +1018,156 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     }
     return scoped as unknown as Api;
   };
-  return { ...base, forRepository: bind, calls };
+  const api = { ...base, forRepository: bind, calls };
+  FakeSocket.api = api;
+  return api;
 }
 
-export class FakeEventSource implements EventSourceLike {
-  static last: FakeEventSource | null = null;
+type SentMessage = {
+  op: string;
+  id: string;
+  topic?: { kind: string } & Record<string, unknown>;
+};
+
+/**
+ * The live connection of a test. It stands in for the server: a subscription is answered from the
+ * last `fakeApi` (as the server reads the daemon), and after a `run` event the topics of the runs
+ * are read again and sent when they changed. `FakeSocket.answers = false` leaves every answer to
+ * the test (`topic`).
+ */
+export class FakeSocket implements SocketLike {
+  static last: FakeSocket | null = null;
+  /** The API the subscriptions are answered from: the last one `fakeApi` made. */
+  static api: Api | null = null;
+  static answers = true;
   onopen: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
-  onerror: ((event: Event) => void) | null = null;
+  onclose: (() => void) | null = null;
   closed = false;
+  /** The messages the panel sent, parsed. */
+  sent: SentMessage[] = [];
+  private readonly answered = new Map<string, string>();
 
   constructor() {
-    FakeEventSource.last = this;
+    FakeSocket.last = this;
   }
 
+  /** The connection comes up. */
   open(): void {
     this.onopen?.(new Event('open'));
   }
 
+  /** A message of the panel (a string), or a message of the server to give to the panel. */
   send(data: unknown): void {
+    if (typeof data === 'string') {
+      const message = JSON.parse(data) as SentMessage;
+      this.sent.push(message);
+      if (message.op === 'refresh') this.answered.delete(message.id);
+      if (message.op !== 'unsubscribe') void this.answer(message.id);
+      return;
+    }
     this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(data) }));
+    if ((data as { event?: string }).event !== 'run') return;
+    // the server reads the topics of the runs again after a change of a run
+    for (const held of this.subscriptions()) {
+      if (held.topic?.kind !== 'transcript') void this.answer(held.id);
+    }
   }
 
+  /** The connection breaks. */
   fail(): void {
-    this.onerror?.(new Event('error'));
+    this.closed = true;
+    this.onclose?.();
   }
 
   close(): void {
     this.closed = true;
   }
+
+  /** The subscriptions the panel holds now, of one kind or of all. */
+  subscriptions(kind?: string): SentMessage[] {
+    const dropped = new Set(
+      this.sent.filter((message) => message.op === 'unsubscribe').map((message) => message.id),
+    );
+    return this.sent.filter(
+      (message) =>
+        message.op === 'subscribe' &&
+        !dropped.has(message.id) &&
+        (kind === undefined || message.topic?.kind === kind),
+    );
+  }
+
+  /** Sends the data of a topic to the last subscription of this kind that matches. */
+  topic(kind: string, data: unknown, where: Record<string, unknown> = {}): void {
+    const found = this.subscriptions(kind)
+      .filter((message) =>
+        Object.entries(where).every(([key, value]) => message.topic?.[key] === value),
+      )
+      .at(-1);
+    if (!found) throw new Error(`the panel holds no subscription to ${kind}`);
+    this.send({ event: 'topic', id: found.id, data });
+  }
+
+  /** Tells the last subscription of this kind that the read of its topic failed. */
+  topicError(kind: string, error: string): void {
+    const found = this.subscriptions(kind).at(-1);
+    if (!found) throw new Error(`the panel holds no subscription to ${kind}`);
+    this.send({ event: 'topic_error', id: found.id, error });
+  }
+
+  /** Reads the topic of a subscription from the fake API and sends it when it is new. */
+  private async answer(id: string): Promise<void> {
+    const api = FakeSocket.api;
+    const topic = this.subscriptions().find((message) => message.id === id)?.topic;
+    if (!FakeSocket.answers || api === null || topic === undefined) return;
+    const { runId, group, seq, after, repository, level } = topic as unknown as {
+      runId: string;
+      group: string;
+      seq: number;
+      after?: number;
+      repository?: string;
+      level?: 'global';
+    };
+    let message: Record<string, unknown>;
+    try {
+      const data =
+        topic.kind === 'transcript'
+          ? await api.transcript(runId, group, seq, after ?? 0)
+          : topic.kind === 'group'
+            ? await api.group(runId, group)
+            : topic.kind === 'group_spec'
+              ? await api.groupSpec(runId, group)
+              : await (repository === undefined ? api : api.forRepository(repository)).providers(
+                  level,
+                );
+      message = { event: 'topic', id, data };
+    } catch (error) {
+      message = { event: 'topic_error', id, error: (error as Error).message };
+    }
+    const text = JSON.stringify(message);
+    const held = this.subscriptions().some((candidate) => candidate.id === id);
+    if (this.closed || !held || this.answered.get(id) === text) return;
+    this.answered.set(id, text);
+    this.onmessage?.(new MessageEvent('message', { data: text }));
+  }
 }
 
-export const openFake = () => new FakeEventSource();
+export const openFake = () => new FakeSocket();
+
+/**
+ * A live connection for a component rendered without the panel around it: the topics are
+ * subscribed on the returned socket. The test ends it with `liveTopics.detach()`.
+ */
+export function attachLive(): FakeSocket {
+  const socket = new FakeSocket();
+  socket.onmessage = (message) =>
+    void liveTopics.message(JSON.parse(message.data) as { event: string });
+  liveTopics.opened((message) => {
+    socket.send(JSON.stringify(message));
+    return true;
+  });
+  return socket;
+}
 
 /** A registry entry of the daemon's list of repositories. */
 export function repositoryView(

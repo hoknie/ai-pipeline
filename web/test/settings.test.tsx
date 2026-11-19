@@ -6,7 +6,7 @@ import { App } from '../src/app/App.tsx';
 import { ApiError } from '../src/shared/api/api.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   configView,
   fakeApi,
   openFake,
@@ -35,8 +35,8 @@ function show(queue = queueOf(), overrides = {}, hash = '#settings/queue') {
   return api;
 }
 
-function stream(): FakeEventSource {
-  const source = FakeEventSource.last;
+function stream(): FakeSocket {
+  const source = FakeSocket.last;
   if (!source) throw new Error('no event source');
   return source;
 }

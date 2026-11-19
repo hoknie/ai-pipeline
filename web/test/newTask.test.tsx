@@ -25,7 +25,7 @@ import {
 } from './render.tsx';
 import { chooseKind } from './linkKind.ts';
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   openFake,
   queueItem,
@@ -297,9 +297,9 @@ describe('new task from the top strip', () => {
       target: { value: 'Only text\nmore' },
     });
     act(() => {
-      FakeEventSource.last!.open();
-      FakeEventSource.last!.send({ event: 'queue', seq: 1, queue: queueOf() });
-      FakeEventSource.last!.send({ event: 'run', seq: 2, run: runView() });
+      FakeSocket.last!.open();
+      FakeSocket.last!.send({ event: 'queue', seq: 1, queue: queueOf() });
+      FakeSocket.last!.send({ event: 'run', seq: 2, run: runView() });
     });
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
@@ -522,7 +522,7 @@ function twoRepositories(
   ];
   render(<App api={api as Api} openStream={openFake} />);
   act(() => {
-    FakeEventSource.last?.send({
+    FakeSocket.last?.send({
       event: 'snapshot',
       seq: 1,
       runs: options.runs ?? [runView({ id: 'a1', repository: APP })],
@@ -841,11 +841,11 @@ describe('subtask from the run header', () => {
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
     act(() => {
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'queue',
         queue: queueOf({ repository: APP, items: [queueItem('qa', 'app task', 1)] }),
       });
-      FakeEventSource.last?.send({ event: 'run', run: { ...finished, title: 'Sign-in' } });
+      FakeSocket.last?.send({ event: 'run', run: { ...finished, title: 'Sign-in' } });
     });
     expect(parentField(dialog).textContent).toMatch(/^#115 /);
   });
@@ -899,7 +899,7 @@ describe('subtask from the run header', () => {
     expect(within(dialog).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
     // an event of a run while the dialog is open does not bring the parent back
     act(() => {
-      FakeEventSource.last?.send({ event: 'run', run: { ...finished, title: 'Sign-in' } });
+      FakeSocket.last?.send({ event: 'run', run: { ...finished, title: 'Sign-in' } });
     });
     expect(within(dialog).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
     await close();
@@ -1255,8 +1255,8 @@ describe('add and continue', () => {
   /** Fills the dialog: a tag, a parent, a predecessor, "Postpone" and the text. */
   async function fillSettings(dialog: HTMLElement) {
     act(() => {
-      FakeEventSource.last?.open();
-      FakeEventSource.last?.send({
+      FakeSocket.last?.open();
+      FakeSocket.last?.send({
         event: 'snapshot',
         seq: 1,
         runs: [runView()],
@@ -1428,7 +1428,7 @@ describe('new task in several projects', () => {
     });
     render(<App api={api as Api} openStream={openFake} />);
     act(() => {
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'snapshot',
         seq: 1,
         runs: [],

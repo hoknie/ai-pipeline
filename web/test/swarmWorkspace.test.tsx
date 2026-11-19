@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.tsx';
 import { forgetSwarm } from '../src/features/swarm/index.ts';
 import {
-  FakeEventSource,
+  FakeSocket,
   configView,
   fakeApi,
   openFake,
@@ -82,7 +82,7 @@ function mount(hash: string, overrides: Parameters<typeof fakeApi>[0] = {}) {
     ...overrides,
   });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
   return api;
 }
 

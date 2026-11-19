@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
+import { liveTopics } from '../../../shared/api/live/topics.ts';
 import { clockSeconds, dateTime, duration, tokens } from '../../../shared/lib/format.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { statusTone, type Tone } from '../../../shared/lib/status.ts';
@@ -22,15 +23,16 @@ import { Markdown } from '../../../shared/ui/layout/Markdown.tsx';
 import { StatusBadge } from '../../../shared/ui/feedback/StatusBadge.tsx';
 import { AttemptActions, AttemptBody, AttemptHeading } from './AttemptParts.tsx';
 
-const TRANSCRIPT_POLL_MS = 1500;
-
 interface Loaded {
   cursor: number;
   running: boolean;
   entries: TranscriptEntry[];
 }
 
-/** Transcript of one attempt, read while `active`; a running attempt is read further on a timer. */
+/**
+ * Transcript of one attempt, watched while `active`: the parts of a running attempt come as its
+ * log grows.
+ */
 function useTranscript(
   api: Api,
   runId: string,
@@ -41,31 +43,18 @@ function useTranscript(
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const current = useRef<Loaded | null>(null);
   useEffect(() => {
-    if (!active) return;
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const read = async () => {
-      const previous = current.current;
-      try {
-        const next = await api.transcript(runId, group, seq, previous?.cursor ?? 0);
-        if (stopped) return;
-        const merged: Loaded = {
-          cursor: next.cursor,
-          running: next.running,
-          entries: [...(previous?.entries ?? []), ...next.entries],
-        };
-        current.current = merged;
-        setLoaded(merged);
-        if (next.running) timer = setTimeout(() => void read(), TRANSCRIPT_POLL_MS);
-      } catch {
-        if (!stopped) timer = setTimeout(() => void read(), TRANSCRIPT_POLL_MS * 2);
-      }
-    };
-    if (!current.current || current.current.running) void read();
-    return () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-    };
+    const before = current.current;
+    if (!active || (before && !before.running)) return;
+    const topic = { kind: 'transcript' as const, runId, group, seq, after: before?.cursor ?? 0 };
+    return liveTopics.watch(api, topic, (next) => {
+      const merged: Loaded = {
+        cursor: next.cursor,
+        running: next.running,
+        entries: [...(current.current?.entries ?? []), ...next.entries],
+      };
+      current.current = merged;
+      setLoaded(merged);
+    });
   }, [api, runId, group, seq, active]);
   return loaded;
 }

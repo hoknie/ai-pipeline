@@ -11,7 +11,7 @@ import { ru } from '../src/shared/i18n/locales/ru.ts';
 import { zh } from '../src/shared/i18n/locales/zh.ts';
 import type { Dictionary } from '../src/shared/i18n/types.ts';
 
-import { FakeEventSource, configView, fakeApi, groupView, openFake, runView } from './fixtures.ts';
+import { FakeSocket, configView, fakeApi, groupView, openFake, runView } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
 // What the dictionary type lets through and what it stops; checked by `tsc -p web/tsconfig.json`.
@@ -46,7 +46,7 @@ function mount(runs = [runView()]) {
     config: vi.fn(async () => configView()),
   });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs }));
   return api;
 }
 

@@ -28,7 +28,7 @@ export function ProviderFormPage({
 }) {
   const { t } = useTranslation();
   const scope = useProvidersScope();
-  const { view } = useProviderRegistry(api, repository, undefined, levelOf(scope));
+  const { view } = useProviderRegistry(api, repository, levelOf(scope));
   const { editor } = useProviderEditor(api, repository);
   const chosen = presetOf(preset);
   const initial = useMemo(

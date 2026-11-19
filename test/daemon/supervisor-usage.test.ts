@@ -163,3 +163,34 @@ describe('readTimes', () => {
     expect(timesPath('/a/b/output.log')).toBe('/a/b/output.times');
   });
 });
+
+describe('launchProcess onLog', () => {
+  it('tells about the log once its new lines are on disk, the last line included', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'aip-supervisor-'));
+    const logPath = join(directory, 'output.log');
+    const seen: number[] = [];
+    const process = launchProcess(
+      {
+        command: globalThis.process.execPath,
+        args: ['-e', 'console.log("one"); console.error("two"); console.log("three")'],
+        env: {},
+        files: [],
+        sessionId: null,
+      },
+      {
+        cwd: directory,
+        logPath,
+        parser: summing(),
+        environment: globalThis.process.env,
+        drainMs: 50,
+        onLog: () => seen.push(readLines(logPath, 0).lines.length),
+      },
+    );
+    await process.exited;
+    // every call saw the lines written before it; the last one saw the exit line
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+    expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+    expect(seen[0]).toBeGreaterThan(0);
+    expect(seen.at(-1)).toBe(4);
+  });
+});

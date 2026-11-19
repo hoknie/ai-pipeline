@@ -7,6 +7,7 @@ import type {
   DiffPort,
   QueueAdvancePort,
   RunAttachmentsPort,
+  RunsPublishPort,
 } from '../../ports/index.ts';
 import type { RunState } from '../../types/index.ts';
 
@@ -53,6 +54,7 @@ export interface EffectDependencies {
   agentExit: AgentExitPort;
   queue: QueueAdvancePort;
   attachments: RunAttachmentsPort;
+  publish: Pick<RunsPublishPort, 'logGrew'>;
 }
 
 /** The attempt of a group an agent works on. */

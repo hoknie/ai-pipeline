@@ -5,11 +5,10 @@ import { useGroupSpec } from '../src/features/runs/group/useGroupSpec.ts';
 
 import { App } from '../src/app/App.tsx';
 import { taskProgress } from '../src/features/runs/group/taskProgress.ts';
-import { SPEC_POLL_MS } from '../src/features/runs/group/useGroupSpec.ts';
 import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
 import type { GroupSpecView } from '../src/shared/api/types.ts';
 
-import { FakeEventSource, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
+import { FakeSocket, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
 import {
   act,
   cleanup,
@@ -31,6 +30,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/** Longer than any interval the documents were ever read at. */
+const QUIET_MS = 15_000;
+
 const spec = (tasks: string | null, design: string | null = '# Design\n\ntext'): GroupSpecView => ({
   change: 'add-login',
   path: 'openspec/changes/add-login',
@@ -44,7 +46,7 @@ function mount(
 ) {
   const api = fakeApi({ group: vi.fn(async () => groupView()), groupSpec });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs }));
   return api;
 }
 
@@ -139,7 +141,7 @@ describe('summary of the changes', () => {
       ),
     });
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     const panel = await screen.findByRole('tabpanel');
     await waitFor(() => expect(panel.textContent).toContain('2 files +9 −2'));
     const region = screen.getByRole('region', { name: 'group Sign-in' });
@@ -175,7 +177,7 @@ describe('diff in the Changes tab while the step runs', () => {
     });
     render(<App api={api} openStream={openFake} />);
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'snapshot',
         seq: 1,
         runs: [runView({ groups: [groupRow({ diff: { files: 1, added: 5, removed: 1 } })] })],
@@ -188,7 +190,7 @@ describe('diff in the Changes tab while the step runs', () => {
 
   const send = (seq: number, added: number, overrides: Parameters<typeof groupRow>[0]) =>
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'run',
         seq,
         run: runView({
@@ -276,7 +278,7 @@ describe('Artifacts tab', () => {
     });
     window.location.hash = '#runs/run1/login?tab=artifacts';
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [withArtifacts(1)] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [withArtifacts(1)] }));
     const tab = await screen.findByRole('tab', { name: 'Artifacts · 1' });
     expect(tab.getAttribute('aria-selected')).toBe('true');
     expect(await screen.findByText('report.md')).toBeTruthy();
@@ -287,29 +289,22 @@ describe('Artifacts tab', () => {
     const api = fakeApi({ group: vi.fn(async () => groupView()) });
     render(<App api={api} openStream={openFake} />);
     window.location.hash = '#runs/run1/login';
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [withArtifacts(0)] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [withArtifacts(0)] }));
     const tab = await screen.findByRole('tab', { name: 'Artifacts' });
     expect((tab as HTMLButtonElement).disabled).toBe(true);
-    act(() => FakeEventSource.last!.send({ event: 'run', seq: 2, run: withArtifacts(2) }));
+    act(() => FakeSocket.last!.send({ event: 'run', seq: 2, run: withArtifacts(2) }));
     const next = await screen.findByRole('tab', { name: 'Artifacts · 2' });
     expect((next as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
 describe('Design and Tasks tabs', () => {
-  it('keeps the last documents and stays silent when a periodic request fails', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it('keeps the last documents and stays silent when a later read fails', async () => {
     window.location.hash = '#runs/run1/login?tab=tasks';
-    const groupSpec = vi
-      .fn()
-      .mockResolvedValueOnce(spec('- [x] a\n- [ ] b\n'))
-      .mockRejectedValue(new Error('spec-boom'));
+    const groupSpec = vi.fn(async () => spec('- [x] a\n- [ ] b\n'));
     mount([runView()], groupSpec);
     await screen.findByRole('tab', { name: /^Tasks · 1\/2/ });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SPEC_POLL_MS * 2);
-    });
-    expect(groupSpec.mock.calls.length).toBeGreaterThan(1);
+    act(() => FakeSocket.last!.topicError('group_spec', 'spec-boom'));
     expect(screen.queryByText(/spec-boom/)).toBeNull();
     expect(screen.getByRole('tab', { name: /^Tasks · 1\/2/ })).toBeTruthy();
   });
@@ -317,7 +312,7 @@ describe('Design and Tasks tabs', () => {
   it('reports a failed first request and resolves to no documents', async () => {
     const api = fakeApi({ groupSpec: vi.fn().mockRejectedValue(new Error('first')) });
     const onError = vi.fn();
-    const { result } = renderHook(() => useGroupSpec(api, 'run1', 'login', 'v', false, onError));
+    const { result } = renderHook(() => useGroupSpec(api, 'run1', 'login', false, onError));
     await waitFor(() => expect(result.current).toBeNull());
     expect(onError).toHaveBeenCalledWith('first');
   });
@@ -361,20 +356,28 @@ describe('Design and Tasks tabs', () => {
     expect(screen.queryByRole('tab', { name: 'Design' })).toBeNull();
   });
 
-  it('polls while the group works and the tab is open, and stops for a merged group', async () => {
+  it('watches the log of a working group while the tab is open, and never reads on a timer', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     window.location.hash = '#runs/run1/login?tab=tasks';
     const tasks = (done: number) => `${'- [x] a\n'.repeat(done)}${'- [ ] b\n'.repeat(10 - done)}`;
-    const groupSpec = vi
-      .fn()
-      .mockResolvedValueOnce(spec(tasks(3)))
-      .mockResolvedValue(spec(tasks(4)));
+    const groupSpec = vi.fn(async () => spec(tasks(3)));
     mount([runView()], groupSpec);
     await screen.findByRole('tab', { name: /^Tasks · 3\/10/ });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SPEC_POLL_MS);
-    });
+    await waitFor(() =>
+      expect(FakeSocket.last!.subscriptions('group_spec').at(-1)?.topic).toMatchObject({
+        runId: 'run1',
+        group: 'login',
+        watch: true,
+      }),
+    );
+    // the server sends the documents when the specialist ticks a task
+    act(() => FakeSocket.last!.topic('group_spec', spec(tasks(4))));
     await screen.findByRole('tab', { name: /^Tasks · 4\/10/ });
+    const calls = groupSpec.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(QUIET_MS);
+    });
+    expect(groupSpec.mock.calls.length).toBe(calls);
     cleanup();
 
     const merged = vi.fn(async () => spec(tasks(10)));
@@ -383,23 +386,28 @@ describe('Design and Tasks tabs', () => {
       merged,
     );
     await screen.findByRole('tab', { name: /^Tasks · 10\/10/ });
-    const calls = merged.mock.calls.length;
+    expect(FakeSocket.last!.subscriptions('group_spec').at(-1)?.topic).not.toHaveProperty('watch');
+    const before = merged.mock.calls.length;
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(SPEC_POLL_MS * 3);
+      await vi.advanceTimersByTimeAsync(QUIET_MS);
     });
-    expect(merged.mock.calls.length).toBe(calls);
+    expect(merged.mock.calls.length).toBe(before);
   });
 
-  it('does not poll on the log tab', async () => {
+  it('does not watch the log on the log tab', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     window.location.hash = '#runs/run1/login';
     const groupSpec = vi.fn(async () => spec('- [ ] a\n'));
     mount([runView()], groupSpec);
     await screen.findByRole('tab', { name: /^Tasks/ });
+    expect(FakeSocket.last!.subscriptions('group_spec').at(-1)?.topic).not.toHaveProperty('watch');
     const calls = groupSpec.mock.calls.length;
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(SPEC_POLL_MS * 3);
+      await vi.advanceTimersByTimeAsync(QUIET_MS);
     });
     expect(groupSpec.mock.calls.length).toBe(calls);
+    // the documents come again with a change of the run
+    act(() => FakeSocket.last!.send({ event: 'run', seq: 2, run: runView() }));
+    await waitFor(() => expect(groupSpec.mock.calls.length).toBe(calls + 1));
   });
 });

@@ -6,7 +6,7 @@ import { App } from '../src/app/App.tsx';
 import { ApiError, type Api } from '../src/shared/api/api.ts';
 import type { RepositoryView } from '../src/shared/api/types.ts';
 
-import { FakeEventSource, fakeApi, openFake, queueOf, repositoryView } from './fixtures.ts';
+import { FakeSocket, fakeApi, openFake, queueOf, repositoryView } from './fixtures.ts';
 
 const APP = '/work/app';
 const LIB = '/work/lib';
@@ -34,7 +34,7 @@ async function show(
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
   act(() => {
-    FakeEventSource.last?.send({
+    FakeSocket.last?.send({
       event: 'snapshot',
       seq: 1,
       runs: [],
@@ -369,7 +369,7 @@ describe('the group Projects', () => {
     fireEvent.click(dialog.getByRole('button', { name: 'Remove from list' }));
     await waitFor(() => expect(headerLabel()).toBe('Repository: app'));
     act(() =>
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'repositories',
         seq: 9,
         repositories: [repositoryView(APP), repositoryView(LIB)],

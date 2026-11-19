@@ -228,6 +228,7 @@ export class AttemptStarter {
       drainMs: timings.drainMs,
       timesPath: timesPath(log),
       onUsage: (usage) => this.parts.usage.report(state, key, usage),
+      onLog: () => this.dependencies.publish.logGrew(key),
     });
   }
 

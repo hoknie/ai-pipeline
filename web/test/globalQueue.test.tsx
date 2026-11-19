@@ -11,7 +11,7 @@ import type { Api } from '../src/shared/api/api.ts';
 import type { GlobalQueueItemView, GlobalQueueView, QueueView } from '../src/shared/api/types.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   dependency,
   openFake,
@@ -66,7 +66,7 @@ function mount(
   const fake = fakeApi({ queue: vi.fn(async () => queueOf({ repository: APP })), ...api });
   render(<App api={fake as Api} openStream={openFake} />);
   act(() => {
-    FakeEventSource.last?.send({
+    FakeSocket.last?.send({
       event: 'snapshot',
       seq: 1,
       runs: [runView({ id: 'a1', repository: APP })],
@@ -413,7 +413,7 @@ describe('page of the global queue', () => {
     mount(globalOf());
     await screen.findByText('Global queue');
     act(() => {
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'globalQueue',
         seq: 2,
         globalQueue: globalOf({ items: [globalItem('qz', 'new one', 1, LIB)] }),

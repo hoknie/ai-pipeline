@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../../shared/api/api.ts';
+import { liveTopics } from '../../../../shared/api/live/topics.ts';
 import { useConfirm } from '../../../../shared/ui/overlays/confirm.tsx';
 import { notifySuccess } from '../../../../shared/lib/browser/notify.ts';
 import type { GroupRow, GroupView, RunView, SystemStepRow } from '../../../../shared/api/types.ts';
@@ -12,25 +13,18 @@ import type { Capabilities } from './capabilities.ts';
 
 type Row = GroupRow | SystemStepRow;
 
-/** The group as the daemon describes it, loaded again when the row changes. */
+/** The group as the daemon describes it, sent again whenever it changes. */
 export function useGroupView(
   api: Api,
   runId: string,
   slug: string,
-  version: string,
   onError: (message: string) => void,
 ): GroupView | null {
   const [view, setView] = useState<GroupView | null>(null);
-  useEffect(() => {
-    let stopped = false;
-    api.group(runId, slug).then(
-      (next) => !stopped && setView(next),
-      (failure: Error) => !stopped && onError(failure.message),
-    );
-    return () => {
-      stopped = true;
-    };
-  }, [api, runId, slug, version, onError]);
+  useEffect(
+    () => liveTopics.watch(api, { kind: 'group', runId, group: slug }, setView, onError),
+    [api, runId, slug, onError],
+  );
   return view;
 }
 
@@ -95,7 +89,6 @@ export function useGroupTabs(args: {
     api,
     runId,
     row.slug,
-    version,
     active && (requestedTab === 'design' || requestedTab === 'tasks'),
     onError,
     !system,

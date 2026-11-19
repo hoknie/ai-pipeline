@@ -7,20 +7,15 @@ import { join, normalize } from 'node:path';
 import { checkDaemon, request } from '../ipc/client/index.ts';
 import type { Method, ParamsOf } from '../ipc/contract/index.ts';
 
+import { assertLocalHost, assertServerHost, assertToken, connectionIdentity } from './access.ts';
 import { requestContext } from './auth/context.ts';
-import { serverHostAllowed, serverOriginAllowed } from './auth/proxy.ts';
 import { authRoute, createGate, ipcRoute, type ServerGate } from './auth/routes.ts';
 import { TOKEN_HINT, configError, panel, renderPanelError } from './errors.ts';
 import { Hub } from './hub.ts';
-import {
-  cookieToken,
-  decodeParts,
-  hostAllowed,
-  json,
-  parseBody,
-  Reply,
-  sameToken,
-} from './http.ts';
+import { topicReader } from './live/read.ts';
+import { serveLive } from './live/socket.ts';
+import { Topics } from './live/topics.ts';
+import { decodeParts, json, parseBody, Reply } from './http.ts';
 import { DEFAULT_ASSETS, type WebOptions, type WebServer } from './options.ts';
 import { serveAsset, servePage } from './pages.ts';
 import { requestBody, requestRepository } from './request.ts';
@@ -135,13 +130,8 @@ async function handleApi(
   url: URL,
 ): Promise<void> {
   const verb = incoming.method ?? 'GET';
-  if (d.token !== null) {
-    const given =
-      (incoming.headers['x-aip-token'] as string | undefined) ??
-      cookieToken(incoming.headers.cookie);
-    if (!sameToken(given, d.token)) throw panel('unauthorized', 'missing or invalid token');
-  }
-  if (url.pathname === '/api/events' || (d.gate !== null && url.pathname === '/api/ipc/events')) {
+  assertToken(incoming, d.token);
+  if (d.gate !== null && url.pathname === '/api/ipc/events') {
     if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
     d.hub.attach(incoming, response);
     return;
@@ -160,7 +150,7 @@ async function handle(
   response: ServerResponse,
 ): Promise<void> {
   if (d.gate !== null) return handleServerMode(d, d.gate, incoming, response);
-  if (!hostAllowed(incoming, port)) throw panel('forbidden', 'forbidden host or origin');
+  assertLocalHost(incoming, port);
   const url = new URL(incoming.url ?? '/', `http://${incoming.headers.host}`);
   const verb = incoming.method ?? 'GET';
   const isPage = url.pathname === '/' || url.pathname === '/index.html';
@@ -183,11 +173,7 @@ async function handleServerMode(
   response: ServerResponse,
 ): Promise<void> {
   const url = new URL(incoming.url ?? '/', 'http://panel');
-  if (!serverHostAllowed(incoming, gate.options)) throw panel('forbidden', 'forbidden host');
-  const exempt = url.pathname === '/auth/cli/token';
-  if (!serverOriginAllowed(incoming, gate.options, exempt)) {
-    throw panel('forbidden', 'forbidden origin');
-  }
+  assertServerHost(incoming, gate, url.pathname === '/auth/cli/token');
   if (await authRoute(gate, incoming, response, url)) return;
   const verb = incoming.method ?? 'GET';
   if (url.pathname.startsWith('/assets/')) {
@@ -225,7 +211,8 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
   const host = options.host ?? '127.0.0.1';
   if (!serverMode) assertLoopbackHost(host);
   const ensureDaemon = options.ensureDaemon ?? (() => checkDaemon(options.socket));
-  const hub = new Hub(options.socket, ensureDaemon);
+  const topics = new Topics(topicReader(options.socket, options));
+  const hub = new Hub(options.socket, ensureDaemon, (signal) => topics.signal(signal));
   let port = options.port ?? 0;
   const kit: RouteKit = {
     call: <M extends Method>(method: M, params: ParamsOf<M>) =>
@@ -255,6 +242,12 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       json(response, rendered.status, rendered.body);
     });
   });
+  const stopLive = serveLive(server, {
+    identify: (incoming) => connectionIdentity({ token, gate: dispatch.gate, port }, incoming),
+    join: (send) => hub.join(send),
+    topics,
+    ...options.live,
+  });
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -262,6 +255,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       server.listen(port, host, () => resolve());
     });
   } catch (error) {
+    stopLive();
     hub.stop();
     throw error;
   }
@@ -281,6 +275,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     close: () =>
       new Promise((resolve) => {
         clearInterval(sweeper);
+        stopLive();
         hub.stop();
         server.close(() => resolve());
         server.closeAllConnections();

@@ -6,7 +6,7 @@ import { App } from '../src/app/App.tsx';
 import { clock } from '../src/shared/lib/format.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   groupRow,
   groupView,
@@ -38,7 +38,7 @@ function showQueue(
 function showRun(run = runView(), overrides: Parameters<typeof fakeApi>[0] = {}) {
   const api = fakeApi({ group: vi.fn(async () => groupView()), ...overrides });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [run] }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [run] }));
   return api;
 }
 
@@ -173,7 +173,7 @@ describe('a returned run on the run screen', () => {
     expect((await screen.findAllByText('Queued')).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Return to the queue' })).toBeNull();
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'run',
         seq: 2,
         run: runView({

@@ -6,7 +6,7 @@ import { StatusBar } from '../src/app/shell/status/StatusBar.tsx';
 import type { StreamedProcesses } from '../src/shared/api/runs/runsState.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   openFake,
   processView,
@@ -527,7 +527,7 @@ describe('status bar in the panel', () => {
   function mount() {
     render(<App api={fakeApi()} openStream={openFake} />);
     act(() =>
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'snapshot',
         seq: 1,
         runs: runs(),
@@ -543,7 +543,7 @@ describe('status bar in the panel', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
     expect(await screen.findByText(summary(1, 2, 0))).toBeTruthy();
     act(() =>
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'run',
         run: runView({
           id: 'r2',

@@ -2,34 +2,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  REFRESH_MS,
   invalidateProviders,
   useProviderRegistry,
 } from '../src/features/providers/page/useProviderRegistry.ts';
 import { act, cleanup, render, screen, waitFor } from './render.tsx';
-import { fakeApi } from './fixtures.ts';
+import type { Api } from '../src/shared/api/api.ts';
+import { liveTopics } from '../src/shared/api/live/topics.ts';
+import { attachLive, fakeApi } from './fixtures.ts';
 import { providersView, providerView } from './providerFixtures.ts';
 
 afterEach(() => {
   cleanup();
+  liveTopics.detach();
   vi.useRealTimers();
 });
 
 let counter = 0;
 const nextRepository = () => `/registry-${(counter += 1)}`;
 
-function Watcher({
-  api,
-  repository,
-  watch,
-  id,
-}: {
-  api: ReturnType<typeof fakeApi>;
-  repository: string;
-  watch?: unknown;
-  id: string;
-}) {
-  const { view } = useProviderRegistry(api, repository, watch);
+function Watcher({ api, repository, id }: { api: Api; repository: string; id: string }) {
+  const { view } = useProviderRegistry(api, repository);
   return <p data-testid={id}>{view ? view.providers.map((p) => p.slug).join(',') : 'none'}</p>;
 }
 
@@ -59,45 +51,49 @@ describe('the registry hook', () => {
     expect(screen.getByTestId('b').textContent).toBe('openai');
   });
 
-  it('reads again when the runs change, at most once in five seconds', async () => {
-    vi.useFakeTimers();
+  it('takes the registry from one subscription and asks again when the window gets focus', async () => {
     const repository = nextRepository();
     const api = fakeApi({
       providers: vi.fn(async () => providersView({ providers: [providerView('zai')] })),
     });
-    const { rerender } = render(<Watcher api={api} repository={repository} watch={0} id="a" />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(api.providers).toHaveBeenCalledTimes(1);
+    const socket = attachLive();
+    render(
+      <>
+        <Watcher api={api.forRepository(repository)} repository={repository} id="a" />
+        <Watcher api={api.forRepository(repository)} repository={repository} id="b" />
+      </>,
+    );
+    await waitFor(() => expect(screen.getByTestId('a').textContent).toBe('zai'));
+    // one subscription for both hooks, bound to the project
+    expect(socket.subscriptions('providers').map((held) => held.topic)).toEqual([
+      { kind: 'providers', repository },
+    ]);
+    // the server sends the registry when a run changed it
+    act(() => socket.topic('providers', providersView({ providers: [providerView('openai')] })));
+    expect(screen.getByTestId('a').textContent).toBe('openai');
+    expect(screen.getByTestId('b').textContent).toBe('openai');
+    // the focus asks over the connection, not with a request of the panel
+    const asked = socket.sent.length;
+    act(() => void window.dispatchEvent(new Event('focus')));
+    expect(socket.sent.slice(asked)).toEqual([
+      { op: 'refresh', id: socket.subscriptions('providers')[0]?.id },
+    ]);
+    cleanup();
+    expect(socket.subscriptions('providers')).toEqual([]);
+  });
 
-    // a change right after the read waits for the end of the window
-    rerender(<Watcher api={api} repository={repository} watch={1} id="a" />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(REFRESH_MS - 1000);
+  it('reads with a request once while there is no connection, and again on focus', async () => {
+    const repository = nextRepository();
+    let slug = 'zai';
+    const api = fakeApi({
+      providers: vi.fn(async () => providersView({ providers: [providerView(slug)] })),
     });
+    render(<Watcher api={api} repository={repository} id="a" />);
+    await waitFor(() => expect(screen.getByTestId('a').textContent).toBe('zai'));
     expect(api.providers).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
+    slug = 'openai';
+    act(() => void window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('a').textContent).toBe('openai'));
     expect(api.providers).toHaveBeenCalledTimes(2);
-
-    // several changes in a row make one read
-    rerender(<Watcher api={api} repository={repository} watch={2} id="a" />);
-    rerender(<Watcher api={api} repository={repository} watch={3} id="a" />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(REFRESH_MS);
-    });
-    expect(api.providers).toHaveBeenCalledTimes(3);
-
-    // after a quiet window the next change reads at once
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(REFRESH_MS);
-    });
-    rerender(<Watcher api={api} repository={repository} watch={4} id="a" />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(api.providers).toHaveBeenCalledTimes(4);
   });
 });

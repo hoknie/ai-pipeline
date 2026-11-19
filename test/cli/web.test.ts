@@ -36,6 +36,7 @@ import type {
 import { MANUAL_CONFIG, harness, startRun, until, type Harness } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
+import { liveStatus, openLive } from '../fixtures/live.ts';
 import { waitValue } from '../fixtures/wait-until.ts';
 
 let h: Harness | null = null;
@@ -350,29 +351,16 @@ describe('aip web', () => {
     expect((await h.status(runId)).groups[0]?.status).toBe('failed');
   });
 
-  it('streams a snapshot over SSE', async () => {
+  it('streams a snapshot over the live connection', async () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
-    const controller = new AbortController();
-    const response = await fetch(`${base}/api/events`, {
-      headers: authed(web),
-      signal: controller.signal,
-    });
-    expect(response.headers.get('content-type')).toContain('text/event-stream');
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let text = '';
-    const deadline = Date.now() + 10_000;
-    while (!text.includes('"snapshot"') && Date.now() < deadline) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      text += decoder.decode(value);
-    }
-    controller.abort();
+    const live = await openLive(base, authed(web));
+    const text = await live.until('"snapshot"');
+    live.close();
     expect(text).toContain('"event":"snapshot"');
     expect(text).toContain(runId);
   });
@@ -381,27 +369,12 @@ describe('aip web', () => {
     const old = { version: '0.0.1', fingerprint: 'old', builtAt: 1 };
     h = await harness(MANUAL_CONFIG, {}, { build: old });
     web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
-    const controller = new AbortController();
-    const response = await fetch(`http://127.0.0.1:${web.port}/api/events`, {
-      headers: authed(web),
-      signal: controller.signal,
-    });
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let text = '';
-    const deadline = Date.now() + 10_000;
-    while (!text.includes('"snapshot"') && Date.now() < deadline) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      text += decoder.decode(value);
-    }
-    controller.abort();
-    const snapshot = JSON.parse(
-      text
-        .split('\n')
-        .find((line) => line.includes('"snapshot"'))!
-        .slice('data: '.length),
-    ) as { daemon: unknown };
+    const live = await openLive(`http://127.0.0.1:${web.port}`, authed(web));
+    const text = await live.until('"snapshot"');
+    live.close();
+    const snapshot = JSON.parse(text.split('\n').find((line) => line.includes('"snapshot"'))!) as {
+      daemon: unknown;
+    };
     expect(snapshot.daemon).toMatchObject({
       outdated: 'daemon',
       pid: process.pid,
@@ -412,22 +385,8 @@ describe('aip web', () => {
 
   it('keeps relaying runs when the daemon sends queue events', async () => {
     const { h, web, base } = await setup();
-    const controller = new AbortController();
-    const response = await fetch(`${base}/api/events`, {
-      headers: authed(web),
-      signal: controller.signal,
-    });
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let text = '';
-    const read = async (until: string) => {
-      const deadline = Date.now() + 10_000;
-      while (!text.includes(until) && Date.now() < deadline) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value);
-      }
-    };
+    const live = await openLive(base, authed(web));
+    const read = (needle: string) => live.until(needle);
     await read('"snapshot"');
     await h.call('queue_settings', { repository: h.repo, parallel: 2 });
     await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'x' });
@@ -437,8 +396,8 @@ describe('aip web', () => {
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await read(runId);
-    controller.abort();
-    expect(text).toContain(`"id":"${runId}"`);
+    live.close();
+    expect(live.text).toContain(`"id":"${runId}"`);
   });
 
   it('relays the processes event and gives the last one to a new client', async () => {
@@ -446,23 +405,8 @@ describe('aip web', () => {
     web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
     const base = `http://127.0.0.1:${web.port}`;
     const open = async () => {
-      const controller = new AbortController();
-      const response = await fetch(`${base}/api/events`, {
-        headers: authed(web!),
-        signal: controller.signal,
-      });
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      const client = { text: '', controller };
-      const read = async (until: string) => {
-        const deadline = Date.now() + 10_000;
-        while (!client.text.includes(until) && Date.now() < deadline) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          client.text += decoder.decode(value);
-        }
-      };
-      return { client, read };
+      const client = await openLive(base, authed(web!));
+      return { client, read: (needle: string) => client.until(needle) };
     };
     const first = await open();
     await first.read('"event":"processes"');
@@ -474,29 +418,15 @@ describe('aip web', () => {
     expect(text.indexOf('"event":"processes"')).toBeGreaterThan(text.indexOf('"event":"snapshot"'));
     await h.call('tag_add', { repository: h.repo, name: 'later' });
     await second.read('"name":"later"');
-    first.client.controller.abort();
-    second.client.controller.abort();
+    first.client.close();
+    second.client.close();
     expect(second.client.text).toContain('"name":"later"');
   });
 
   it('relays the tags event and keeps tags in the snapshot', async () => {
     const { h, web, base } = await setup();
-    const controller = new AbortController();
-    const response = await fetch(`${base}/api/events`, {
-      headers: authed(web),
-      signal: controller.signal,
-    });
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let text = '';
-    const read = async (until: string) => {
-      const deadline = Date.now() + 10_000;
-      while (!text.includes(until) && Date.now() < deadline) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value);
-      }
-    };
+    const live = await openLive(base, authed(web));
+    const read = (needle: string) => live.until(needle);
     await read('"snapshot"');
     await h.call('tag_add', { repository: h.repo, name: 'auth' });
     const { runId } = (await startRun(h, {
@@ -505,10 +435,10 @@ describe('aip web', () => {
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await read(runId);
-    controller.abort();
-    expect(text).toContain(`"id":"${runId}"`);
-    expect(text).toContain('"event":"tags"');
-    expect(text).toContain('"name":"auth"');
+    live.close();
+    expect(live.text).toContain(`"id":"${runId}"`);
+    expect(live.text).toContain('"event":"tags"');
+    expect(live.text).toContain('"name":"auth"');
   });
 
   it('serves the tags API with the same protection as the rest', async () => {
@@ -997,28 +927,7 @@ describe('aip web', () => {
 
   it('relays queue events and keeps queues in the snapshot of new clients', async () => {
     const { h, web, base } = await setup();
-    const open = async () => {
-      const controller = new AbortController();
-      const response = await fetch(`${base}/api/events`, {
-        headers: authed(web),
-        signal: controller.signal,
-      });
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let text = '';
-      return {
-        controller,
-        async until(needle: string) {
-          const deadline = Date.now() + 10_000;
-          while (!text.includes(needle) && Date.now() < deadline) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            text += decoder.decode(value);
-          }
-          return text;
-        },
-      };
-    };
+    const open = () => openLive(base, authed(web));
     const first = await open();
     await first.until('"snapshot"');
     await h.call('queue_add', {
@@ -1027,10 +936,10 @@ describe('aip web', () => {
       task: 'from the terminal',
     });
     expect(await first.until('"event":"queue"')).toContain('from the terminal');
-    first.controller.abort();
+    first.close();
     const second = await open();
     const text = await second.until('from the terminal');
-    second.controller.abort();
+    second.close();
     expect(text).toContain('"event":"snapshot"');
     expect(text).toMatch(/"queues":\[\{[^]*from the terminal/);
   });
@@ -2029,30 +1938,16 @@ describe('aip web repositories', () => {
 
   it('relays the repositories event and the list in the snapshot', async () => {
     const { h, web, base } = await setup();
-    const controller = new AbortController();
-    const response = await fetch(`${base}/api/events`, {
-      headers: authed(web),
-      signal: controller.signal,
-    });
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let text = '';
-    const read = async (until: string) => {
-      const deadline = Date.now() + 10_000;
-      while (!text.includes(until) && Date.now() < deadline) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value);
-      }
-    };
+    const live = await openLive(base, authed(web));
+    const read = (needle: string) => live.until(needle);
     await read('"snapshot"');
-    expect(text).toContain('"repositories":[]');
+    expect(live.text).toContain('"repositories":[]');
     const repo = temporaryRepository();
     await h.call('repository_add', { path: repo });
     await read('"event":"repositories"');
-    expect(text).toContain('"event":"repositories"');
-    expect(text).toContain(repo);
-    controller.abort();
+    expect(live.text).toContain('"event":"repositories"');
+    expect(live.text).toContain(repo);
+    live.close();
   });
 });
 
@@ -2764,22 +2659,8 @@ describe('observers API', () => {
 
   it('forwards the observers event to the browser and drops incident', async () => {
     const { h, web, base } = await setup();
-    const controller = new AbortController();
-    const response = await fetch(`${base}/api/events`, {
-      headers: authed(web),
-      signal: controller.signal,
-    });
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let text = '';
-    const readUntil = async (needle: string) => {
-      const deadline = Date.now() + 10_000;
-      while (!text.includes(needle) && Date.now() < deadline) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value);
-      }
-    };
+    const live = await openLive(base, authed(web));
+    const readUntil = (needle: string) => live.until(needle);
     await readUntil('"snapshot"');
     h.script({ code: [{ exitCode: 1, noReport: true }] });
     const { runId } = (await startRun(h, {
@@ -2790,8 +2671,8 @@ describe('observers API', () => {
     await h.waitFor(runId, (run) => run.finished);
     await h.call('observers_set', { settings: { workers: 2 } });
     await readUntil('"observers"');
-    controller.abort();
-    expect(text).toContain('"event":"observers"');
-    expect(text).not.toContain('"event":"incident"');
+    live.close();
+    expect(live.text).toContain('"event":"observers"');
+    expect(live.text).not.toContain('"event":"incident"');
   });
 });

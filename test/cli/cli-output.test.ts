@@ -89,6 +89,11 @@ describe('cli', () => {
     await aip(box, 'run', 'start', 'feature', '--task', 'stream');
     await waitUntil('a run event', () => lines.some((line) => line.includes('"event":"run"')));
     expect(lines.some((line) => line.includes('"event":"run"'))).toBe(true);
+    // the agents wrote their logs by now; a plain subscription hears nothing about them
+    await waitUntil('the finished run', () =>
+      lines.some((line) => line.includes('"finished":true')),
+    );
+    expect(lines.some((line) => line.includes('"event":"log"'))).toBe(false);
     const exited = new Promise<number | null>((resolve) =>
       events.once('exit', (code) => resolve(code)),
     );

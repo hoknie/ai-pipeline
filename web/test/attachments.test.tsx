@@ -7,7 +7,7 @@ import { fieldsOf, emptyDraft, draftOf, draftValid } from '../src/features/queue
 import type { AttachmentView, QueueFields } from '../src/shared/api/types.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   groupView,
   openFake,
@@ -310,7 +310,7 @@ function showRun(run = runView()) {
   window.location.hash = '#runs/run1/login';
   const api = fakeApi({ group: vi.fn(async () => groupView()) });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [run] }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [run] }));
   return api;
 }
 
@@ -337,7 +337,7 @@ describe('attachments of a run', () => {
     const api = fakeApi({ group: vi.fn(async () => groupView()) });
     render(<App api={api} openStream={openFake} />);
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'snapshot',
         seq: 1,
         runs: [runView({ attachments: [attachment()] })],

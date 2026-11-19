@@ -1,5 +1,6 @@
 import type { Api } from '../api.ts';
-import { createFallback, listen, type EventSourceFactory } from '../stream.ts';
+import { liveTopics } from '../live/topics.ts';
+import { connectLive, createFallback, type SocketFactory } from '../stream.ts';
 import type { GlobalQueueView, QueueView, RunView } from '../types.ts';
 import { applyEvent, type RunsSetters } from './streamEvents.ts';
 import { mergeRuns, putQueue, putRun, replaceTags, sameRepositories } from './runsState.ts';
@@ -79,10 +80,10 @@ async function poll(connection: Connection): Promise<void> {
   await loadQueue(connection);
 }
 
-/** Opens the event stream; returns the function that closes it. */
+/** Opens the live connection; returns the function that closes it. */
 export function connectRuns(
   api: Api,
-  openStream: EventSourceFactory,
+  openStream: SocketFactory,
   set: RunsSetters,
   refs: RunsRefs,
 ): () => void {
@@ -91,19 +92,28 @@ export function connectRuns(
   void loadQueue(connection);
   const fallback = createFallback(
     () => poll(connection),
-    () => set.setConnection('polling'),
+    () => {
+      set.setConnection('polling');
+      liveTopics.polling();
+    },
     connection.closed,
   );
-  const source = openStream('/api/events');
-  listen(source, fallback, {
+  const live = connectLive(openStream, fallback, {
     live: () => set.setConnection('live'),
-    event: (event) => applyEvent(event, set, (list) => refreshOpened(connection, list)),
-    broken: () =>
-      set.setConnection((current) => (current === 'polling' ? current : 'reconnecting')),
+    opened: () => liveTopics.opened((message) => live.send(message)),
+    event: (event) => {
+      if (liveTopics.message(event)) return;
+      applyEvent(event, set, (list) => refreshOpened(connection, list));
+    },
+    broken: () => {
+      liveTopics.down();
+      set.setConnection((current) => (current === 'polling' ? current : 'reconnecting'));
+    },
   });
   return () => {
     closed = true;
     fallback.stop();
-    source.close();
+    live.close();
+    liveTopics.detach();
   };
 }

@@ -12,7 +12,7 @@ import { layout, liveState } from '../src/features/topology/topologyLayout.ts';
 import { usageText } from '../src/shared/lib/format.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   groupRow,
   groupView,
@@ -35,8 +35,8 @@ afterEach(() => {
 
 const usage = (inputTokens: number, outputTokens: number) => ({ inputTokens, outputTokens });
 
-function stream(): FakeEventSource {
-  const source = FakeEventSource.last;
+function stream(): FakeSocket {
+  const source = FakeSocket.last;
   if (!source) throw new Error('no event source');
   return source;
 }

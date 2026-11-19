@@ -10,7 +10,7 @@ import { AppShell } from '../src/app/shell/AppShell.tsx';
 import { TopNav } from '../src/app/shell/nav/TopNav.tsx';
 import { TooltipProvider } from '../src/shared/ui/feedback/tooltip.tsx';
 
-import { FakeEventSource, configView, fakeApi, openFake, runView } from './fixtures.ts';
+import { FakeSocket, configView, fakeApi, openFake, runView } from './fixtures.ts';
 import { editorProvider, providersView, providerView } from './providerFixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
@@ -358,7 +358,7 @@ describe('providers section', () => {
     window.location.hash = '#providers/roles';
     const api = fakeApi();
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     const nav = screen.getByRole('navigation', { name: 'sections' });
     expect(within(nav).getByRole('link', { name: 'Swarm' }).getAttribute('aria-current')).toBe(
       'page',
@@ -380,7 +380,7 @@ describe('providers section', () => {
       ),
     });
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     expect(await screen.findByRole('heading', { name: 'Z.ai' })).toBeTruthy();
     window.location.hash = '';
   });
@@ -391,7 +391,7 @@ describe('statistics section', () => {
     window.location.hash = '#stats?period=7d';
     const api = fakeApi();
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     const nav = screen.getByRole('navigation', { name: 'sections' });
     expect(within(nav).getByRole('link', { name: 'Statistics' }).getAttribute('aria-current')).toBe(
       'page',
@@ -407,7 +407,7 @@ describe('statistics section', () => {
     window.location.hash = '#runs/run1';
     const api = fakeApi();
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     const nav = screen.getByRole('navigation', { name: 'sections' });
     const link = within(nav).getByRole('link', { name: 'Statistics' });
     expect(link.getAttribute('href')).toBe('#stats?period=30d');
@@ -428,7 +428,7 @@ describe('statistics section', () => {
     window.location.hash = '#stats';
     const api = fakeApi();
     render(<App api={api} openStream={openFake} />);
-    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     fireEvent.click(await screen.findByRole('radio', { name: '90 days' }));
     await waitFor(() => expect(window.location.hash).toBe('#stats?period=90d'));
     window.location.hash = '';

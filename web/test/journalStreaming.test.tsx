@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { liveTopics } from '../src/shared/api/live/topics.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Transcript } from '../src/features/runs/transcript/Transcript.tsx';
@@ -10,6 +11,7 @@ import { agyTranscript } from '../../src/feature/agents/clients/agy/transcript.t
 
 afterEach(() => {
   cleanup();
+  liveTopics.detach();
   vi.useRealTimers();
 });
 
@@ -160,8 +162,10 @@ describe('streamed journal rendering', () => {
       );
     expect(textCards()).toHaveLength(1);
     expect(screen.getByText('Sal')).toBeTruthy();
+    // without a connection for long the panel reads the log with requests
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1500);
+      liveTopics.polling();
+      await vi.advanceTimersByTimeAsync(10);
     });
     expect(transcript).toHaveBeenNthCalledWith(2, 'run1', 'login', 1, 2);
     expect(textCards()).toHaveLength(1);

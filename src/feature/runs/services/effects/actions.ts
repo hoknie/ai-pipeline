@@ -141,7 +141,7 @@ export class ActionRunner {
     directory: string,
     finish: (outcome: ActionOutcome) => Promise<void>,
   ): void {
-    const { context, environment, graceMs, timings, agentExit } = this.dependencies;
+    const { context, environment, graceMs, timings, agentExit, publish } = this.dependencies;
     const key = { run: state.run.id, group: group.slug, seq };
     const log = logPath(state, group.slug, seq);
     mkdirSync(attemptDirectory(workspaceOf(state), state.run.id, group.slug, seq), {
@@ -165,6 +165,7 @@ export class ActionRunner {
         graceMs,
         drainMs: timings.drainMs,
         timesPath: timesPath(log),
+        onLog: () => publish.logGrew(key),
       },
     );
     let timedOut = false;

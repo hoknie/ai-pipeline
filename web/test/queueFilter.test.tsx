@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.tsx';
 import { ApiError } from '../src/shared/api/api.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
-import { FakeEventSource, fakeApi, openFake, queueItem, queueOf } from './fixtures.ts';
+import { FakeSocket, fakeApi, openFake, queueItem, queueOf } from './fixtures.ts';
 
-function stream(): FakeEventSource {
-  const source = FakeEventSource.last;
+function stream(): FakeSocket {
+  const source = FakeSocket.last;
   if (!source) throw new Error('no event source');
   return source;
 }

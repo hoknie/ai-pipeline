@@ -5,6 +5,10 @@ import { streamEventSchema, type DaemonCheck } from '../ipc/contract/index.ts';
 
 import { RECHECK_MS } from './options.ts';
 
+/** What the subscriptions of the panel react to: a run changed, a log grew. */
+export type HubSignal =
+  { event: 'run'; runId: string } | { event: 'log'; runId: string; group: string; attempt: number };
+
 /** Fan-out of the daemon event stream; keeps the latest state of every run. */
 export class Hub {
   private readonly socket: string;
@@ -21,15 +25,23 @@ export class Hub {
   private stopped = false;
   private readonly abort = new AbortController();
   private readonly clients = new Set<ServerResponse>();
+  /** The live connections of the panel: each takes a message as text. */
+  private readonly sinks = new Set<(text: string) => void>();
+  private readonly onSignal: (signal: HubSignal) => void;
   private readonly ensure: () => Promise<DaemonCheck>;
   /** Build mismatch with the daemon, as the panel shows it; null when the builds match. */
   private daemon: DaemonCheck['mismatch'] = null;
   private checking: Promise<void> | null = null;
   private readonly recheck: ReturnType<typeof setInterval>;
 
-  constructor(socket: string, ensure: () => Promise<DaemonCheck>) {
+  constructor(
+    socket: string,
+    ensure: () => Promise<DaemonCheck>,
+    onSignal: (signal: HubSignal) => void = () => undefined,
+  ) {
     this.socket = socket;
     this.ensure = ensure;
+    this.onSignal = onSignal;
     this.recheck = setInterval(() => {
       if (this.daemon?.outdated === 'daemon') void this.check();
     }, RECHECK_MS);
@@ -58,7 +70,9 @@ export class Hub {
       await this.check();
       if (this.stopped) break;
       try {
-        await subscribe(this.socket, (line) => this.onLine(line), this.abort.signal);
+        await subscribe(this.socket, (line) => this.onLine(line), this.abort.signal, {
+          logs: true,
+        });
       } catch {
         // the daemon is not reachable yet; retry below
       }
@@ -85,7 +99,11 @@ export class Hub {
     } catch {
       return;
     }
-    if (event.event === 'snapshot') {
+    if (event.event === 'log') {
+      // Never relayed: the subscriptions read the log and send what is new.
+      this.seq = event.seq;
+      this.onSignal(event);
+    } else if (event.event === 'snapshot') {
       this.tags = event.tags ?? [];
       this.runs = new Map(event.runs.map((run) => [run.id, run]));
       this.queues = new Map((event.queues ?? []).map((queue) => [queue.repository, queue]));
@@ -99,6 +117,7 @@ export class Hub {
       this.runs.set(event.run.id, event.run);
       this.seq = event.seq;
       this.broadcast(event);
+      this.onSignal({ event: 'run', runId: event.run.id });
     } else if (event.event === 'repositories') {
       this.repositories = event.repositories;
       this.seq = event.seq;
@@ -144,8 +163,20 @@ export class Hub {
   }
 
   private broadcast(event: unknown): void {
-    const frame = `data: ${JSON.stringify(event)}\n\n`;
+    const text = JSON.stringify(event);
+    const frame = `data: ${text}\n\n`;
     for (const client of this.clients) client.write(frame);
+    for (const send of this.sinks) send(text);
+  }
+
+  /** A live connection: the snapshot and the last processes now, then every event. */
+  join(send: (text: string) => void): () => void {
+    this.sinks.add(send);
+    if (this.ready) {
+      send(JSON.stringify(this.snapshot()));
+      if (this.processes) send(JSON.stringify({ ...this.processes, seq: this.seq }));
+    }
+    return () => this.sinks.delete(send);
   }
 
   attach(incoming: IncomingMessage, response: ServerResponse): void {

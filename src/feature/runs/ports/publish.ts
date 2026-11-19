@@ -6,4 +6,6 @@ export interface RunsPublishPort {
   runSaved(state: RunState): void;
   /** The waits of these runs changed; the queues of these repositories may show it. */
   waitsChanged(states: RunState[], repositories: ReadonlySet<string>): void;
+  /** The log of this attempt has new lines on disk. */
+  logGrew(attempt: { run: string; group: string; seq: number }): void;
 }

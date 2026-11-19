@@ -60,14 +60,14 @@ export interface ProvidersPageProps {
 
 /** The rows of the list: one project's providers, or in «All projects» the shared ones and each project's. */
 function useRows(props: ProvidersPageProps, scope: ProvidersScope) {
-  const { api, repository, runs, projects } = props;
-  const own = useProviderRegistry(api, repository, runs, levelOf(scope));
+  const { api, repository, projects } = props;
+  const own = useProviderRegistry(api, repository, levelOf(scope));
   const { editor } = useProviderEditor(api, repository);
   const paths = useMemo(
     () => (projects ? enabledProjects(projects.registry).map((entry) => entry.path) : []),
     [projects],
   );
-  const others = useProviderRegistries(api, paths, runs);
+  const others = useProviderRegistries(api, paths);
   const rows = useMemo<ProviderRow[]>(() => {
     if (!projects) return own.view ? rowsOfProject(own.view, editor) : [];
     const entries = projects.registry.flatMap((entry) => {

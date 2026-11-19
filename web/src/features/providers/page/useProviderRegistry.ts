@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useRef, useSyncExternalStore } from 'react';
 
 import type { Api } from '../../../shared/api/api.ts';
+import { liveTopics } from '../../../shared/api/live/topics.ts';
 import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/types.ts';
 import { createShared } from './shared.ts';
-
-/** The registry is read again at most this often because of the events of the runs. */
-export const REFRESH_MS = 5000;
 
 /** The level a registry is read at: both levels merged for a project, or the shared one alone. */
 export type RegistryLevel = 'global' | undefined;
@@ -31,47 +29,64 @@ export function invalidateProviders(repository: string | null): Promise<void> {
   ]).then(() => {});
 }
 
-/** Calls `read` again at most once per `REFRESH_MS` while `watch` changes. */
-function useThrottledReload(key: string, watch: unknown): void {
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
+/** The subscriptions to the registries: one per key for all the components that watch it. */
+const watched = new Map<string, { count: number; stop: () => void }>();
+
+/**
+ * Watches the registry of a key for one more component: the server sends it when it changes, and
+ * a return of the focus to the window asks for it again.
+ */
+function watchRegistry(key: string, api: Api, listener: () => void): () => void {
+  const leave = registries.subscribe(key, api, listener, false);
+  let entry = watched.get(key);
+  if (!entry) {
+    registries.expect(key);
+    const repository = api.repository ?? undefined;
+    const watch = liveTopics.watch(
+      api,
+      {
+        kind: 'providers',
+        ...(repository === undefined ? {} : { repository }),
+        ...(key.endsWith(GLOBAL_MARK) ? { level: 'global' as const } : {}),
+      },
+      (value) => registries.receive(key, { value }),
+      (failure) => registries.receive(key, { failure }),
+    );
+    const onFocus = () => watch.refresh();
+    window.addEventListener('focus', onFocus);
+    entry = {
+      count: 0,
+      stop: () => {
+        window.removeEventListener('focus', onFocus);
+        watch();
+      },
+    };
+    watched.set(key, entry);
+  }
+  entry.count += 1;
+  const mine = entry;
+  return () => {
+    mine.count -= 1;
+    if (mine.count === 0) {
+      mine.stop();
+      watched.delete(key);
     }
-    const wait = registries.fetchedAt(key) + REFRESH_MS - Date.now();
-    if (wait <= 0) {
-      void registries.reload(key, true);
-      return;
-    }
-    const timer = setTimeout(() => void registries.reload(key, true), wait);
-    return () => clearTimeout(timer);
-  }, [key, watch]);
+    leave();
+  };
 }
 
 /**
  * The roles and providers of a project with status and limit. Components of one project share one
- * request; it is repeated when the window gets focus, after a write (`invalidateProviders`) and
- * when `watch` (the runs) changes, at most every five seconds.
+ * subscription: the registry comes again when the runs change it, when the window gets focus and
+ * after a write (`invalidateProviders`).
  */
-export function useProviderRegistry(
-  api: Api,
-  repository: string | null,
-  watch?: unknown,
-  level?: RegistryLevel,
-) {
+export function useProviderRegistry(api: Api, repository: string | null, level?: RegistryLevel) {
   const key = registryKey(repository, level);
   const subscribe = useCallback(
-    (listener: () => void) => registries.subscribe(key, api, listener, true),
+    (listener: () => void) => watchRegistry(key, api, listener),
     [key, api],
   );
   const state = useSyncExternalStore(subscribe, () => registries.read(key));
-  useEffect(() => {
-    const onFocus = () => void registries.reload(key, true);
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [key]);
-  useThrottledReload(key, watch);
   const reload = useCallback(() => registries.reload(key, true), [key]);
   return { view: state.value, failure: state.failure, loading: state.loading, reload };
 }
@@ -80,7 +95,6 @@ export function useProviderRegistry(
 export function useProviderRegistries(
   api: Api,
   repositories: readonly string[],
-  watch?: unknown,
 ): { views: (ProvidersView | null)[]; failures: string[] } {
   const joined = repositories.join('\n');
   const subscribe = useCallback(
@@ -88,7 +102,7 @@ export function useProviderRegistries(
       const stops = joined
         .split('\n')
         .filter((path) => path !== '')
-        .map((path) => registries.subscribe(path, api.forRepository(path), listener, true));
+        .map((path) => watchRegistry(path, api.forRepository(path), listener));
       return () => stops.forEach((stop) => stop());
     },
     [joined, api],
@@ -106,14 +120,6 @@ export function useProviderRegistries(
     return snapshot.current.value;
   };
   const states = useSyncExternalStore(subscribe, read);
-  useEffect(() => {
-    if (watch === undefined) return;
-    const timer = setTimeout(
-      () => repositories.forEach((path) => void registries.reload(path, true)),
-      REFRESH_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [joined, watch]);
   return {
     views: states.map((state) => state.value),
     failures: states.flatMap((state) => (state.failure ? [state.failure] : [])),

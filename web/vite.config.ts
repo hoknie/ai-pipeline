@@ -41,9 +41,12 @@ export default defineConfig({
       '/api': {
         target,
         changeOrigin: true,
+        // the live connection of the panel is a WebSocket
+        ws: true,
         headers: { 'x-aip-token': process.env.AIP_WEB_TOKEN ?? '' },
         configure: (proxy) => {
           proxy.on('proxyReq', (request) => request.removeHeader('origin'));
+          proxy.on('proxyReqWs', (request) => request.removeHeader('origin'));
         },
       },
     },

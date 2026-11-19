@@ -35,7 +35,7 @@ export function ItemProvider({
 }) {
   const { t } = useTranslation();
   const scope = useProvidersScope();
-  const { view } = useProviderRegistry(api, null, undefined, levelOf(scope));
+  const { view } = useProviderRegistry(api, null, levelOf(scope));
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={`chain-item-${index}-provider`}>{t('chains.item.provider')}</Label>

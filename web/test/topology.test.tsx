@@ -20,7 +20,7 @@ import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
 import { machineLoad } from '../src/shared/lib/pipeline/specialistLoad.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   groupRow,
   groupView,
@@ -352,7 +352,7 @@ describe('tabs', () => {
     });
     render(<App api={api} openStream={openFake} />);
     act(() =>
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'snapshot',
         seq: 1,
         runs: [runView({ groups: [groupRow()] })],
@@ -428,7 +428,7 @@ describe('tabs', () => {
   it('still opens an older link of a group', () => {
     window.location.hash = '#run1/login';
     render(<App api={fakeApi()} openStream={openFake} />);
-    act(() => FakeEventSource.last?.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => FakeSocket.last?.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     expect(screen.getByRole('region', { name: 'group Sign-in' })).toBeTruthy();
     expect(window.location.hash).toBe('#runs/run1/login');
   });

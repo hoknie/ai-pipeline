@@ -22,7 +22,7 @@ export function useGroupCtx(props: GroupScreenProps, section: HTMLElement | null
   const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.diffRevision ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}/${row.artifacts}/${row.artifactsRevision}`;
   const delivering = run?.delivery.inProgress ?? false;
   const caps = capabilities(row, deliverable, delivering);
-  const view = useGroupView(api, runId, row.slug, version, onError);
+  const view = useGroupView(api, runId, row.slug, onError);
   const { busy, act } = useGroupAct(onError);
   const tabs = useGroupTabs({
     api,

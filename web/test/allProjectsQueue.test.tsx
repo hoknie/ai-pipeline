@@ -7,7 +7,7 @@ import type { Api } from '../src/shared/api/api.ts';
 import type { QueueView } from '../src/shared/api/types.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   openFake,
   queueItem,
@@ -50,7 +50,7 @@ function mount(
   const api = { ...base, forRepository: bound } as Api;
   render(<App api={api} openStream={openFake} />);
   act(() => {
-    FakeEventSource.last?.send({
+    FakeSocket.last?.send({
       event: 'snapshot',
       seq: 1,
       runs,

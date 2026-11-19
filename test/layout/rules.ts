@@ -171,6 +171,7 @@ export const packagePlaces: Record<string, readonly string[]> = {
   commander: ['presentation/cli'],
   '@modelcontextprotocol/sdk': ['presentation/mcp', 'presentation/cli'],
   'openid-client': ['feature/identity/clients'],
+  ws: ['presentation/web'],
 };
 
 /** Classes that may be created with `new` only in `app` and `<feature>/services/create.ts`. */

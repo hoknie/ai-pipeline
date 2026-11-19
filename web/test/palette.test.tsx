@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.tsx';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   configView,
   fakeApi,
   groupRow,
@@ -31,7 +31,7 @@ function mount(runs = [runView()], extra: Parameters<typeof fakeApi>[0] = {}) {
     ...extra,
   });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs }));
   return api;
 }
 
@@ -188,7 +188,7 @@ describe('section counters', () => {
     );
     expect(screen.getByLabelText('waiting for an answer: 1')).toBeTruthy();
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'run',
         seq: 2,
         run: runView({ id: 'a', state: 'active', waiting: 0 }),
@@ -197,7 +197,7 @@ describe('section counters', () => {
     await waitFor(() => expect(screen.queryByLabelText(/waiting for an answer/)).toBeNull());
     expect(screen.getAllByLabelText('running: 1').length).toBeGreaterThan(0);
     act(() =>
-      FakeEventSource.last!.send({
+      FakeSocket.last!.send({
         event: 'run',
         seq: 3,
         run: runView({ id: 'a', state: 'finished', finished: true }),
@@ -215,11 +215,11 @@ describe('section counters', () => {
 
   it('shows the reconnection and the return of the link', () => {
     mount();
-    act(() => FakeEventSource.last!.open());
+    act(() => FakeSocket.last!.open());
     expect(screen.getByRole('status', { name: 'link with the daemon: Connected' })).toBeTruthy();
-    act(() => FakeEventSource.last!.fail());
+    act(() => FakeSocket.last!.fail());
     expect(screen.getByRole('status', { name: 'link with the daemon: Reconnecting' })).toBeTruthy();
-    act(() => FakeEventSource.last!.open());
+    act(() => FakeSocket.last!.open());
     expect(screen.getByRole('status', { name: 'link with the daemon: Connected' })).toBeTruthy();
   });
 });

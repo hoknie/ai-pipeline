@@ -246,7 +246,7 @@ export function ChainRuntimeItem({
 }: ChainRuntimeItemProps) {
   const { t } = useTranslation();
   const scope = useProvidersScope();
-  const { view } = useProviderRegistry(api, null, undefined, levelOf(scope));
+  const { view } = useProviderRegistry(api, null, levelOf(scope));
   const provider = view?.providers.find((candidate) => candidate.slug === item.provider);
   // the models of the roles of the provider through the CLI of the item, before the catalog
   const extra: ModelEntry[] = provider

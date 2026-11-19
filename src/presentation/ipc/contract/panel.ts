@@ -18,7 +18,11 @@ export const panelRequests = [
   z.object({ method: z.literal('ping'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('shutdown'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('shutdown_idle'), params: z.object({}).default({}) }),
-  z.object({ method: z.literal('subscribe'), params: z.object({}).default({}) }),
+  z.object({
+    method: z.literal('subscribe'),
+    /** `logs`: the subscriber also gets a `log` event when the log of an attempt grew. */
+    params: z.object({ logs: z.boolean().optional() }).default({}),
+  }),
   z.object({ method: z.literal('web_status'), params: z.object({}).default({}) }),
   z.object({
     method: z.literal('web_start'),

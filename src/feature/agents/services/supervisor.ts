@@ -41,6 +41,8 @@ export interface LaunchOptions {
   onUsage?: (usage: Usage) => void;
   /** When set, the moment each log line was written is appended there as `<line>\t<ms>`. */
   timesPath?: string;
+  /** Called once new lines of the log are on disk. */
+  onLog?: () => void;
 }
 
 /** Writes `<line>\t<ms>` for each new log line; does nothing without a times file. */
@@ -94,8 +96,9 @@ function readOutput(
 ): Interface {
   const stdout = createInterface({ input: child.stdout! });
   let reported: Usage | null = null;
+  const grew = () => options.onLog?.();
   stdout.on('line', (line) => {
-    log.write(`${line}\n`);
+    log.write(`${line}\n`, grew);
     stamp(1);
     options.parser.push(line);
     if (!options.onUsage) return;
@@ -111,7 +114,7 @@ function readOutput(
     }
   });
   child.stderr!.on('data', (chunk: Buffer) => {
-    log.write(chunk);
+    log.write(chunk, grew);
     stamp(chunk.filter((byte) => byte === 10).length);
   });
   return stdout;
@@ -157,7 +160,10 @@ function exitOf(watched: Watched): Promise<ProcessExit> {
       // Resolved once the log is on disk: a reader after the exit sees its last line.
       log.end(
         `[aip] exited code=${code} signal=${signal}${spawnError ? ` error=${spawnError}` : ''}\n`,
-        () => resolve(exit),
+        () => {
+          options.onLog?.();
+          resolve(exit);
+        },
       );
     };
     child.once('error', (error) => {

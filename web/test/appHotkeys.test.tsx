@@ -5,7 +5,7 @@ import { App } from '../src/app/App.tsx';
 import { SECTION_SHORTCUTS } from '../src/app/sections.ts';
 import { SHORTCUTS } from '../src/app/shortcuts.ts';
 
-import { FakeEventSource, configView, fakeApi, groupView, openFake, queueOf } from './fixtures.ts';
+import { FakeSocket, configView, fakeApi, groupView, openFake, queueOf } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
 beforeEach(() => {
@@ -21,7 +21,7 @@ function mount() {
     queue: vi.fn(async () => queueOf()),
   });
   render(<App api={api} openStream={openFake} />);
-  act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [] }));
+  act(() => FakeSocket.last!.send({ event: 'snapshot', seq: 1, runs: [] }));
   return api;
 }
 

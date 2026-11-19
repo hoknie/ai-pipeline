@@ -6,7 +6,7 @@ import type { Api } from '../src/shared/api/api.ts';
 import type { ConfigEditorResponse, EditorSpecialist, RunView } from '../src/shared/api/types.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   actionEntry,
   configView,
   fakeApi,
@@ -106,7 +106,7 @@ function mount(setup: Setup = {}) {
   const api = { ...base, forRepository: bound } as Api;
   render(<App api={api} openStream={openFake} />);
   act(() => {
-    FakeEventSource.last?.send({
+    FakeSocket.last?.send({
       event: 'snapshot',
       seq: 1,
       runs: setup.runs ?? [],
@@ -172,7 +172,7 @@ describe('the mode «All projects»', () => {
       ).toBeGreaterThan(0),
     );
     act(() => {
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'queue',
         seq: 2,
         queue: queueOf({
@@ -180,7 +180,7 @@ describe('the mode «All projects»', () => {
           items: [queueItem('a', 'x', 1), queueItem('b', 'y', 2)],
         }),
       });
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'queue',
         seq: 3,
         queue: queueOf({ repository: LIB, items: [queueItem('c', 'z', 1)] }),

@@ -11,16 +11,21 @@ import type {
 
 export type Connection = 'live' | 'reconnecting' | 'polling';
 
-export interface EventSourceLike {
+/** A WebSocket as the panel uses it; tests put their own in its place. */
+export interface SocketLike {
   onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent<string>) => void) | null;
-  onerror: ((event: Event) => void) | null;
+  onclose: (() => void) | null;
+  send(text: string): void;
   close(): void;
 }
 
-export type EventSourceFactory = (url: string) => EventSourceLike;
+export type SocketFactory = (path: string) => SocketLike;
 
-export const browserEventSource: EventSourceFactory = (url) => new EventSource(url);
+export const browserSocket: SocketFactory = (path) => {
+  const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return new WebSocket(`${scheme}//${location.host}${path}`) as SocketLike;
+};
 
 export type StreamEvent =
   | {
@@ -113,32 +118,75 @@ export function createFallback(
 }
 
 export interface StreamHandlers {
-  /** The stream works: an open connection or a message. */
+  /** The connection works: it opened or sent a message. */
   live: () => void;
+  /** The connection came up: once per connection, before its first event. */
+  opened: () => void;
   event: (event: ReadEvent) => void;
-  /** The stream broke. */
+  /** The connection broke. */
   broken: () => void;
 }
 
-/** Wires a stream to the handlers; the fallback polling stops while the stream speaks. */
-export function listen(
-  source: EventSourceLike,
+/** The address of the live connection of the panel. */
+export const LIVE_PATH = '/api/ws';
+/** A broken connection is opened again after this long. */
+export const RECONNECT_MS = 2000;
+
+export interface LiveConnection {
+  /** Sends a message; false while the connection is down. */
+  send(message: object): boolean;
+  close(): void;
+}
+
+/**
+ * Keeps a connection open: a broken one is opened again, and the fallback polling runs while it
+ * is down for long.
+ */
+export function connectLive(
+  open: SocketFactory,
   fallback: Fallback,
   handlers: StreamHandlers,
-): void {
-  source.onopen = () => {
+): LiveConnection {
+  let socket: SocketLike | null = null;
+  let up = false;
+  let closed = false;
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  const works = () => {
     fallback.stop();
     handlers.live();
+    if (up) return;
+    up = true;
+    handlers.opened();
   };
-  source.onmessage = (message) => {
-    const event = parseMessage(message.data);
-    if (event === null) return;
-    fallback.stop();
-    handlers.live();
-    handlers.event(event);
+  const start = () => {
+    const current = open(LIVE_PATH);
+    socket = current;
+    current.onopen = works;
+    current.onmessage = (message) => {
+      const event = parseMessage(message.data);
+      if (event === null) return;
+      works();
+      handlers.event(event);
+    };
+    current.onclose = () => {
+      if (closed || socket !== current) return;
+      up = false;
+      handlers.broken();
+      fallback.start();
+      retry = setTimeout(start, RECONNECT_MS);
+    };
   };
-  source.onerror = () => {
-    handlers.broken();
-    fallback.start();
+  start();
+  return {
+    send(message) {
+      if (!up || socket === null) return false;
+      socket.send(JSON.stringify(message));
+      return true;
+    },
+    close() {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      socket?.close();
+    },
   };
 }

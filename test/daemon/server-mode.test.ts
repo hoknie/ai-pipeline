@@ -10,6 +10,7 @@ import { request } from '../../src/presentation/ipc/client/index.ts';
 import { remoteRequest, remoteSubscribe } from '../../src/presentation/ipc/client/remote.ts';
 import { startWebServer, type WebServer } from '../../src/presentation/web/index.ts';
 
+import { liveStatus, openLive } from '../fixtures/live.ts';
 import { harness, type Harness } from './harness.ts';
 
 const PUBLIC = 'https://aip.example.com';
@@ -32,7 +33,10 @@ interface Answer {
   body: string;
 }
 
-async function start(trustedProxies: string[] = []): Promise<Harness> {
+async function start(
+  trustedProxies: string[] = [],
+  live?: { recheckMs: number },
+): Promise<Harness> {
   current = await harness();
   const directory = join(String(current.environment.XDG_CONFIG_HOME), 'aip');
   mkdirSync(directory, { recursive: true });
@@ -45,6 +49,7 @@ async function start(trustedProxies: string[] = []): Promise<Harness> {
     host: '127.0.0.1',
     port: 0,
     server: { publicUrl: PUBLIC, trustedProxies },
+    ...(live ? { live } : {}),
   });
   return current;
 }
@@ -243,6 +248,35 @@ describe('remote transport', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 11_000);
     expect((await ipc(bob, 'status')).status).toBe(401);
+  });
+
+  it('opens the live connection for a signed-in user and closes it once the access is gone', async () => {
+    const h = await start([], { recheckMs: 30 });
+    await signIn(h, 'admin@example.com', true);
+    const bob = await token(h, 'bob@example.com');
+    const base = `http://127.0.0.1:${web?.port}`;
+    expect(await liveStatus(base, { host: HOST })).toBe(401);
+    expect(await liveStatus(base, { host: HOST, authorization: 'Bearer aip_pat_nope' })).toBe(401);
+    const allowed = { host: HOST, authorization: `Bearer ${bob}` };
+    expect(await liveStatus(base, { ...allowed, origin: 'https://evil.example' })).toBe(403);
+    expect(await liveStatus(base, { authorization: `Bearer ${bob}` })).toBe(403);
+    const probe = await openLive(base, allowed);
+    await probe.until('"snapshot"');
+    expect(probe.messages[0]).toMatchObject({ event: 'snapshot' });
+    // the reads of a subscription are made for the user and answered by the daemon
+    probe.send({
+      op: 'subscribe',
+      id: 'g1',
+      topic: { kind: 'group', runId: 'nope', group: 'login' },
+    });
+    expect(await probe.message('the answer', (message) => message.id === 'g1')).toMatchObject({
+      event: 'topic_error',
+    });
+    await request(h.socket, 'users_disable', { email: 'bob@example.com' });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 11_000);
+    expect(await probe.closed).toBe(4401);
+    expect(await liveStatus(base, allowed)).toBe(401);
   });
 
   it('is used by the remote client for requests and events', async () => {

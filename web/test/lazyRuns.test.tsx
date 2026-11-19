@@ -10,7 +10,7 @@ import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 import { useNearEnd } from '../src/shared/lib/browser/useNearEnd.ts';
 import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
 
-import { FakeEventSource, fakeApi, groupRow, openFake, queueOf, runView } from './fixtures.ts';
+import { FakeSocket, fakeApi, groupRow, openFake, queueOf, runView } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from './render.tsx';
 
 afterEach(() => {
@@ -18,7 +18,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const stream = () => FakeEventSource.last!;
+const stream = () => FakeSocket.last!;
 const project = (path: string) => ({
   path,
   displayPath: path,

@@ -7,7 +7,7 @@ import type { ProvidersView } from '../src/shared/api/types.ts';
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import {
-  FakeEventSource,
+  FakeSocket,
   fakeApi,
   openFake,
   pipelineOf,
@@ -56,7 +56,7 @@ function mount(
   api.forRepository = scope;
   render(<App api={api as Api} openStream={openFake} />);
   act(() => {
-    FakeEventSource.last?.send({
+    FakeSocket.last?.send({
       event: 'snapshot',
       seq: 1,
       runs: [runView({ id: 'a1', repository: APP })],

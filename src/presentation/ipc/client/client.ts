@@ -82,6 +82,8 @@ export function subscribe(
   socket: DaemonAddress,
   onLine: (line: string) => void,
   signal?: AbortSignal,
+  /** `logs`: also the `log` events of the attempts; a remote server does not send them. */
+  options: { logs?: boolean } = {},
 ): Promise<'closed'> {
   if (isRemote(socket)) {
     return import('./remote.ts').then(({ remoteSubscribe }) =>
@@ -110,7 +112,8 @@ export function subscribe(
         });
         connection.on('close', () => resolve('closed'));
         connection.on('error', reject);
-        connection.write(`${JSON.stringify({ id: 1, method: 'subscribe', params: {} })}\n`);
+        const params = options.logs ? { logs: true } : {};
+        connection.write(`${JSON.stringify({ id: 1, method: 'subscribe', params })}\n`);
       }),
   );
 }

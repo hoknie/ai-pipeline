@@ -12,7 +12,15 @@ import {
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
-import { POLL_MS, PIPELINE_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
+import {
+  POLL_MS,
+  PIPELINE_CONFIG,
+  harness,
+  settle,
+  startRun,
+  until,
+  type Harness,
+} from './harness.ts';
 
 // Each test needs a fresh daemon: the snapshot, the registry of repositories and the seq of the
 // events are those of one daemon from its start.
@@ -24,6 +32,42 @@ afterEach(async () => {
 });
 
 describe('event stream', () => {
+  it('sends log events to the subscriber that asked for them, and the last one after the attempt', async () => {
+    const h = (current = await harness());
+    const plain: StreamEvent[] = [];
+    const withLogs: StreamEvent[] = [];
+    void subscribe(h.socket, (line) => plain.push(streamEventSchema.parse(JSON.parse(line))));
+    void subscribe(
+      h.socket,
+      (line) => withLogs.push(streamEventSchema.parse(JSON.parse(line))),
+      undefined,
+      { logs: true },
+    );
+    await until('the snapshots', () => plain.length > 0 && withLogs.length > 0);
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (view) => view.finished);
+    await settle(h);
+    const logs = withLogs.flatMap((event) => (event.event === 'log' ? [event] : []));
+    expect(logs.length).toBeGreaterThan(0);
+    expect(logs.every((event) => event.runId === runId && event.group === 'login')).toBe(true);
+    expect(plain.some((event) => event.event === 'log')).toBe(false);
+    // after the last event of an attempt its log is whole and the attempt no longer runs
+    for (const attempt of new Set(logs.map((event) => event.attempt))) {
+      const transcript = (await h.call('transcript', {
+        runId,
+        group: 'login',
+        seq: attempt,
+      })) as { running: boolean; entries: unknown[] };
+      expect(transcript.running).toBe(false);
+    }
+    const seqs = withLogs.map((event) => event.seq);
+    expect([...seqs].sort((a, b) => a - b)).toEqual(seqs);
+  });
+
   it('sends a snapshot, then every change of a run with growing seq', async () => {
     const h = (current = await harness());
     const events: StreamEvent[] = [];

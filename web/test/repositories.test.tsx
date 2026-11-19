@@ -15,7 +15,7 @@ import {
 } from '../src/shared/lib/catalog/repositories.ts';
 
 import {
-  FakeEventSource,
+  FakeSocket,
   configView,
   fakeApi,
   groupRow,
@@ -189,7 +189,7 @@ function twoRepositories(overrides: Partial<Api> = {}) {
 function snapshot(runs = [runView({ id: 'a1', repository: APP })], extra = {}) {
   const lib = runView({ id: 'l1', repository: LIB, title: 'lib run', groups: [groupRow()] });
   act(() => {
-    FakeEventSource.last?.send({
+    FakeSocket.last?.send({
       event: 'snapshot',
       seq: 1,
       runs: [...runs, lib],
@@ -232,14 +232,14 @@ describe('repository selector', () => {
     snapshot();
     await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: app'));
     act(() =>
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'run',
         seq: 2,
         run: runView({ id: 'l1', repository: LIB, state: 'needs_human', waiting: 1 }),
       }),
     );
     act(() =>
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'repositories',
         seq: 3,
         repositories: [entry(APP), entry(LIB, 1)],
@@ -431,7 +431,7 @@ describe('repository registry in the panel', () => {
     const { api } = twoRepositories();
     await ready(api);
     act(() =>
-      FakeEventSource.last?.send({
+      FakeSocket.last?.send({
         event: 'repositories',
         seq: 5,
         repositories: [entry(APP), entry(LIB), entry(NEW)],

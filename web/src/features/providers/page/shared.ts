@@ -25,6 +25,10 @@ export interface SharedStore<V> {
   reload(key: string, refresh?: boolean): Promise<void>;
   /** When the key was fetched last (ms); 0 when never. */
   fetchedAt(key: string): number;
+  /** The value of a key came from elsewhere (a subscription), or the read of it failed. */
+  receive(key: string, result: { value: V } | { failure: string }): void;
+  /** A value for the key is on its way: it shows as loading until `receive`. */
+  expect(key: string): void;
 }
 
 /**
@@ -80,5 +84,21 @@ export function createShared<V>(
     read: (key) => entries.get(key)?.state ?? IDLE,
     reload,
     fetchedAt: (key) => entries.get(key)?.fetchedAt ?? 0,
+    receive(key, result) {
+      const entry = entries.get(key);
+      if (!entry) return;
+      entry.state =
+        'value' in result
+          ? { value: result.value, failure: null, loading: false }
+          : { value: entry.state.value, failure: result.failure, loading: false };
+      entry.fetchedAt = Date.now();
+      notify(entry);
+    },
+    expect(key) {
+      const entry = entries.get(key);
+      if (!entry || entry.state.value !== null || entry.state.loading) return;
+      entry.state = { ...entry.state, loading: true };
+      notify(entry);
+    },
   };
 }

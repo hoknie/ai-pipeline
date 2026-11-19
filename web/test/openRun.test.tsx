@@ -6,15 +6,7 @@ import { App } from '../src/app/App.tsx';
 import { ApiError } from '../src/shared/api/api.ts';
 import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 
-import {
-  FakeEventSource,
-  fakeApi,
-  groupRow,
-  openFake,
-  queueOf,
-  queueRun,
-  runView,
-} from './fixtures.ts';
+import { FakeSocket, fakeApi, groupRow, openFake, queueOf, queueRun, runView } from './fixtures.ts';
 
 beforeEach(() => {
   window.location.hash = '';
@@ -24,7 +16,7 @@ afterEach(() => {
   cleanup();
 });
 
-const stream = () => FakeEventSource.last!;
+const stream = () => FakeSocket.last!;
 const old = () => runView({ id: 'old', title: 'Old run', finished: true, state: 'finished' });
 
 describe('a run missing from the list', () => {

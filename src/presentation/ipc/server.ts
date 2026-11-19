@@ -24,7 +24,8 @@ export interface ServedApplication {
   /** Path of the daemon socket. */
   readonly socket: string;
   handle(request: Request, actor?: string): Promise<unknown>;
-  subscribe(send: (line: string) => void): () => void;
+  /** `logs`: the subscriber also gets the `log` events. */
+  subscribe(send: (line: string) => void, logs?: boolean): () => void;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -115,15 +116,16 @@ async function answer(daemon: ServedApplication, parsed: Parsed): Promise<Respon
 }
 
 /** Sends events to a subscribed connection; a connection that falls behind is dropped. */
-function subscribeConnection(serving: Serving, connection: Socket): void {
-  const unsubscribe = serving.daemon.subscribe((event) => {
+function subscribeConnection(serving: Serving, connection: Socket, logs: boolean): void {
+  const send = (event: string): void => {
     if (connection.destroyed) return;
     if (connection.writableLength > SUBSCRIBER_BUFFER_LIMIT) {
       connection.destroy();
       return;
     }
     connection.write(`${event}\n`);
-  });
+  };
+  const unsubscribe = serving.daemon.subscribe(send, logs);
   serving.subscriptions.add(connection);
   connection.once('close', () => {
     unsubscribe();
@@ -134,7 +136,7 @@ function subscribeConnection(serving: Serving, connection: Socket): void {
 function handleLine(serving: Serving, connection: Socket, line: string, close: () => void): void {
   const parsed = parseRequest(line);
   if ('request' in parsed && parsed.request.method === 'subscribe') {
-    subscribeConnection(serving, connection);
+    subscribeConnection(serving, connection, parsed.request.params.logs === true);
     return;
   }
   void answer(serving.daemon, parsed).then((response) => {

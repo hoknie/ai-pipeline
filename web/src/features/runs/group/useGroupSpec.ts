@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import type { Api } from '../../../shared/api/api.ts';
+import { liveTopics } from '../../../shared/api/live/topics.ts';
 import type { GroupSpecView } from '../../../shared/api/types.ts';
-
-/** Interval of the requests for the change documents while a group works and they are shown. */
-export const SPEC_POLL_MS = 5000;
 
 const same = (a: GroupSpecView | null, b: GroupSpecView | null) =>
   a === b ||
@@ -16,15 +14,15 @@ const same = (a: GroupSpecView | null, b: GroupSpecView | null) =>
     a.tasks === b.tasks);
 
 /**
- * The OpenSpec change documents of a group: requested on mount and whenever `version` changes,
- * and every `SPEC_POLL_MS` while `poll` holds. `undefined` until the first answer.
+ * The OpenSpec change documents of a group: sent on mount and whenever the run changes, and with
+ * `watch` also while the log of the group grows. `undefined` until the first answer. Only the
+ * first failure is told: after it the last text stays.
  */
 export function useGroupSpec(
   api: Api,
   runId: string,
   group: string,
-  version: string,
-  poll: boolean,
+  watch: boolean,
   onError: (message: string) => void,
   enabled = true,
 ): GroupSpecView | null | undefined {
@@ -32,26 +30,23 @@ export function useGroupSpec(
 
   useEffect(() => {
     if (!enabled) return;
-    let stopped = false;
-    const load = (quiet: boolean) =>
-      api.groupSpec(runId, group).then(
-        (next) => {
-          if (!stopped)
-            setSpec((before) => (before !== undefined && same(before, next) ? before : next));
-        },
-        (failure: Error) => {
-          if (stopped || quiet) return;
-          setSpec((before) => (before === undefined ? null : before));
-          onError(failure.message);
-        },
-      );
-    void load(false);
-    const timer = poll ? setInterval(() => void load(true), SPEC_POLL_MS) : null;
-    return () => {
-      stopped = true;
-      if (timer !== null) clearInterval(timer);
-    };
-  }, [api, runId, group, version, poll, enabled, onError]);
+    let answered = false;
+    const topic = { kind: 'group_spec' as const, runId, group, ...(watch ? { watch } : {}) };
+    return liveTopics.watch(
+      api,
+      topic,
+      (next) => {
+        answered = true;
+        setSpec((before) => (before !== undefined && same(before, next) ? before : next));
+      },
+      (message) => {
+        if (answered) return;
+        answered = true;
+        setSpec((before) => (before === undefined ? null : before));
+        onError(message);
+      },
+    );
+  }, [api, runId, group, watch, enabled, onError]);
 
   return spec;
 }
