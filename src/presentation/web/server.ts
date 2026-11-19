@@ -31,6 +31,7 @@ import { mcpServerRoutes } from './routes/catalog/mcp-servers.ts';
 import { settingsRoutes } from './routes/settings.ts';
 import { observerHistoryRoutes } from './routes/observers/history.ts';
 import { specialistsRoutes } from './routes/specialists.ts';
+import { auditRoutes } from './routes/audit/audit.ts';
 import { statsRoutes } from './routes/stats/stats.ts';
 import { sweepUploads, UPLOAD_SWEEP_MS, uploadRoute } from './uploads.ts';
 import { systemRoute } from './routes/system.ts';
@@ -81,6 +82,7 @@ function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
       tagsRoutes,
       processesRoutes,
       statsRoutes,
+      auditRoutes,
     ].flatMap((routes) => routes(kit)),
   };
 }

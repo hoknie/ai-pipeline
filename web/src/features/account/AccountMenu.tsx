@@ -14,6 +14,7 @@ import {
 } from '../../shared/ui/overlays/dropdown-menu.tsx';
 
 import { loadSystemMe, signOut, type Me } from './accountApi.ts';
+import { AuditDialog } from './AuditDialog.tsx';
 import { TokensDialog } from './TokensDialog.tsx';
 import { UsersDialog } from './UsersDialog.tsx';
 
@@ -21,7 +22,7 @@ import { UsersDialog } from './UsersDialog.tsx';
 export function AccountMenu({ initial }: { initial?: Me | null }) {
   const { t } = useTranslation();
   const [me, setMe] = useState<Me | null>(initial ?? null);
-  const [dialog, setDialog] = useState<'tokens' | 'users' | null>(null);
+  const [dialog, setDialog] = useState<'tokens' | 'users' | 'audit' | null>(null);
   useEffect(() => {
     if (initial !== undefined) return;
     void loadSystemMe().then((system) => {
@@ -54,11 +55,17 @@ export function AccountMenu({ initial }: { initial?: Me | null }) {
               {t('account.users.title')}
             </DropdownMenuItem>
           ) : null}
+          {me.admin ? (
+            <DropdownMenuItem onSelect={() => setDialog('audit')}>
+              {t('account.audit.title')}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onSelect={() => void leave()}>{t('account.logout')}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <TokensDialog open={dialog === 'tokens'} onClose={() => setDialog(null)} />
       <UsersDialog open={dialog === 'users'} onClose={() => setDialog(null)} />
+      <AuditDialog open={dialog === 'audit'} onClose={() => setDialog(null)} />
     </>
   );
 }

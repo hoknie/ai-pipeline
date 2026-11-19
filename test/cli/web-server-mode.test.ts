@@ -237,3 +237,47 @@ describe('sign-in through OIDC in the panel', () => {
     expect(me.user).toMatchObject({ email: 'alice@corp.com', source: 'oidc' });
   });
 });
+
+describe('the author in the panel API', () => {
+  it('shows the author of a run to a user who signed in through the provider', async () => {
+    const h = await start();
+    const cookie = cookieOf(await browse(ALICE))!;
+    const users = (await request(h.socket, 'users_list', {})) as {
+      users: { id: string; email: string }[];
+    };
+    const alice = users.users.find((user) => user.email === 'alice@corp.com')!;
+    h.script({ code: [{}, {}] });
+    const created = (await request(
+      h.socket,
+      'run',
+      { repository: h.repo, pipeline: 'feature', task: 'work' },
+      30_000,
+      alice.id,
+    )) as { run: { runId: string } | null; item: string };
+    const runId = created.run?.runId;
+    expect(runId).toBeDefined();
+    const answer = await send('GET', `/api/runs/${runId}`, { cookie });
+    expect(answer.status).toBe(200);
+    expect(JSON.parse(answer.body)).toMatchObject({
+      id: runId,
+      author: { id: alice.id, email: 'alice@corp.com', name: 'Alice', disabled: false },
+    });
+  });
+});
+
+describe('the audit journal of the sign-ins of the panel', () => {
+  it('records a sign-in refused for its domain with the reason and the address of the client', async () => {
+    const h = await start('      allowed_domains: [corp.com]\n');
+    await browse({ sub: '7', email: 'eve@gmail.com', email_verified: true });
+    await browse(ALICE);
+    const { events } = (await request(h.socket, 'audit_list', {})) as {
+      events: { action: string; outcome: string; details: Record<string, unknown> }[];
+    };
+    const failed = events.find((event) => event.action === 'auth.login_failed');
+    expect(failed).toMatchObject({ outcome: 'failed', details: { method: 'oidc' } });
+    expect(String(failed?.details.reason)).toContain('corp.com');
+    expect(failed?.details.address).toBe('127.0.0.1');
+    const login = events.find((event) => event.action === 'auth.login');
+    expect(login?.details).toMatchObject({ method: 'oidc', email: 'alice@corp.com' });
+  });
+});

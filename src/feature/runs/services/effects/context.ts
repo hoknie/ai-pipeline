@@ -6,6 +6,7 @@ import type {
   AgentExitPort,
   DiffPort,
   QueueAdvancePort,
+  RunCommitsPort,
   RunAttachmentsPort,
   RunsPublishPort,
 } from '../../ports/index.ts';
@@ -54,6 +55,7 @@ export interface EffectDependencies {
   agentExit: AgentExitPort;
   queue: QueueAdvancePort;
   attachments: RunAttachmentsPort;
+  commits: RunCommitsPort;
   publish: Pick<RunsPublishPort, 'logGrew'>;
 }
 

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** The address of the client of the panel; the journal of the audit keeps it with a sign-in. */
+const address = z.string().trim().min(1).max(64).optional();
+
 const email = z.string().trim().min(3).max(320);
 
 const attributes = z.record(z.string().min(1).max(64), z.array(z.string().min(1).max(256)).max(64));
@@ -14,11 +17,11 @@ export const identityRequests = [
   }),
   z.object({
     method: z.literal('auth_link_login'),
-    params: z.object({ code: z.string().min(1).max(512) }),
+    params: z.object({ code: z.string().min(1).max(512), address }),
   }),
   z.object({
     method: z.literal('auth_logout'),
-    params: z.object({ session: z.string().min(1).max(512) }),
+    params: z.object({ session: z.string().min(1).max(512), address }),
   }),
   z.object({ method: z.literal('auth_oidc_info'), params: z.object({}).default({}) }),
   z.object({
@@ -27,7 +30,7 @@ export const identityRequests = [
   }),
   z.object({
     method: z.literal('auth_oidc_complete'),
-    params: z.object({ query: z.string().max(8192) }),
+    params: z.object({ query: z.string().max(8192), address }),
   }),
   z.object({
     method: z.literal('auth_saml_begin'),
@@ -38,6 +41,7 @@ export const identityRequests = [
     params: z.object({
       samlResponse: z.string().min(1).max(1_000_000),
       relayState: z.string().max(512).default(''),
+      address,
     }),
   }),
   z.object({ method: z.literal('auth_saml_metadata'), params: z.object({}).default({}) }),
@@ -83,7 +87,11 @@ export const identityRequests = [
   }),
   z.object({
     method: z.literal('cli_login_exchange'),
-    params: z.object({ code: z.string().min(1).max(512), verifier: z.string().min(1).max(256) }),
+    params: z.object({
+      code: z.string().min(1).max(512),
+      verifier: z.string().min(1).max(256),
+      address,
+    }),
   }),
 ] as const;
 

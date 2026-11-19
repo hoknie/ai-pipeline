@@ -149,6 +149,14 @@ SVG and any other file come back with code 400 and are only downloaded. An unkno
 
 - `GET /api/stats` takes `since` and `until` (moments in milliseconds; without them all time) and `repository` (an absolute path or a slug; without it all projects). A wrong value comes back with code 400.
 
+## Audit journal
+
+| Request | What it does |
+|---|---|
+| `GET /api/audit` | The [audit journal](../configuration/server.md#audit-journal) as `{"events": [...]}`, newest first; administrators only (403 otherwise) |
+
+- It takes `user` (an email or `system`), `repository` (a path or a slug), `action` (a prefix), `since` (`<n>m`, `<n>h` or `<n>d`; default `7d`) and `limit` (1 to 1000; default 200). A wrong value comes back with code 400.
+
 ## Configuration
 
 | Request | What it does |

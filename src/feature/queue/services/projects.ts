@@ -41,7 +41,13 @@ export interface QueueProjectsDependencies {
 }
 
 /** The fields of the new item of a task for several projects. */
-function fields(request: TaskFields & { postponed?: boolean | undefined }): ItemFields {
+function fields(
+  request: TaskFields & {
+    postponed?: boolean | undefined;
+    author?: string | null | undefined;
+    createdBySystem?: boolean | undefined;
+  },
+): ItemFields {
   const {
     pipeline,
     variant,
@@ -66,6 +72,8 @@ function fields(request: TaskFields & { postponed?: boolean | undefined }): Item
     skip,
     after,
     ...(request.postponed !== undefined ? { postponed: request.postponed } : {}),
+    ...(request.author !== undefined ? { author: request.author } : {}),
+    ...(request.createdBySystem !== undefined ? { createdBySystem: request.createdBySystem } : {}),
   };
 }
 

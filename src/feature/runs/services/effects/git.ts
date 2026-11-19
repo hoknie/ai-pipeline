@@ -140,15 +140,18 @@ export class GitEffects {
         const { include } = state.run.config.workspace;
         const base = await git(repository, 'rev-parse', resolveBaseRef(state));
         const resolved = await commitResolve(worktree, base, include);
+        const stamp = this.dependencies.commits.stamp(state.run, message);
         result = await deliver({
           repository,
           changes: [{ group: RESOLVE_GROUP, from: base, to: resolved }],
           mode: state.run.config.delivery.mode,
           force: false,
-          message,
+          message: stamp?.message ?? message,
           branch: deliveryBranch(state.run),
           runRef: runRef(state.run),
           include,
+          base: state.run.baseCommit,
+          ...(stamp ? { identity: stamp.identity } : {}),
         });
       }
     } catch (error) {
@@ -161,15 +164,18 @@ export class GitEffects {
   async deliver(state: RunState, slugs: string[], force: boolean, message: string): Promise<void> {
     let result: DeliveryResult;
     try {
+      const stamp = this.dependencies.commits.stamp(state.run, message);
       result = await deliver({
         repository: state.run.repository,
         changes: groupChanges(state, slugs),
         mode: state.run.config.delivery.mode,
         force,
-        message,
+        message: stamp?.message ?? message,
         branch: deliveryBranch(state.run),
         runRef: runRef(state.run),
         include: state.run.config.workspace.include,
+        base: state.run.baseCommit,
+        ...(stamp ? { identity: stamp.identity } : {}),
       });
     } catch (error) {
       result = { kind: 'failed', message: (error as Error).message };

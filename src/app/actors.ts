@@ -1,3 +1,9 @@
+import { currentBuild } from '../platform/build/index.ts';
+import type { IpcContext } from '../presentation/ipc/handlers/types.ts';
+import type { DaemonServices } from '../presentation/ipc/services.ts';
+import type { Snapshots } from '../presentation/ipc/snapshots.ts';
+import type { ApplicationOptions } from './application.ts';
+import { createAuditServices } from '../feature/audit/services/index.ts';
 import { createIdentityServices } from '../feature/identity/services/index.ts';
 import { actorOf, type Actor } from '../feature/identity/types/index.ts';
 import { defaultServer } from '../feature/swarm-config/types/index.ts';
@@ -18,7 +24,7 @@ interface ActorOptions {
 
 const stderr = (message: string): void => console.error(`[aip] ${message}`);
 
-/** The identity services and the actor of a request: `local` without server mode, else a user or `system`. */
+/** The identity services, the audit journal and the actor of a request: `local` without server mode, else a user or `system`. */
 export function createActors({ database, config, now, environment, options }: ActorOptions) {
   const serverSettings = () => {
     const settings = config.serverSettings();
@@ -65,5 +71,23 @@ export function createActors({ database, config, now, environment, options }: Ac
     }
     return actorOf(user);
   };
-  return { identity, actorOfRequest };
+  // who did what: the journal of the actions of the users
+  const audit = createAuditServices({ database }).log;
+  return { identity, audit, actorOfRequest };
+}
+
+/** What every handler of the daemon works with, except the actor of the request. */
+export function createIpcContext(
+  services: DaemonServices,
+  snapshots: Snapshots,
+  options: ApplicationOptions,
+): Omit<IpcContext, 'actor'> {
+  return {
+    services,
+    snapshots,
+    build: options.build ?? currentBuild(),
+    panel: options.panel,
+    // the daemon's own messages: a failed write of the audit journal, a provider that cannot be reached
+    log: options.log ?? ((message) => console.error(`[aip] ${message}`)),
+  };
 }

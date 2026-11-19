@@ -17,6 +17,10 @@ export interface QueueItem {
   variant: string;
   /** Id of the provider the task runs on, or `null`: not chosen. */
   provider: string | null;
+  /** Id of the user who created the task; `null`: none (local mode, the system, or before the server mode). Never changes. */
+  author: string | null;
+  /** Created by `system` (server mode): no author, but not a task from before the server mode. */
+  createdBySystem: boolean;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -99,6 +103,8 @@ export interface ItemFields {
   pipeline: string;
   variant?: string | undefined;
   provider?: string | null | undefined;
+  author?: string | null | undefined;
+  createdBySystem?: boolean | undefined;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;

@@ -13,6 +13,8 @@ export interface IpcContext {
   panel: PanelControl | undefined;
   /** Who makes the request: `local`, `system` or a user (set by the application). */
   actor: Actor;
+  /** Writes a line to the log of the daemon. */
+  log: (message: string) => void;
 }
 
 /** The handler of one method: one change of one service, then the answer through the views. */

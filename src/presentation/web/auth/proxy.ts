@@ -14,6 +14,14 @@ export function peerAddress(incoming: IncomingMessage): string {
   return address.startsWith('::ffff:') ? address.slice('::ffff:'.length) : address;
 }
 
+/** The address of the client: the first `X-Forwarded-For` entry from a trusted proxy, else the peer. */
+export function clientAddress(incoming: IncomingMessage, server: ServerModeOptions): string {
+  const forwarded = fromTrustedProxy(incoming, server)
+    ? first(incoming.headers['x-forwarded-for'])
+    : undefined;
+  return (forwarded ?? peerAddress(incoming)).slice(0, 64);
+}
+
 export function fromTrustedProxy(incoming: IncomingMessage, server: ServerModeOptions): boolean {
   return server.trustedProxies.includes(peerAddress(incoming));
 }

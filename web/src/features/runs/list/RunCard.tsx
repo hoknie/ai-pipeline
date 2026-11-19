@@ -11,7 +11,7 @@ import { orderEntries } from '../../../shared/lib/order.ts';
 import { StatusBadge } from '../../../shared/ui/feedback/StatusBadge.tsx';
 import { TagChips } from '../../../shared/ui/feedback/TagChip.tsx';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
-import { VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
+import { AuthorBadge, VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { undeliveredMark } from '../header/delivery.ts';
 import { RunDecisions } from './RunDecisions.tsx';
@@ -136,6 +136,7 @@ export function RunCard(props: RunCardProps) {
           ) : null}
           <PipelineBadge id={run.pipeline} name={run.pipelineName} focusable={false} />
           <VariantBadge id={run.variant} name={run.variantName} focusable={false} />
+          <AuthorBadge author={run.author} createdBySystem={run.createdBySystem} />
           <TagChips tags={run.tags ?? []} nested />
         </span>
         <span className="grid grid-cols-2 items-center gap-2 text-xs text-muted-foreground">

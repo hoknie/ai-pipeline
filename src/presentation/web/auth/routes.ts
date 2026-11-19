@@ -10,6 +10,7 @@ import { call, cookie, createGate, redirect, statusOf, type ServerGate } from '.
 import { oidcCallback, oidcStart, renderLogin } from './oidc.ts';
 import { samlAcs, samlMetadata, samlStart } from './saml.ts';
 import { confirmCliPage, errorPage } from './pages.ts';
+import { clientAddress } from './proxy.ts';
 import { sessionCookie } from './session.ts';
 
 export { createGate, type ServerGate };
@@ -30,9 +31,14 @@ const cliFields = z.object({
   machine: z.string().min(1).max(128),
 });
 
-async function linkLogin(gate: ServerGate, response: ServerResponse, code: string): Promise<void> {
+async function linkLogin(
+  gate: ServerGate,
+  response: ServerResponse,
+  code: string,
+  address: string,
+): Promise<void> {
   try {
-    const result = (await call(gate, 'auth_link_login', { code })) as {
+    const result = (await call(gate, 'auth_link_login', { code, address })) as {
       session: string;
       expiresAt: number;
     };
@@ -47,7 +53,7 @@ async function logout(gate: ServerGate, incoming: IncomingMessage, response: Ser
   const session = sessionCookie(incoming.headers.cookie);
   if (session !== undefined) {
     gate.auth.forget(session);
-    await call(gate, 'auth_logout', { session });
+    await call(gate, 'auth_logout', { session, address: clientAddress(incoming, gate.options) });
   }
   send(response, 200, JSON.stringify({ ok: true }), 'application/json', {
     'set-cookie': cookie(gate, '', 0),
@@ -116,7 +122,12 @@ export async function authRoute(
   const path = url.pathname;
   const link = /^\/auth\/link\/([^/]+)$/.exec(path);
   if (link && verb === 'GET') {
-    await linkLogin(gate, response, decodeURIComponent(link[1] as string));
+    await linkLogin(
+      gate,
+      response,
+      decodeURIComponent(link[1] as string),
+      clientAddress(incoming, gate.options),
+    );
   } else if (path === '/auth/login' && verb === 'GET') {
     await renderLogin(gate, response);
   } else if (path === '/auth/oidc/start' && verb === 'GET') {
@@ -137,7 +148,14 @@ export async function authRoute(
     await cliApprove(gate, incoming, response);
   } else if (path === '/auth/cli/token' && verb === 'POST') {
     const body = parseBody(exchangeBody, await readJson(incoming));
-    json(response, 200, await call(gate, 'cli_login_exchange', body));
+    json(
+      response,
+      200,
+      await call(gate, 'cli_login_exchange', {
+        ...body,
+        address: clientAddress(incoming, gate.options),
+      }),
+    );
   } else if (path.startsWith('/auth/')) {
     send(response, 404, 'not found', 'text/plain');
   } else {

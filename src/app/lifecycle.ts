@@ -1,3 +1,4 @@
+import { DAY, parseTtl } from '../feature/identity/types/index.ts';
 import type { Database } from '../platform/sqlite/index.ts';
 import type { DaemonServices } from '../presentation/ipc/services.ts';
 
@@ -7,7 +8,11 @@ export interface Lifecycle {
   stop(): Promise<void>;
 }
 
-export function createLifecycle(services: DaemonServices, database: Database): Lifecycle {
+export function createLifecycle(
+  services: DaemonServices,
+  database: Database,
+  log: (message: string) => void,
+): Lifecycle {
   const {
     network,
     runs,
@@ -22,6 +27,7 @@ export function createLifecycle(services: DaemonServices, database: Database): L
     stats,
     integrations,
   } = services;
+  const auditPruner = createAuditPruner(services, log);
   return {
     async start() {
       network.start();
@@ -51,13 +57,60 @@ export function createLifecycle(services: DaemonServices, database: Database): L
         await observers.observe(true);
         runs.engine.armWake();
       });
+      auditPruner.start();
     },
     async stop() {
+      auditPruner.stop();
       runs.engine.halt();
       network.stop();
       processes.stop();
       await runs.engine.drain();
       database.close();
+    },
+  };
+}
+
+/** How often the audit journal is cleared of old entries. */
+export const AUDIT_PRUNE_MS = DAY;
+
+/** The retention used when the setting cannot be read. */
+const DEFAULT_RETENTION_MS = 365 * DAY;
+
+export interface AuditPruner {
+  /** Deletes the entries older than `server.audit_retention`; returns how many. */
+  prune(): number;
+  start(): void;
+  stop(): void;
+}
+
+/** Clears the journal once at the start and then every day; the server mode only. */
+export function createAuditPruner(
+  services: Pick<DaemonServices, 'audit' | 'config' | 'now'>,
+  log: (message: string) => void,
+  intervalMs = AUDIT_PRUNE_MS,
+): AuditPruner {
+  let timer: NodeJS.Timeout | null = null;
+  const prune = (): number => {
+    const settings = services.config.serverSettings();
+    if (typeof settings === 'string' || !settings.enabled) return 0;
+    const retention = parseTtl(settings.auditRetention) ?? DEFAULT_RETENTION_MS;
+    try {
+      return services.audit.prune(services.now() - retention);
+    } catch (error) {
+      log(`audit: cannot clear the journal: ${error instanceof Error ? error.message : error}`);
+      return 0;
+    }
+  };
+  return {
+    prune,
+    start() {
+      prune();
+      timer = setInterval(prune, intervalMs);
+      timer.unref();
+    },
+    stop() {
+      if (timer !== null) clearInterval(timer);
+      timer = null;
     },
   };
 }

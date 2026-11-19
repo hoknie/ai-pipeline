@@ -308,6 +308,17 @@ export const zh: Dictionary = {
       enable: '启用',
       disable: '停用',
     },
+    audit: {
+      title: '日志',
+      user: '用户（邮箱）',
+      project: '项目',
+      action: '操作，例如 run.',
+      period: '时间范围',
+      show: '显示',
+      empty: '没有记录',
+      periods: { '1h': '最近一小时', '1d': '最近一天', '7d': '最近 7 天', '30d': '最近 30 天' },
+      outcomes: { ok: '成功', denied: '拒绝', failed: '失败' },
+    },
   },
   language: {
     label: '语言：{{language}}',
@@ -1080,6 +1091,11 @@ export const zh: Dictionary = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  authorBadge: {
+    label: '作者：{{name}}（{{email}}）',
+    system: '系统',
+    disabled: '已停用',
   },
   providerBadge: {
     label: '提供商：{{id}}',

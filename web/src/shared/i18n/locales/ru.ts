@@ -319,6 +319,22 @@ export const ru: Dictionary = {
       enable: 'Включить',
       disable: 'Отключить',
     },
+    audit: {
+      title: 'Журнал',
+      user: 'Пользователь (email)',
+      project: 'Проект',
+      action: 'Действие, например run.',
+      period: 'Период',
+      show: 'Показать',
+      empty: 'Записей нет',
+      periods: {
+        '1h': 'Последний час',
+        '1d': 'Последние сутки',
+        '7d': 'Последние 7 дней',
+        '30d': 'Последние 30 дней',
+      },
+      outcomes: { ok: 'успешно', denied: 'отказ', failed: 'сбой' },
+    },
   },
   language: {
     label: 'Язык: {{language}}',
@@ -1118,6 +1134,11 @@ export const ru: Dictionary = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  authorBadge: {
+    label: 'Автор: {{name}} ({{email}})',
+    system: 'система',
+    disabled: 'отключён',
   },
   providerBadge: {
     label: 'Провайдер: {{id}}',

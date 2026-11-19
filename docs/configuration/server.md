@@ -12,6 +12,8 @@ server:
   trusted_proxies: [10.0.0.5]
   session_ttl: 12h
   token_max_ttl: 90d
+  audit_retention: 365d
+  commit_trailer: aip <aip@example.com>
 ```
 
 | Field | Default | Meaning |
@@ -22,6 +24,8 @@ server:
 | `trusted_proxies` | none | IP addresses of reverse proxies whose `X-Forwarded-For`, `-Proto` and `-Host` headers are trusted; from other addresses they are ignored |
 | `session_ttl` | `12h` | Lifetime of a panel session, `<n>h` or `<n>d` |
 | `token_max_ttl` | `90d` | The longest lifetime of a personal token, `<n>d` |
+| `audit_retention` | `365d` | How long the [audit journal](#audit-journal) keeps an entry, `<n>d` |
+| `commit_trailer` | none | `Name <email>` added to the message of a delivery commit as `Co-Authored-By`, see [authors](#authors-and-commits) |
 | `sso` | none | Sign-in through a corporate provider: see [sso.md](sso.md) (OpenID Connect) and [sso-saml.md](sso-saml.md) (SAML 2.0) |
 
 The section is set in the shared `settings.yaml` only; in a project `aip/settings.yaml` it is a validation error (`swarm.server`). In server mode `web.auth: none` and `web.autostart: false` are validation errors. A change takes effect after the daemon restarts.
@@ -68,6 +72,32 @@ In server mode the shared panel token and `AIP_WEB_TOKEN` do not work: a page wi
 - `aip server users` lists users; `disable` and `enable <email>` switch one off and on (the sessions and tokens stop within 10 seconds); `set <email> role=admin team=core` changes the attributes of a local user. The last active administrator cannot be removed.
 - Users are never deleted, so their runs keep an author.
 
+## Authors and commits
+
+- A task belongs to the person who added it, and its run to the same person. A task a specialist adds takes the author of its run.
+- Restarting, pausing or returning a run, and editing a task (also by someone else), leave the author as it is. Tasks added by the system, and everything from before server mode, have no author.
+- The panel, `aip queue`, `aip status` and `aip run show` show the author. `--json` and the API carry `author` as `{ id, email, name, disabled }`.
+- With `delivery.mode: commit` or `branch` the delivery commit is by the author of the run: `Author` is their name and email, `Committer` stays the git identity of the daemon's OS user. With `branch` the result is one commit on the base of the run.
+- A run without an author gets the git identity of the daemon for both. A local daemon changes nothing in its commits.
+- With `commit_trailer` the message ends with `Co-Authored-By: <value>` after an empty line, once.
+
+## Audit journal
+
+Server mode keeps a journal of what people do. An entry has who, when, the action, the project and resource, the outcome (`ok`, `denied`, `failed`) and the details.
+
+- Every call that changes something is written: runs, queue, settings, projects, tokens, users. Reads and the tools of specialists are not.
+- Actions are named `run.cancel`, `config.write` (a project), `config.global.write` (shared settings), `project.add`, `stats.clear` and so on.
+- Sign-ins are written too: `auth.login`, `auth.logout`, `auth.login_failed` with the reason and the address of the client, `token.create`, `token.revoke`, `login_link.create`, `user.disable`.
+- Details never hold tokens, codes or secrets; the text of an answer is cut to 2000 characters. A failed write of an entry never undoes the action; it goes to the daemon log.
+
+Administrators read it, newest first (by default the last 7 days, at most 200 entries):
+
+```
+aip audit [--user <email>] [--repo <slug|path>] [--action <prefix>] [--since 1d] [--limit 50] [--json]
+```
+
+The panel has the same under «Journal» in the account menu, and `GET /api/audit` takes the same filters. Anyone else gets 403. Entries older than `audit_retention` are deleted once a day; entries cannot be edited or deleted by hand.
+
 ## From your machine
 
 ```
@@ -85,6 +115,6 @@ A path on your machine is matched to a server project by the `git remote` of tha
 
 ## Limits
 
-- Only administrators change the shared settings, add or move projects, import specialists and clear statistics.
+- Only administrators change the shared settings, add or move projects, import specialists, clear statistics and read the audit journal.
 - A user delivers a result only with `delivery.mode: branch`; with `worktree` or `commit` the server answers `access.denied`, because the working tree on the server is shared.
 - `shutdown` and the daemon and panel controls are not available over the network.

@@ -120,6 +120,8 @@ export class RunRequests {
       skip: params.skip,
       variant: params.variant,
       provider: params.provider,
+      author: params.author,
+      createdBySystem: params.createdBySystem,
       attachments: params.attachments,
       tags: tagIds,
       now: now(),

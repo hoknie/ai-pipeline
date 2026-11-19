@@ -41,6 +41,8 @@ export function hydrateRun(database: Database, row: Row): RunState {
       pipeline: String(row.pipeline),
       variant: row.variant === null || row.variant === undefined ? 'default' : String(row.variant),
       provider: text(row.provider ?? null),
+      author: text(row.author_id ?? null),
+      createdBySystem: Number(row.created_by_system ?? 0) === 1,
       baseCommit: String(row.base_commit),
       branch: String(row.branch),
       refStyle: String(row.ref_style) as RefStyle,

@@ -38,6 +38,10 @@ export interface Run {
   variant: string;
   /** Id of the provider the run follows in its tiers, or `null`: not chosen. */
   provider: string | null;
+  /** Id of the user who created the run (the author of its task); `null`: none. Never changes. */
+  author: string | null;
+  /** Created by `system` (server mode): no author, but not a run from before the server mode. Never changes. */
+  createdBySystem: boolean;
   baseCommit: string;
   branch: string;
   refStyle: RefStyle;

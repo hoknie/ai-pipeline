@@ -45,6 +45,16 @@ export function actorOf(user: User): Actor {
   return { kind: 'user', user: userRef(user), attributes: user.attributes };
 }
 
+/** The id a task or a run gets as its author: a user's own; `null` for `local` and `system`. */
+export function authorOf(actor: Actor): string | null {
+  return actor.kind === 'user' ? actor.user.id : null;
+}
+
+/** A task or a run of `system` has no author, but is marked: it is not one from before the server mode. */
+export function createdBySystemOf(actor: Actor): boolean {
+  return actor.kind === 'system';
+}
+
 export function hasAdminRole(attributes: Attributes): boolean {
   return (attributes.role ?? []).includes(ADMIN_ROLE);
 }

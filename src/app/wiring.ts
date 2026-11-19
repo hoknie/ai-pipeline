@@ -1,5 +1,5 @@
 import type { ArtifactsPublishPort } from '../feature/artifacts/ports/index.ts';
-import type { DeliveryPublishPort } from '../feature/delivery/ports/index.ts';
+import type { DeliveryAuthorsPort, DeliveryPublishPort } from '../feature/delivery/ports/index.ts';
 import type { IntegrationOperationsPort } from '../feature/integrations/ports/index.ts';
 import type { NetworkChangedPort } from '../feature/network/ports/index.ts';
 import type { ObserversPublishPort } from '../feature/observers/ports/index.ts';
@@ -11,6 +11,7 @@ import type {
   ObservePort,
   QueueAdvancePort,
   RunAttachmentsPort,
+  RunCommitsPort,
   RunsPublishPort,
 } from '../feature/runs/ports/index.ts';
 import type { ConfigChangedPort } from '../feature/swarm-edit/ports/index.ts';
@@ -72,6 +73,8 @@ export function declarePorts() {
     diff: wiring.port<DiffPort>('runs.diff'),
     attachments: wiring.port<RunAttachmentsPort>('runs.attachments'),
     delivery: wiring.port<DeliveryPublishPort>('delivery.publish'),
+    authors: wiring.port<DeliveryAuthorsPort>('delivery.authors'),
+    commits: wiring.port<RunCommitsPort>('runs.commits'),
     artifacts: wiring.port<ArtifactsPublishPort>('artifacts.publish'),
     queuePublish: wiring.port<QueuePublishPort>('queue.publish'),
     repair: wiring.port<RepairPolicyPort>('queue.repair'),

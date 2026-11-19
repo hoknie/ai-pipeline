@@ -314,6 +314,17 @@ export const en = {
       enable: 'Enable',
       disable: 'Disable',
     },
+    audit: {
+      title: 'Journal',
+      user: 'User (email)',
+      project: 'Project',
+      action: 'Action, e.g. run.',
+      period: 'Period',
+      show: 'Show',
+      empty: 'No entries',
+      periods: { '1h': 'Last hour', '1d': 'Last day', '7d': 'Last 7 days', '30d': 'Last 30 days' },
+      outcomes: { ok: 'ok', denied: 'denied', failed: 'failed' },
+    },
   },
   language: {
     label: 'Language: {{language}}',
@@ -1095,6 +1106,11 @@ export const en = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  authorBadge: {
+    label: 'Author: {{name}} ({{email}})',
+    system: 'system',
+    disabled: 'disabled',
   },
   providerBadge: {
     label: 'Provider: {{id}}',

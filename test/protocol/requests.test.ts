@@ -129,6 +129,7 @@ const SAMPLES: Record<Method, unknown> = {
   login_link_create: { email: 'a@example.com' },
   whoami: {},
   users_list: {},
+  audit_list: {},
   users_set: { email: 'a@example.com', attributes: { role: ['admin'] } },
   users_disable: { email: 'a@example.com' },
   users_enable: { email: 'a@example.com' },
@@ -191,9 +192,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 120 methods, each in the request schema once', () => {
+  it('has 121 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(120);
+    expect(methods).toHaveLength(121);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

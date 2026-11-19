@@ -214,6 +214,9 @@ function runHead(state: RunState, observers: RepairPolicy) {
     provider: state.run.provider,
     providerName:
       state.run.provider === null ? null : providerName(state.run.config, state.run.provider),
+    // the snapshots fill the author in: the views do not read the accounts
+    author: null,
+    createdBySystem: state.run.createdBySystem,
     branch: state.run.branch,
     createdAt: state.run.createdAt,
     startedAt: runStartedAt(state),

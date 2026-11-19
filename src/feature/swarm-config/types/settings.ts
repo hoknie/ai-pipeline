@@ -317,6 +317,10 @@ export interface ServerSettings {
   tokenMaxTtl: string;
   /** External sign-in providers; none while unset. */
   sso: SsoSettings;
+  /** How long the audit journal keeps an entry: `<n>d`. */
+  auditRetention: string;
+  /** `Name <email>` added as a co-author to the commits of a delivery; `null`: none. */
+  commitTrailer: string | null;
 }
 
 /** The OpenID Connect provider of `server.sso.oidc`. */
@@ -377,5 +381,7 @@ export function defaultServer(): ServerSettings {
     sessionTtl: '12h',
     tokenMaxTtl: '90d',
     sso: { oidc: null, saml: null },
+    auditRetention: '365d',
+    commitTrailer: null,
   };
 }

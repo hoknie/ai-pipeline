@@ -4,6 +4,7 @@ import { IpcError } from '../../ipc/client/index.ts';
 import { panel } from '../errors.ts';
 import { send } from '../http.ts';
 import { call, cookie, redirect, statusOf, type ServerGate } from './gate.ts';
+import { clientAddress } from './proxy.ts';
 import { errorPage } from './pages.ts';
 
 /** A SAML response with its assertions and signatures is large; the form of the ACS may be this big. */
@@ -56,6 +57,7 @@ export async function samlAcs(
     const result = (await call(gate, 'auth_saml_complete', {
       samlResponse: form.SAMLResponse ?? '',
       relayState: form.RelayState ?? '',
+      address: clientAddress(incoming, gate.options),
     })) as { session: string; expiresAt: number; returnTo: string };
     const age = Math.max(1, Math.floor((result.expiresAt - Date.now()) / 1000));
     redirect(response, result.returnTo, { 'set-cookie': cookie(gate, result.session, age) });

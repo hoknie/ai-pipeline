@@ -6,7 +6,7 @@ import { useLocale } from '../../../shared/i18n/index.ts';
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import type { PipelinesView, QueueItemView } from '../../../shared/api/types.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
-import { ProviderBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
+import { AuthorBadge, ProviderBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 import { groupsText } from './itemText.ts';
 import { ReadinessBadge, SkippedSteps } from './RowParts.tsx';
 
@@ -68,6 +68,7 @@ export function RowMeta({
   return (
     <>
       <ProviderBadge provider={item.provider} name={item.providerName} />
+      <AuthorBadge author={item.author} createdBySystem={item.createdBySystem} />
       {item.autoDeliver === null ? null : (
         <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
           {item.autoDeliver ? t('queue.list.autoDelivery') : t('queue.list.manualDelivery')}

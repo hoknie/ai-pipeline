@@ -52,6 +52,24 @@ function historyQuery(search: URLSearchParams): object {
   return result;
 }
 
+/** `user`, `repository`, `action`, `since` (`<n>m`, `<n>h`, `<n>d`) and `limit` of `/api/audit`. */
+function auditQuery(search: URLSearchParams): object {
+  const text = (name: string): string | undefined => {
+    const value = search.get(name);
+    return value === null || value === '' ? undefined : value;
+  };
+  const since = text('since');
+  if (since !== undefined && !/^[1-9]\d*[mhd]$/.test(since))
+    throw panel('invalid', 'since must be <n>m, <n>h or <n>d');
+  return {
+    ...(text('user') ? { user: text('user') } : {}),
+    ...(text('repository') ? { repository: text('repository') } : {}),
+    ...(text('action') ? { action: text('action') } : {}),
+    ...(since ? { since } : {}),
+    ...(search.has('limit') ? { limit: boundedInteger(search, 'limit', 200, 1000) } : {}),
+  };
+}
+
 /** `since`, `until`, `repository` and `bucket` of `/api/stats`; the moments are whole milliseconds. */
 function statsQuery(search: URLSearchParams): {
   since?: number;
@@ -123,6 +141,7 @@ export async function requestBody(incoming: IncomingMessage, url: URL): Promise<
       throw panel('invalid', 'repository must be an absolute path');
     return { limit, ...(before ? { before } : {}), ...(repository ? { repository } : {}) };
   }
+  if (pathname === '/api/audit') return auditQuery(searchParams);
   if (pathname === '/api/observers/history') return historyQuery(searchParams);
   if (pathname.endsWith('/transcript')) return transcriptQuery(searchParams);
   if (pathname.endsWith('/diff')) {
@@ -148,6 +167,7 @@ function repositoryFree(pathname: string, search: URLSearchParams): boolean {
     pathname === '/api/observers' ||
     pathname === '/api/observers/history' ||
     pathname === '/api/stats' ||
+    pathname === '/api/audit' ||
     own
   );
 }

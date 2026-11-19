@@ -44,6 +44,8 @@ export function run(
     pipeline?: string;
     variant?: string;
     provider?: string;
+    author?: string | null;
+    createdBySystem?: boolean;
   } = {},
 ): RunState {
   const resolved = config(options.configText);
@@ -67,6 +69,8 @@ export function run(
     skip: options.skip,
     variant: options.variant,
     provider: options.provider,
+    author: options.author,
+    createdBySystem: options.createdBySystem,
   });
 }
 

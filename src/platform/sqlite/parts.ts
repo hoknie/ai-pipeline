@@ -2,6 +2,7 @@ import { ATTACHMENTS_MIGRATION } from './attachments-migration.ts';
 import { IDENTITY_MIGRATION } from './identity-migration.ts';
 import { INTEGRATIONS_MIGRATION } from './integrations-migration.ts';
 import { TASK_LINKS_MIGRATION } from './links-migration.ts';
+import { AUTHORSHIP_MIGRATION } from './authorship-migration.ts';
 import { SAML_MIGRATION } from './saml-migration.ts';
 import { SSO_MIGRATION } from './sso-migration.ts';
 
@@ -48,4 +49,5 @@ export const LATER_MIGRATIONS: string[] = [
   IDENTITY_MIGRATION,
   SSO_MIGRATION,
   SAML_MIGRATION,
+  AUTHORSHIP_MIGRATION,
 ];

@@ -74,6 +74,7 @@ export const featureGraph: Record<string, readonly string[]> = {
   stats: ['runs', 'repos', 'swarm-config'],
   integrations: ['repos'],
   identity: ['swarm-config'],
+  audit: [],
   compose: ['observers', 'queue', 'runs', 'tags', 'repos', 'integrations'],
 };
 

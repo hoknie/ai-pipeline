@@ -36,6 +36,10 @@ export interface RunRequest {
   variant?: string | undefined;
   /** Id of a known provider the run follows in its tiers; absent or `null`: not chosen. */
   provider?: string | null | undefined;
+  /** Id of the user who created the task; absent: none. */
+  author?: string | null | undefined;
+  /** The task is by `system`: no author, marked so. */
+  createdBySystem?: boolean | undefined;
   /** The files attached to the task. */
   attachments?: RunAttachment[] | undefined;
 }
@@ -93,6 +97,10 @@ export interface NewRun {
   variant?: string | undefined;
   /** Id of a known provider the run follows in its tiers; absent or `null`: not chosen. */
   provider?: string | null | undefined;
+  /** Id of the user who created the run; absent: none. */
+  author?: string | null | undefined;
+  /** The run is by `system`: no author, marked so. */
+  createdBySystem?: boolean | undefined;
   /** Files attached to the task. */
   attachments?: RunAttachment[] | undefined;
 }
@@ -152,6 +160,7 @@ export function createRun(input: NewRun): RunState {
       pipeline: input.pipeline,
       variant,
       provider,
+      ...{ author: input.author ?? null, createdBySystem: input.createdBySystem ?? false },
       baseCommit: input.baseCommit,
       branch: `refs/aip/${input.id}/run`,
       refStyle: 'refs',

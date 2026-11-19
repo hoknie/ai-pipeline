@@ -10,6 +10,7 @@ import type {
   RepositoryView,
   RunView,
 } from './contract/index.ts';
+import type { AuthorView } from './contract/index.ts';
 import type { DaemonServices } from './services.ts';
 import {
   globalQueueView,
@@ -49,7 +50,10 @@ export class Snapshots {
       view,
       queue.links.index.viewsOf(...[state.run.id, ...(item ? [item.id] : [])]),
     );
-    return withQueue({ ...linked, returnable: this.returnable(state) }, item?.id ?? null);
+    return withQueue(
+      { ...linked, author: this.author(state.run.author), returnable: this.returnable(state) },
+      item?.id ?? null,
+    );
   }
 
   /** The recent runs, the latest first. */
@@ -60,7 +64,7 @@ export class Snapshots {
   queue(queue: Queue): QueueView {
     const { config, tags, runs } = this.services;
     const delivery = config.delivery(queue.repository);
-    return queueView(
+    const view = queueView(
       queue,
       (id) => runs.states.lookup(id),
       delivery.auto,
@@ -74,6 +78,7 @@ export class Snapshots {
       (ids) => this.services.queue.links.index.viewsOf(...ids),
       delivery.providerNames,
     );
+    return { ...view, items: this.withAuthors(view.items) };
   }
 
   /** The global queue as clients see it; its tasks are those of every project. */
@@ -82,7 +87,7 @@ export class Snapshots {
     const line = queue.store.lines.line(GLOBAL_KEY);
     const delivery = (repository: string) => config.delivery(repository);
     const settings = config.queueSettings();
-    return globalQueueView(queue.store.globalQueue(), line, {
+    const view = globalQueueView(queue.store.globalQueue(), line, {
       lookup: (id) => runs.states.lookup(id),
       waits: runs.engine.waitOf,
       attachments: (item) => this.services.attachments.listOf(item),
@@ -97,6 +102,7 @@ export class Snapshots {
         catalog: tags.of(repository),
       }),
     });
+    return { ...view, items: this.withAuthors(view.items) };
   }
 
   /** The answer of a queue request: the queue of the project, or the global queue in its mode. */
@@ -152,6 +158,23 @@ export class Snapshots {
       delivery.diffs.diffOf(state.run.id, group.slug),
       runs.engine.waitOf,
     );
+  }
+
+  /** The author of a task or a run by the id of the user; `null` for none or for an id nobody knows. */
+  private author(id: string | null): AuthorView | null {
+    if (id === null) return null;
+    const user = this.services.identity.users.byId(id);
+    if (!user) return null;
+    return { id: user.id, email: user.email, name: user.name, disabled: user.disabled };
+  }
+
+  /** The items of a queue with their authors; the author of an item never changes, so it is read from the item. */
+  private withAuthors<T extends { id: string }>(items: T[]): (T & { author: AuthorView | null })[] {
+    const find = this.services.queue.store.findItem;
+    return items.map((view) => ({
+      ...view,
+      author: this.author(find(view.id)?.item.author ?? null),
+    }));
   }
 
   /** Whether `queue_return` would take the run: something to retry, and not in its queue yet. */

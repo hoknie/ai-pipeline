@@ -2,6 +2,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { authorEnvironment, commitTreeAs, type DeliveryIdentity } from './authorship.ts';
+import { changedFiles } from './changes.ts';
 import { git, gitFailure, runGit, runGitBuffer } from './runner.ts';
 import { commitAll, existingPaths, snapshotCommit } from './workspace.ts';
 
@@ -23,6 +25,13 @@ export interface DeliveryRequest {
   runRef: string;
   /** Paths git ignores that the run carries; never committed in commit mode. */
   include?: string[];
+  /**
+   * The server mode: the commit of a delivery is by the author of the run. A `branch` delivery
+   * is then one commit with the tree of the run on top of `base`, not the history of the run.
+   */
+  identity?: DeliveryIdentity;
+  /** The commit the run started from; where the commit of a `branch` delivery with an identity sits. */
+  base?: string;
 }
 
 export type DeliveryOutcome =
@@ -46,27 +55,6 @@ function underInclude(file: string, include: string[]): boolean {
 
 function lines(text: string): string[] {
   return text === '' ? [] : text.split('\n');
-}
-
-export async function changedFiles(
-  repository: string,
-  from: string,
-  to: string,
-): Promise<string[]> {
-  const output = await git(repository, 'diff', '--name-status', '-M', '-z', from, to);
-  const parts = output.split('\0').filter((part) => part !== '');
-  const files: string[] = [];
-  for (let index = 0; index < parts.length; index += 1) {
-    const status = parts[index] ?? '';
-    if (status.startsWith('R') || status.startsWith('C')) {
-      files.push(parts[index + 1] ?? '', parts[index + 2] ?? '');
-      index += 2;
-    } else {
-      files.push(parts[index + 1] ?? '');
-      index += 1;
-    }
-  }
-  return [...new Set(files.filter((file) => file !== ''))].sort();
 }
 
 export async function dirtyPaths(repository: string): Promise<string[]> {
@@ -225,8 +213,18 @@ export async function deliver(request: DeliveryRequest): Promise<DeliveryOutcome
     ),
   ].sort();
   if (request.mode === 'branch') {
-    await git(repository, 'branch', '-f', request.branch, request.runRef);
-    return { kind: 'applied', files, conflicts: [], commit: null, userEdits: [] };
+    const commit =
+      request.identity && request.base
+        ? await commitTreeAs(
+            repository,
+            request.runRef,
+            request.base,
+            request.message,
+            request.identity,
+          )
+        : null;
+    await git(repository, 'branch', '-f', request.branch, commit ?? request.runRef);
+    return { kind: 'applied', files, conflicts: [], commit, userEdits: [] };
   }
   if (request.mode === 'commit') {
     const staged = await runGit(repository, ['diff', '--cached', '--quiet'], {
@@ -260,7 +258,11 @@ export async function deliver(request: DeliveryRequest): Promise<DeliveryOutcome
     let commit: string | null = null;
     if (request.mode === 'commit' && conflicts.length === 0 && committed.length > 0) {
       await git(repository, 'add', '-A', '--', ...committed);
-      await git(repository, 'commit', '--no-verify', '-m', request.message, '--', ...committed);
+      await runGit(
+        repository,
+        ['commit', '--no-verify', '-m', request.message, '--', ...committed],
+        { env: authorEnvironment(request.identity) },
+      );
       commit = await git(repository, 'rev-parse', 'HEAD');
     }
     return { kind: 'applied', files, conflicts, commit, userEdits };

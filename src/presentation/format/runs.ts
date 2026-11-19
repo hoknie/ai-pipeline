@@ -44,13 +44,28 @@ function shortTitle(title: string | undefined): string {
 export function formatRunList(runs: RunView[], style: Style = plainStyle): string {
   if (runs.length === 0) return 'No runs yet.';
   const withRepository = !isTerminal(style) || new Set(runs.map((run) => run.repository)).size > 1;
+  // The column exists once an author is known: never in the local mode.
+  const withAuthor = runs.some((run) => run.author !== null);
+  const author = (run: RunView): string[] => (withAuthor ? [run.author?.email ?? '—'] : []);
   const rows = [
-    ['#', 'RUN', 'STATE', 'PIPELINE', 'TITLE', 'GROUPS', 'CHANGES', 'USAGE', 'REPOSITORY'],
+    [
+      '#',
+      'RUN',
+      'STATE',
+      'PIPELINE',
+      ...(withAuthor ? ['AUTHOR'] : []),
+      'TITLE',
+      'GROUPS',
+      'CHANGES',
+      'USAGE',
+      'REPOSITORY',
+    ],
     ...runs.map((run) => [
       taskNumber(run.number),
       style.accent(run.id),
       statusBadge(run.state, style),
       runPipelineLabel(run),
+      ...author(run),
       withTags(shortTitle(run.title), run.tags, style),
       [
         run.split && run.split.status !== 'done' ? `split ${run.split.status}` : run.counts || '—',
@@ -79,6 +94,7 @@ export function formatRun(
       ? [`${style.muted('Title:')} ${run.title}${run.name ? ` (${run.name})` : ''}`]
       : []),
     `${style.muted('Repository:')} ${run.repository}`,
+    ...(run.author ? [`${style.muted('Author:')} ${run.author.email}`] : []),
     ...(run.attachments.length > 0
       ? [
           `${style.muted('Attachments:')} ${run.attachments

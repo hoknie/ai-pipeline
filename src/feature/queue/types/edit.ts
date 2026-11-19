@@ -78,6 +78,8 @@ export function addItem(
     pipeline: cleanPipeline(fields.pipeline),
     variant: fields.variant ?? DEFAULT_VARIANT,
     provider: fields.provider ?? null,
+    author: fields.author ?? null,
+    createdBySystem: fields.createdBySystem ?? false,
     ...cleanBody(fields),
     title: cleanTitle(fields.title),
     autoDeliver: fields.autoDeliver ?? null,

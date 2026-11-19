@@ -1,5 +1,6 @@
 import type { Method, Request } from '../contract/index.ts';
 
+import { auditHandlers, audited } from './audit/index.ts';
 import { configHandlers } from './config.ts';
 import { groupHandlers } from './groups.ts';
 import { guard, identityHandlers } from './identity/index.ts';
@@ -26,11 +27,14 @@ export const handlers: HandlerTable = {
   ...queueHandlers,
   ...statsHandlers,
   ...identityHandlers,
+  ...auditHandlers,
 };
 
-/** Answers a request with the handler of its method. */
+/** Answers a request with the handler of its method; in server mode the journal records the calls that change something. */
 export function handle(request: Request, context: IpcContext): Promise<unknown> {
-  guard(request, context);
-  const handler = handlers[request.method] as Handler<Method>;
-  return handler(request.params as never, context);
+  return audited(request, context, async () => {
+    guard(request, context);
+    const handler = handlers[request.method] as Handler<Method>;
+    return handler(request.params as never, context);
+  });
 }

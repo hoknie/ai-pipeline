@@ -275,6 +275,9 @@ export function queueView(
       id: item.id,
       number: item.number,
       position: index + 1,
+      // the snapshots fill the author in: the views do not read the accounts
+      author: null,
+      createdBySystem: item.createdBySystem,
       ...itemTarget(item, lookup, names, variantNames, providerNames),
       ...itemBody(item, lookup),
       title: item.title,

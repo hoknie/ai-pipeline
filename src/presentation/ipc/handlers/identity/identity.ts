@@ -75,8 +75,10 @@ export const identityHandlers = {
   },
   auth_logout: async (params, context) => {
     serverOnly(context);
-    context.services.identity.sessions.logout(params.session);
-    return { ok: true };
+    const { sessions } = context.services.identity;
+    const user = sessions.resolve(params.session);
+    sessions.logout(params.session);
+    return { ok: true, user: user ? userView(user) : null };
   },
   auth_oidc_info: async (_params, context) => {
     serverOnly(context);

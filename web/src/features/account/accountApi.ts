@@ -1,4 +1,5 @@
-import { post } from '../../shared/api/http.ts';
+import { call, enc, post } from '../../shared/api/http.ts';
+import type { AuditEventView } from '../../shared/api/types.ts';
 
 export interface Me {
   email: string;
@@ -60,3 +61,21 @@ export const setUserDisabled = (email: string, disabled: boolean): Promise<unkno
   ipc(disabled ? 'users_disable' : 'users_enable', { email });
 
 export const signOut = (): Promise<unknown> => post('/auth/logout');
+
+/** What the journal is asked for; an empty field is no filter. */
+export interface AuditFilter {
+  user: string;
+  repository: string;
+  action: string;
+  /** `<n>m`, `<n>h` or `<n>d`. */
+  since: string;
+}
+
+/** The journal of the audit, newest first: `GET /api/audit` (administrators only). */
+export async function listAudit(filter: AuditFilter): Promise<AuditEventView[]> {
+  const query = (Object.entries(filter) as [keyof AuditFilter, string][])
+    .filter(([, value]) => value.trim() !== '')
+    .map(([key, value]) => `${key}=${enc(value.trim())}`)
+    .join('&');
+  return (await call<{ events: AuditEventView[] }>(`/api/audit${query ? `?${query}` : ''}`)).events;
+}

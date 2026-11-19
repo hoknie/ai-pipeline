@@ -3,6 +3,7 @@ import { agentsRequests } from './agents.ts';
 import { artifactsRequests } from './artifacts.ts';
 import { configRequests } from './config.ts';
 import { groupsRequests } from './groups.ts';
+import { auditRequests } from './identity/audit.ts';
 import { identityRequests } from './identity/identity.ts';
 import { integrationsRequests } from './integrations/integrations.ts';
 import { observersRequests } from './observers.ts';
@@ -30,6 +31,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   ...agentsRequests,
   ...panelRequests,
   ...identityRequests,
+  ...auditRequests,
 ]);
 
 export type Request = z.infer<typeof requestSchema>;

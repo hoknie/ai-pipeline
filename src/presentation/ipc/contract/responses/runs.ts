@@ -145,6 +145,14 @@ export interface RunRepairView {
   cancelReason: string | null;
 }
 
+/** The author of a task or a run as clients see them; the object stays the same for a disabled user. */
+export interface AuthorView {
+  id: string;
+  email: string;
+  name: string;
+  disabled: boolean;
+}
+
 export interface RunView {
   id: string;
   /** Integer number of the task within the repository. */
@@ -164,6 +172,10 @@ export interface RunView {
   provider: string | null;
   /** Name of the provider in the configuration of the run; `null`: not chosen or not known. */
   providerName: string | null;
+  /** Who created the run; `null`: nobody (local mode, the system, or before the server mode). */
+  author: AuthorView | null;
+  /** Created by `system`: no author, but marked so; `false` for runs of the local mode and from before the server mode. */
+  createdBySystem: boolean;
   branch: string;
   createdAt: number;
   /** When the first attempt of any group started; null while the run waits for a free slot. */

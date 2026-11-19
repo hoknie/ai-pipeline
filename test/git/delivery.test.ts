@@ -495,3 +495,61 @@ describe('file diff and range patch', () => {
     expect(readFileSync(join(clone, 'logo.bin')).equals(binary)).toBe(true);
   });
 });
+
+describe('the author of a delivery commit (server mode)', () => {
+  const alice = { name: 'Alice', email: 'alice@corp.com' };
+  const people = (repo: string, ref: string) =>
+    sh(repo, 'log', '-1', '--format=%an <%ae>|%cn <%ce>', ref);
+
+  it('commit mode: the author is the identity, the committer stays the git identity', async () => {
+    const { repo, change } = await setup(editApp);
+    const outcome = await deliver(
+      request(repo, change, { mode: 'commit', identity: { author: alice } }),
+    );
+    expect(outcome).toMatchObject({ kind: 'applied', commit: expect.any(String) });
+    expect(people(repo, 'HEAD')).toBe('Alice <alice@corp.com>|Test <test@example.com>');
+    expect(sh(repo, 'log', '-1', '--format=%s')).toBe('feat: from aip');
+  });
+
+  it('commit mode: a run without an author takes both from the git identity', async () => {
+    const { repo, change } = await setup(editApp);
+    await deliver(request(repo, change, { mode: 'commit', identity: { author: null } }));
+    expect(people(repo, 'HEAD')).toBe('Test <test@example.com>|Test <test@example.com>');
+  });
+
+  it('branch mode: one commit of the run on the base, by the author, the committer unchanged', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    const outcome = await deliver(
+      request(repo, change, {
+        mode: 'branch',
+        identity: { author: alice },
+        base,
+        message: 'feat: from aip\n\nCo-Authored-By: aip <aip@corp.com>',
+      }),
+    );
+    expect(outcome).toMatchObject({
+      kind: 'applied',
+      commit: sh(repo, 'rev-parse', 'aip/run000000003'),
+    });
+    expect(people(repo, 'aip/run000000003')).toBe('Alice <alice@corp.com>|Test <test@example.com>');
+    expect(sh(repo, 'rev-list', '--count', `${base}..aip/run000000003`)).toBe('1');
+    expect(sh(repo, 'rev-parse', 'aip/run000000003^')).toBe(base);
+    expect(sh(repo, 'rev-parse', 'aip/run000000003^{tree}')).toBe(
+      sh(repo, 'rev-parse', `${RUN}^{tree}`),
+    );
+    expect(sh(repo, 'log', '-1', '--format=%B', 'aip/run000000003')).toContain(
+      'Co-Authored-By: aip <aip@corp.com>',
+    );
+    expect(sh(repo, 'status', '--porcelain')).toBe('');
+  });
+
+  it('local mode: nothing changes, the branch is the ref of the run and the commit is by the git identity', async () => {
+    const { repo, change } = await setup(editApp);
+    await deliver(request(repo, change, { mode: 'branch' }));
+    expect(sh(repo, 'rev-parse', 'aip/run000000003')).toBe(sh(repo, 'rev-parse', RUN));
+    const second = await setup(editApp);
+    await deliver(request(second.repo, second.change, { mode: 'commit' }));
+    expect(people(second.repo, 'HEAD')).toBe('Test <test@example.com>|Test <test@example.com>');
+  });
+});

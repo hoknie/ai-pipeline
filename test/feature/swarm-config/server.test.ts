@@ -47,6 +47,8 @@ describe('server settings', () => {
       sessionTtl: '12h',
       tokenMaxTtl: '90d',
       sso: { oidc: null, saml: null },
+      auditRetention: '365d',
+      commitTrailer: null,
     });
   });
 
@@ -62,7 +64,41 @@ describe('server settings', () => {
       publicUrl: 'https://aip.example.com',
       sessionTtl: '12h',
       tokenMaxTtl: '90d',
+      auditRetention: '365d',
+      commitTrailer: null,
     });
+  });
+
+  it('accept a retention of whole days and a trailer in the form `Name <email>`', () => {
+    const { server, errors } = validateServerSection(
+      { audit_retention: '30d', commit_trailer: 'aip <aip@corp.com>' },
+      defaultWeb(),
+    );
+    expect(errors).toEqual([]);
+    expect(server).toMatchObject({
+      auditRetention: '30d',
+      commitTrailer: 'aip <aip@corp.com>',
+    });
+  });
+
+  it('name the path and the format of a wrong audit_retention', () => {
+    for (const value of ['12h', '0d', 'soon', '1.5d', 30]) {
+      const { errors } = validateServerSection({ audit_retention: value }, defaultWeb());
+      expect(errors.map((e) => e.path)).toEqual(['swarm.server.audit_retention']);
+    }
+    expect(
+      validateServerSection({ audit_retention: '12h' }, defaultWeb()).errors[0]?.message,
+    ).toContain('<n>d');
+  });
+
+  it('name the path and the format of a wrong commit_trailer', () => {
+    for (const value of ['aip', 'aip <nope>', '<a@b.c>', 'a <a@b.c> extra']) {
+      const { errors } = validateServerSection({ commit_trailer: value }, defaultWeb());
+      expect(errors.map((e) => e.path)).toEqual(['swarm.server.commit_trailer']);
+    }
+    expect(
+      validateServerSection({ commit_trailer: 'aip' }, defaultWeb()).errors[0]?.message,
+    ).toContain('Name <email>');
   });
 
   it('name the path of a wrong session_ttl and of other wrong fields', () => {

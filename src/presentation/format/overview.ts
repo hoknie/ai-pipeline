@@ -233,10 +233,11 @@ function runLines(data: OverviewData, style: Style): string[] {
   if (runs.length === 0) return ['Runs: none active'];
   const lines = [style.title('Runs:')];
   for (const run of runs) {
+    const by = run.author ? `  by ${run.author.email}` : '';
     const { done, total } = run.progress;
     const bar = style.rich ? `${progressBar(done, total, style)} ` : '';
     lines.push(
-      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${pipelineLabel(run.pipeline, run.pipelineName)}  ${run.title || '—'}  ${bar}${done}/${total} steps  ${slugOf(data, run.repository)}`,
+      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${pipelineLabel(run.pipeline, run.pipelineName)}  ${run.title || '—'}${by}  ${bar}${done}/${total} steps  ${slugOf(data, run.repository)}`,
     );
     for (const group of run.groups) {
       if (group.status !== 'running') continue;

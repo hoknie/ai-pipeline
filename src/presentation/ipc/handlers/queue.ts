@@ -1,3 +1,4 @@
+import { authorOf, createdBySystemOf } from '../../../feature/identity/types/index.ts';
 import { directoryName } from '../../../feature/repos/types/index.ts';
 import type { HandlerTable, IpcContext } from './types.ts';
 
@@ -21,7 +22,11 @@ function viewsOfTask(context: IpcContext, id: string) {
 export const queueHandlers = {
   run: (params, context) =>
     serial(context, async () => {
-      const queued = await context.services.queue.items.enqueue(params);
+      const queued = await context.services.queue.items.enqueue({
+        ...params,
+        author: authorOf(context.actor),
+        createdBySystem: createdBySystemOf(context.actor),
+      });
       return { ...queued, queue: context.snapshots.queueAnswer(queued.queue) };
     }),
   queue: (params, context) =>
@@ -49,14 +54,22 @@ export const queueHandlers = {
     }),
   queue_add: (params, context) =>
     serial(context, async () => {
-      const { queue, item } = await context.services.queue.items.add(params);
+      const { queue, item } = await context.services.queue.items.add({
+        ...params,
+        author: authorOf(context.actor),
+        createdBySystem: createdBySystemOf(context.actor),
+      });
       return { ...context.snapshots.queueAnswer(queue), item };
     }),
   queue_add_projects: (params, context) =>
     serial(context, () => {
       // The schema refused groups and attachments; they are left out of the typed request.
       const { groups: _groups, attachments: _attachments, ...request } = params;
-      return context.services.queue.projects.add(request);
+      return context.services.queue.projects.add({
+        ...request,
+        author: authorOf(context.actor),
+        createdBySystem: createdBySystemOf(context.actor),
+      });
     }),
   queue_edit: (params, context) =>
     serial(context, async () =>

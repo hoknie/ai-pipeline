@@ -2,9 +2,11 @@ import { join } from 'node:path';
 
 import type { Database } from '../../../platform/sqlite/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
-import type { DeliveryPublishPort } from '../ports/index.ts';
+import type { ConfigService } from '../../swarm-config/services/index.ts';
+import type { DeliveryAuthorsPort, DeliveryPublishPort } from '../ports/index.ts';
 import { FilePatchStorage, PatchRepository } from '../repositories/index.ts';
 
+import { CommitStamper } from './commit-stamp.ts';
 import { DeliverService } from './deliver.ts';
 import { DiffService } from './diffs.ts';
 import { PatchService } from './patches.ts';
@@ -13,6 +15,8 @@ export interface DeliveryServices {
   diffs: DiffService;
   patches: PatchService;
   deliver: DeliverService;
+  /** Stamps the commits of the deliveries of the runs; set on the runs as their port. */
+  commits: CommitStamper;
 }
 
 export function createDeliveryServices(dependencies: {
@@ -22,8 +26,10 @@ export function createDeliveryServices(dependencies: {
   runs: RunsServices;
   now: () => number;
   publish: DeliveryPublishPort;
+  config: ConfigService;
+  authors: DeliveryAuthorsPort;
 }): DeliveryServices {
-  const { database, runs, now, publish } = dependencies;
+  const { database, runs, now, publish, config, authors } = dependencies;
   const storages = [new FilePatchStorage(join(dependencies.stateDirectory, 'patches'))];
   return {
     diffs: new DiffService({ runs, publish }),
@@ -35,5 +41,6 @@ export function createDeliveryServices(dependencies: {
       stopping: () => runs.engine.stopping,
     }),
     deliver: new DeliverService({ states: runs.states, engine: runs.engine }),
+    commits: new CommitStamper({ config, authors }),
   };
 }

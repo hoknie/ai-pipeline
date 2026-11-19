@@ -103,8 +103,8 @@ export class QueueRepository {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, delivery_mode, run_id, postponed, number, variant, global_position, provider)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, delivery_mode, run_id, postponed, number, variant, global_position, provider, author_id, created_by_system)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) => {
         this.links.replaceSource(
@@ -133,6 +133,8 @@ export class QueueRepository {
           item.variant,
           item.globalPosition ?? null,
           item.provider,
+          item.author,
+          item.createdBySystem ? 1 : 0,
         );
       });
     }
@@ -257,6 +259,8 @@ function hydrateItem(item: Row, after: string[]): QueueItem {
     pipeline: String(item.pipeline),
     variant: item.variant === null || item.variant === undefined ? 'default' : String(item.variant),
     provider: text(item.provider ?? null),
+    author: text(item.author_id ?? null),
+    createdBySystem: Number(item.created_by_system ?? 0) === 1,
     task: text(item.task ?? null),
     groups: nullable(item.groups_json ?? null),
     title: text(item.title ?? null),

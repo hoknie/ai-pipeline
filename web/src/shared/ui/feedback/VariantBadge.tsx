@@ -1,6 +1,7 @@
-import { Layers } from 'lucide-react';
+import { Layers, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import type { AuthorView } from '../../api/types.ts';
 import { Badge } from './badge.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip.tsx';
 
@@ -70,6 +71,42 @@ export function ProviderBadge({
       data-provider={provider}
     >
       <span className="min-w-0 truncate">{named ?? `@${provider}`}</span>
+    </Badge>
+  );
+}
+
+/**
+ * Who created a task or a run: the name, and the email in the tooltip. Without an author nothing
+ * is shown, unless `createdBySystem` says the task came from the system itself: then it reads "system".
+ * Not interactive.
+ */
+export function AuthorBadge({
+  author,
+  createdBySystem = false,
+}: {
+  author: AuthorView | null | undefined;
+  createdBySystem?: boolean | undefined;
+}) {
+  const { t } = useTranslation();
+  if (!author) {
+    return createdBySystem ? (
+      <Badge variant="outline" className="max-w-32 rounded-md" data-author="system">
+        <User aria-hidden />
+        <span className="min-w-0 truncate">{t('authorBadge.system')}</span>
+      </Badge>
+    ) : null;
+  }
+  const label = t('authorBadge.label', { name: author.name, email: author.email });
+  return (
+    <Badge
+      variant="outline"
+      className={`max-w-32 rounded-md ${author.disabled ? 'opacity-60' : ''}`}
+      aria-label={label}
+      title={author.disabled ? `${author.email} (${t('authorBadge.disabled')})` : author.email}
+      data-author={author.id}
+    >
+      <User aria-hidden />
+      <span className="min-w-0 truncate">{author.name}</span>
     </Badge>
   );
 }

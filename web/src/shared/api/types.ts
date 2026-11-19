@@ -24,6 +24,8 @@ export type {
   SpecialistsImportResult,
   DependencyView,
   AttemptView,
+  AuditEventView,
+  AuthorView,
   BackgroundOwner,
   BackgroundProcessesView,
   BackgroundProcessView,

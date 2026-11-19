@@ -24,6 +24,8 @@ delivery:
 - `commit` puts the changes in the working tree and makes one commit on the current branch, with the run's files only. Your other uncommitted edits are not touched. If anything is staged in the index, delivery refuses.
 - `branch` creates an `aip/<run-id>` branch with the result and leaves the working tree alone.
 
+In [server mode](server.md#authors-and-commits) the commit of `commit` and `branch` is by the person whose task it was.
+
 In `commit` mode with the `working_tree` [base](README.md#workspace), a run file that contained your uncommitted edits goes into the commit as a whole; the delivery answer lists such files.
 
 ## Automatic and manual delivery

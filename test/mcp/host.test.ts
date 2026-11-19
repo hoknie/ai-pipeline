@@ -34,6 +34,8 @@ const VIEW: QueueView & { item: string } = {
       variantName: 'default',
       provider: null,
       providerName: null,
+      author: null,
+      createdBySystem: false,
       pipelineName: 'feature',
       task: 'Build the login',
       groups: null,

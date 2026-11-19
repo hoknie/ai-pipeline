@@ -21,6 +21,7 @@ const sharedRepository: Predicate = (params) => params.repository === null;
  */
 export const adminMethods: Partial<Record<Method, Predicate>> = {
   users_list: always,
+  audit_list: always,
   users_set: always,
   users_disable: always,
   users_enable: always,

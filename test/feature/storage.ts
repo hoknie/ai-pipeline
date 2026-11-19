@@ -83,7 +83,13 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
 
 /** Takes away the columns of the newest migrations (the variants and the take filter), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
-  // The newest migration adds the accepted SAML assertions.
+  // The newest migration adds the author of a task and of a run, and the audit journal.
+  database.exec('DROP TABLE IF EXISTS audit_events');
+  dropColumn(database, 'queue_items', 'created_by_system');
+  dropColumn(database, 'runs', 'created_by_system');
+  dropColumn(database, 'queue_items', 'author_id');
+  dropColumn(database, 'runs', 'author_id');
+  // The one before adds the accepted SAML assertions.
   database.exec('DROP TABLE IF EXISTS saml_assertions');
   // The one before adds the subject of a user and the sign-ins in progress at a provider.
   database.exec('DROP TABLE IF EXISTS sso_requests; DROP INDEX IF EXISTS users_by_subject');

@@ -1,5 +1,6 @@
 export { formatApply, formatDiff, formatGroup } from './groups.ts';
 export { formatConnections, formatIntegrationTypes } from './integration/index.ts';
+export { formatAudit } from './audit/index.ts';
 export { formatLinks } from './links.ts';
 export { formatAddedToProjects, formatQueue, formatQueues, formatRepositories } from './queue.ts';
 export { formatRun, formatRunCreated, formatRunList, formatRunQueued, waitNote } from './runs.ts';

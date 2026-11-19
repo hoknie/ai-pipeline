@@ -52,31 +52,14 @@ export interface QueueItemsDependencies {
 }
 
 /** The fields of a new item without the tags, which are resolved separately. */
-function fields(request: TaskFields & { postponed?: boolean | undefined }): ItemFields {
-  const {
-    pipeline,
-    variant,
-    provider,
-    task,
-    groups,
-    title,
-    autoDeliver,
-    deliveryMode,
-    skip,
-    after,
-  } = request;
+function fields(
+  request: TaskFields & Pick<ItemFields, 'postponed' | 'author' | 'createdBySystem'>,
+): ItemFields {
+  const { pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode } = request;
+  const { skip, after, postponed, author, createdBySystem } = request;
   return {
-    pipeline,
-    variant,
-    provider,
-    task,
-    groups,
-    title,
-    autoDeliver,
-    deliveryMode,
-    skip,
-    after,
-    ...(request.postponed !== undefined ? { postponed: request.postponed } : {}),
+    ...{ pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode },
+    ...{ skip, after, postponed, author, createdBySystem },
   };
 }
 
@@ -210,10 +193,25 @@ export class QueueItems {
         throw rejected("a specialist's task has its run as the parent");
       }
       const { after } = links.plan(repository, params, params.links);
-      this.checkNewItem(queue, fields({ ...params, after }), now());
+      this.checkNewItem(
+        queue,
+        fields({
+          ...params,
+          after,
+          author: state.run.author,
+          createdBySystem: state.run.createdBySystem,
+        }),
+        now(),
+      );
       const tag = await taskTags.linkedTagFor(state);
       const inherited = mergeTags([tag.id], knownTags(tags.of(repository), state.run.tags));
-      return this.addTo(repository, params, inherited, state.run.id);
+      // The task of a specialist has the author of the run it comes from.
+      return this.addTo(
+        repository,
+        { ...params, author: state.run.author, createdBySystem: state.run.createdBySystem },
+        inherited,
+        state.run.id,
+      );
     });
   }
 
@@ -245,7 +243,11 @@ export class QueueItems {
 
   private async addTo(
     repository: string,
-    params: TaskFields & Pick<QueueAddRequest, 'tags' | 'parent' | 'postponed' | 'attachments'>,
+    params: TaskFields &
+      Pick<
+        QueueAddRequest,
+        'tags' | 'parent' | 'postponed' | 'attachments' | 'author' | 'createdBySystem'
+      >,
     inherited?: string[],
     specialistRun?: string,
   ): Promise<QueueChange> {

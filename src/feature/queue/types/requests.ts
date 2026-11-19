@@ -33,6 +33,10 @@ export interface QueueAddRequest extends TaskFields {
   /** The run (id or task number) whose linked task tag the new task carries. */
   parent?: string | number | undefined;
   postponed?: boolean | undefined;
+  /** Id of the user adding the task (from the actor of the call). */
+  author?: string | null | undefined;
+  /** The call is by `system`: the task has no author and is marked so. */
+  createdBySystem?: boolean | undefined;
   /** Files to attach: absolute paths; a specialist's task has none. */
   attachments?: AttachmentSource[] | undefined;
 }
@@ -43,6 +47,9 @@ export interface QueueAddProjectsRequest extends TaskFields {
   repositories: string[];
   task: string;
   postponed?: boolean | undefined;
+  author?: string | null | undefined;
+  /** The call is by `system`: the task has no author and is marked so. */
+  createdBySystem?: boolean | undefined;
   /** An addition to the task text per project, by path or slug. */
   notes?: Record<string, string> | undefined;
   /** The name of the tag every item gets from the catalog of its project; empty: none. */

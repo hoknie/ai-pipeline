@@ -18,6 +18,8 @@ function item(id: string, createdAt: number, extra: Partial<QueueItem> = {}): Qu
     pipeline: 'feature',
     variant: 'default',
     provider: null,
+    author: null,
+    createdBySystem: false,
     task: id,
     groups: null,
     title: null,

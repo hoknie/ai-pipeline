@@ -320,6 +320,22 @@ export const es: Dictionary = {
       enable: 'Activar',
       disable: 'Desactivar',
     },
+    audit: {
+      title: 'Registro',
+      user: 'Usuario (email)',
+      project: 'Proyecto',
+      action: 'Acción, p. ej. run.',
+      period: 'Periodo',
+      show: 'Mostrar',
+      empty: 'Sin entradas',
+      periods: {
+        '1h': 'Última hora',
+        '1d': 'Último día',
+        '7d': 'Últimos 7 días',
+        '30d': 'Últimos 30 días',
+      },
+      outcomes: { ok: 'correcto', denied: 'denegado', failed: 'con error' },
+    },
   },
   language: {
     label: 'Idioma: {{language}}',
@@ -1116,6 +1132,11 @@ export const es: Dictionary = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  authorBadge: {
+    label: 'Autor: {{name}} ({{email}})',
+    system: 'sistema',
+    disabled: 'desactivado',
   },
   providerBadge: {
     label: 'Proveedor: {{id}}',

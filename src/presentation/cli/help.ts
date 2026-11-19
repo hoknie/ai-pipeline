@@ -24,6 +24,7 @@ export const HELP_GROUPS: HelpGroup[] = [
       'whoami',
       'token',
       'server',
+      'audit',
       'version',
       'help',
     ],

@@ -1,4 +1,4 @@
-import { currentBuild, type BuildInfo } from '../platform/build/index.ts';
+import type { BuildInfo } from '../platform/build/index.ts';
 import { databasePath, socketPath } from '../platform/paths/index.ts';
 import { snapshotProcesses, type PsRow } from '../platform/process/index.ts';
 import { createSecretStore, installationId, type SecretStore } from '../platform/secrets/index.ts';
@@ -28,9 +28,9 @@ import { Publisher } from '../presentation/ipc/publisher.ts';
 import type { DaemonServices } from '../presentation/ipc/services.ts';
 import { Snapshots } from '../presentation/ipc/snapshots.ts';
 
-import { createActors } from './actors.ts';
+import { createActors, createIpcContext } from './actors.ts';
+import { wire } from './wire.ts';
 import { createAgents } from './agents.ts';
-import { integrationOperations } from './integration-operations.ts';
 import { createLifecycle } from './lifecycle.ts';
 import { DEFAULT_TIMINGS, type DaemonTimings } from './timings.ts';
 import { declarePorts, type Ports } from './wiring.ts';
@@ -168,6 +168,7 @@ function createRuns(context: Context, lower: Lower) {
     publish: ports.runs.port,
     diff: ports.diff.port,
     attachments: ports.attachments.port,
+    commits: ports.commits.port,
     agentExit: processes,
   });
   return { runs, processes };
@@ -183,6 +184,8 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     runs,
     now,
     publish: ports.delivery.port,
+    config,
+    authors: ports.authors.port,
   });
   const { artifacts } = createArtifactsServices({
     database,
@@ -261,14 +264,14 @@ export function createApplication(options: ApplicationOptions): Application {
   const lower = createLower(context);
   const { runs, processes } = createRuns(context, lower);
   const upper = createUpper(context, lower, runs);
-  const { identity, actorOfRequest } = createActors({ ...context, config: lower.config });
-  const services: DaemonServices = { now, ...lower, runs, processes, ...upper, identity };
+  const { identity, audit, actorOfRequest } = createActors({ ...context, config: lower.config });
+  const services: DaemonServices = { now, ...lower, runs, processes, ...upper, identity, audit };
   const snapshots = new Snapshots(services);
   const publisher = new Publisher(services, snapshots);
   wire(ports, services, publisher);
   wiring.check();
-  const lifecycle = createLifecycle(services, database);
-  const ipc = { services, snapshots, build: options.build ?? currentBuild(), panel: options.panel };
+  const ipc = createIpcContext(services, snapshots, options);
+  const lifecycle = createLifecycle(services, database, ipc.log);
   return {
     socket,
     timings,
@@ -279,54 +282,4 @@ export function createApplication(options: ApplicationOptions): Application {
     start: () => lifecycle.start(),
     stop: () => lifecycle.stop(),
   };
-}
-
-/** Sets every port against the arrows: the publisher, the queue, the observers and the diffs. */
-function wire(ports: Ports, services: DaemonServices, publisher: Publisher): void {
-  const publications = publisher.ports();
-  ports.repos.set(publications.repos);
-  ports.tags.set(publications.tags);
-  // Settings of a runtime may have changed: observers look at the incidents again.
-  ports.config.set({
-    configChanged: (repository) => {
-      publications.config.configChanged(repository);
-      services.observers.request();
-      // The queue mode is a setting of the shared settings.yaml.
-      services.queue.scope.request();
-      // The limits and the pools are settings of the same file: the waits and the free places are
-      // looked at again, queued after the change of the mode, without a run event.
-      const { engine } = services.runs;
-      void engine.serial(() => engine.schedule()).catch(() => undefined);
-    },
-  });
-  ports.integrations.set(integrationOperations(services));
-  ports.processes.set(publications.processes);
-  // Every saved run reaches the clients first, then the usage journal.
-  ports.runs.set({
-    ...publications.runs,
-    runSaved: (state) => {
-      publications.runs.runSaved(state);
-      void services.stats.ledger.capture(state);
-    },
-  });
-  ports.queuePublish.set(publications.queue);
-  ports.observers.set(publications.observers);
-  ports.delivery.set(publications.delivery);
-  ports.artifacts.set(publications.artifacts);
-  // Agents held for the network start, and the clients hear about it, as soon as it changes.
-  ports.network.set({
-    changed: (state) => {
-      publications.network.changed(state);
-      const { engine } = services.runs;
-      void engine.serial(() => engine.wake()).catch(() => undefined);
-    },
-  });
-  ports.attachments.set({ materialize: (run) => services.attachments.materialize(run) });
-  ports.queue.set(services.queue.advance);
-  ports.observe.set(services.observers);
-  ports.repair.set(services.observers);
-  ports.diff.set({
-    savePatch: (state) => services.delivery.patches.save(state),
-    refreshDiff: (state, slug) => services.delivery.diffs.refresh(state, slug),
-  });
 }

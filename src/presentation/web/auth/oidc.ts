@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { IpcError } from '../../ipc/client/index.ts';
 import { errorPage, loginPage, type SsoLink, type SsoLinks } from './pages.ts';
 import { call, cookie, redirect, statusOf, type ServerGate } from './gate.ts';
+import { clientAddress } from './proxy.ts';
 
 /** What the login page says about the providers; a provider that is not configured (or a failing daemon) has no entry. */
 export async function ssoLinks(gate: ServerGate): Promise<SsoLinks> {
@@ -52,12 +53,15 @@ export async function oidcStart(
 /** `GET /auth/oidc/callback`: the return of the browser; the daemon checks everything. */
 export async function oidcCallback(
   gate: ServerGate,
-  _incoming: IncomingMessage,
+  incoming: IncomingMessage,
   response: ServerResponse,
   url: URL,
 ): Promise<void> {
   try {
-    const result = (await call(gate, 'auth_oidc_complete', { query: url.search.slice(1) })) as {
+    const result = (await call(gate, 'auth_oidc_complete', {
+      query: url.search.slice(1),
+      address: clientAddress(incoming, gate.options),
+    })) as {
       session: string;
       expiresAt: number;
       returnTo: string;

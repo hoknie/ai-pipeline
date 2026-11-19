@@ -27,6 +27,8 @@ const SERVER_KEYS = [
   'session_ttl',
   'token_max_ttl',
   'sso',
+  'audit_retention',
+  'commit_trailer',
 ];
 
 const SSO_KEYS = ['oidc', 'saml'];
@@ -163,6 +165,11 @@ const SESSION_TTL = /^[1-9]\d*[hd]$/;
 
 const TOKEN_TTL = /^[1-9]\d*d$/;
 
+const AUDIT_RETENTION = /^[1-9]\d*d$/;
+
+/** `Name <email>`: a name without angle brackets, then an address in them. */
+const TRAILER = /^[^<>\r\n]+ <[^<>\s@]+@[^<>\s@]+>$/;
+
 function listenProblem(value: string): string | null {
   const match = /^(.+):(\d{1,5})$/.exec(value);
   const port = match ? Number(match[2]) : 0;
@@ -219,6 +226,16 @@ function checkField(
     const value = readString(ctx, field, path);
     if (value !== null && !TOKEN_TTL.test(value)) addError(ctx, path, 'must be `<n>d`');
     else if (value !== null) server.tokenMaxTtl = value;
+  }
+  if (key === 'audit_retention') {
+    const value = readString(ctx, field, path);
+    if (value !== null && !AUDIT_RETENTION.test(value)) addError(ctx, path, 'must be `<n>d`');
+    else if (value !== null) server.auditRetention = value;
+  }
+  if (key === 'commit_trailer') {
+    const value = readString(ctx, field, path)?.trim() ?? null;
+    if (value !== null && !TRAILER.test(value)) addError(ctx, path, 'must be `Name <email>`');
+    else if (value !== null) server.commitTrailer = value;
   }
 }
 

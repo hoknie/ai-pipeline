@@ -166,6 +166,7 @@ export function formatQueue(
       item.provider === null
         ? ''
         : ` · provider: ${providerText(item.provider, item.providerName)}`;
+    const by = item.author === null ? '' : ` · by ${item.author.email}`;
     const skipped = item.skip.length === 0 ? '' : ` · skip: ${item.skip.join(', ')}`;
     const mark =
       item.readiness === 'ready'
@@ -182,7 +183,7 @@ export function formatQueue(
     const returned =
       item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;
     const head = `  ${item.position}. ${slug('repository' in item ? item.repository : undefined)}${taskNumber(item.number)} ${style.accent(item.id)}  ${pipelineLabel(item.pipeline, item.pipelineName)}  `;
-    const tail = `${title}${tagText}${delivery}${variant}${provider}${skipped}${after}${links}${files}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`;
+    const tail = `${title}${tagText}${delivery}${variant}${provider}${by}${skipped}${after}${links}${files}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`;
     const room = isTerminal(style)
       ? Math.max(10, style.columns - visibleWidth(head) - visibleWidth(tail))
       : Infinity;

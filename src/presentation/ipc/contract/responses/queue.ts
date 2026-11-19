@@ -16,7 +16,7 @@ import type {
 } from '../../../../feature/runs/types/index.ts';
 import type { DeliveryMode } from '../../../../feature/swarm-config/types/index.ts';
 import type { AttachmentView } from './attachments.ts';
-import type { DeliveryStage, RowStatus, SystemStepKind } from './runs.ts';
+import type { AuthorView, DeliveryStage, RowStatus, SystemStepKind } from './runs.ts';
 import type { TagView } from './tags.ts';
 
 export interface QueueItemView {
@@ -35,6 +35,10 @@ export interface QueueItemView {
   provider: string | null;
   /** Name of the provider in the current configuration; `null`: not chosen or not known. */
   providerName: string | null;
+  /** Who created the task; `null`: nobody (local mode, the system, or before the server mode). */
+  author: AuthorView | null;
+  /** Created by `system`: no author, but marked so; `false` for tasks of the local mode and from before the server mode. */
+  createdBySystem: boolean;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
