@@ -337,8 +337,33 @@ export interface OidcSettings {
   allowedDomains: string[];
 }
 
+/** The SAML 2.0 provider of `server.sso.saml`. */
+export interface SamlSettings {
+  /** The metadata of the provider: an http(s) URL or a path of a file. */
+  idpMetadata: string;
+  /** The entityID of the service; `null` means `<public_url>/auth/saml/metadata`. */
+  entityId: string | null;
+  /** The files with the private key and the certificate the service signs with. */
+  keyFile: string;
+  certFile: string;
+  label: string;
+  /** The attributes of the email and of the name; `null` email means the NameID. */
+  claims: { email: string | null; name: string | null };
+  /** The user attribute name → the SAML attribute it is taken from. */
+  attributes: Record<string, string>;
+  /** Links a user of the provider to the local account of the same email. */
+  trustEmail: boolean;
+  allowedDomains: string[];
+}
+
+/** The entityID of the service: the setting, else the address of its metadata. */
+export function samlEntityId(saml: SamlSettings, publicUrl: string): string {
+  return saml.entityId ?? `${publicUrl}/auth/saml/metadata`;
+}
+
 export interface SsoSettings {
   oidc: OidcSettings | null;
+  saml: SamlSettings | null;
 }
 
 export const DEFAULT_OIDC_SCOPES = ['openid', 'email', 'profile'];
@@ -351,6 +376,6 @@ export function defaultServer(): ServerSettings {
     trustedProxies: [],
     sessionTtl: '12h',
     tokenMaxTtl: '90d',
-    sso: { oidc: null },
+    sso: { oidc: null, saml: null },
   };
 }

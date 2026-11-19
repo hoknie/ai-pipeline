@@ -27,6 +27,7 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | [configuration/stats.md](configuration/stats.md) | usage statistics: what is recorded, exclusions, the report: `stats` |
 | [configuration/server.md](configuration/server.md) | server mode: one shared daemon for several people: `server` |
 | [configuration/sso.md](configuration/sso.md) | sign-in through OpenID Connect: `server.sso.oidc`, the redirect address, Keycloak, Okta, Entra ID, Google |
+| [configuration/sso-saml.md](configuration/sso-saml.md) | sign-in through SAML 2.0: `server.sso.saml`, the metadata of the service, ADFS, Okta, Entra ID, groups as attributes |
 
 ## Running work
 

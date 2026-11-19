@@ -8,6 +8,7 @@ import { json, parseBody, readJson, send } from '../http.ts';
 import { requestContext } from './context.ts';
 import { call, cookie, createGate, redirect, statusOf, type ServerGate } from './gate.ts';
 import { oidcCallback, oidcStart, renderLogin } from './oidc.ts';
+import { samlAcs, samlMetadata, samlStart } from './saml.ts';
 import { confirmCliPage, errorPage } from './pages.ts';
 import { sessionCookie } from './session.ts';
 
@@ -122,6 +123,12 @@ export async function authRoute(
     await oidcStart(gate, response, url);
   } else if (path === '/auth/oidc/callback' && verb === 'GET') {
     await oidcCallback(gate, incoming, response, url);
+  } else if (path === '/auth/saml/start' && verb === 'GET') {
+    await samlStart(gate, response, url);
+  } else if (path === '/auth/saml/acs' && verb === 'POST') {
+    await samlAcs(gate, incoming, response);
+  } else if (path === '/auth/saml/metadata' && verb === 'GET') {
+    await samlMetadata(gate, response);
   } else if (path === '/auth/logout' && verb === 'POST') {
     await logout(gate, incoming, response);
   } else if (path === '/auth/cli' && verb === 'GET') {

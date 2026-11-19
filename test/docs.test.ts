@@ -231,6 +231,30 @@ describe('documentation examples', () => {
     });
   });
 
+  it('the SAML example of docs/configuration/sso-saml.md is valid in the global settings', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aip-docs-saml-'));
+    const block = (
+      yamlBlocks('docs/configuration/sso-saml.md').find((b) => b.startsWith('server:')) ?? ''
+    ).replaceAll('/etc/aip', join(root, 'etc'));
+    mkdirSync(join(root, 'etc'), { recursive: true });
+    for (const name of ['saml.key', 'saml.crt']) writeFileSync(join(root, 'etc', name), 'pem');
+    mkdirSync(join(root, 'xdg', 'aip'), { recursive: true });
+    writeFileSync(
+      join(root, 'xdg', 'aip', 'settings.yaml'),
+      block.replace(/idp_metadata: \S+/, `idp_metadata: ${join(root, 'etc', 'saml.crt')}`),
+    );
+    const server = loadServerSettings(
+      configPaths(join(root, 'repo'), join(root, 'xdg'), undefined),
+    );
+    expect(server.sso.saml).toMatchObject({
+      label: 'ADFS',
+      claims: { email: 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' },
+      attributes: { groups: 'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups' },
+      trustEmail: false,
+      allowedDomains: ['corp.com'],
+    });
+  });
+
   it('the web example of docs/configuration/README.md is valid in the global settings', () => {
     const web =
       yamlBlocks('docs/configuration/README.md').find((block) => block.startsWith('web:')) ?? '';

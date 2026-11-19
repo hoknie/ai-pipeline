@@ -3,16 +3,13 @@ import type { Database } from '../../../platform/sqlite/index.ts';
 import type { OidcSettings, ServerSettings } from '../../swarm-config/types/index.ts';
 import type { Clock, OidcIdentity, OidcProvider, Random } from '../ports/index.ts';
 import type { SsoRequestsRepository, UsersRepository } from '../repositories/index.ts';
-import {
-  type User,
-  claimText,
-  emailDomain,
-  emailVerified,
-  isEmail,
-  mapAttributes,
-} from '../types/index.ts';
+import type { SsoAccounts } from './sso-accounts.ts';
+import { type User, claimText, emailVerified, isEmail, mapAttributes } from '../types/index.ts';
 
 import type { SessionsService } from './sessions.ts';
+
+/** The `codeVerifier` of a request row that belongs to a SAML sign-in (there is no PKCE in SAML). */
+export const SAML_REQUEST = 'saml';
 
 /** A sign-in request lives this long (the user signs in at the provider meanwhile). */
 export const SSO_REQUEST_TTL = 10 * 60_000;
@@ -22,6 +19,7 @@ export interface SsoDependencies {
   users: UsersRepository;
   requests: SsoRequestsRepository;
   sessions: SessionsService;
+  accounts: SsoAccounts;
   settings: () => ServerSettings;
   /** The provider adapter; `null` while it cannot be built (no client secret). */
   provider: () => OidcProvider | null;
@@ -113,7 +111,11 @@ export class SsoLoginService {
     const params = new URLSearchParams(request.query.replace(/^\?/, ''));
     const state = params.get('state');
     const stored = state ? this.deps.requests.take(state) : null;
-    if (!stored || stored.expiresAt <= this.deps.clock.now()) {
+    if (
+      !stored ||
+      stored.codeVerifier === SAML_REQUEST ||
+      stored.expiresAt <= this.deps.clock.now()
+    ) {
       throw refuse(
         'identity.sso_state',
         'the sign-in request is unknown or has expired; start again',
@@ -140,36 +142,23 @@ export class SsoLoginService {
     });
   }
 
-  private checkDomain(oidc: OidcSettings, email: string | null): void {
-    if (oidc.allowedDomains.length === 0) return;
-    const domain = email === null ? null : emailDomain(email);
-    if (domain === null || !oidc.allowedDomains.includes(domain)) {
-      throw appError(
-        'forbidden',
-        'identity.sso_domain',
-        `sign-in is allowed for ${oidc.allowedDomains.join(', ')} only`,
-      );
-    }
-  }
-
   private resolve(oidc: OidcSettings, identity: OidcIdentity): User {
-    const { users } = this.deps;
+    const { users, accounts } = this.deps;
     const email = claimText(identity.claims, oidc.claims.email);
-    this.checkDomain(oidc, email);
+    accounts.checkDomain(oidc.allowedDomains, email);
     const attributes = mapAttributes(identity.claims, oidc.attributes);
     const subject = { issuer: identity.issuer, subject: identity.subject };
     const known = users.bySubject(subject.issuer, subject.subject);
     if (known?.disabled) {
       throw appError('forbidden', 'identity.user_disabled', 'the account is disabled');
     }
-    if (known)
-      return this.refresh(known, email, claimText(identity.claims, oidc.claims.name), attributes);
+    const name = claimText(identity.claims, oidc.claims.name);
+    if (known) return accounts.refresh(known, email, name, attributes);
     if (email === null || !isEmail(email)) {
       throw refuse('identity.sso_email', 'the provider did not tell the email of the user');
     }
-    const name = claimText(identity.claims, oidc.claims.name);
     const local = users.byEmail(email);
-    if (!local) return this.create(email, name, attributes, subject);
+    if (!local) return accounts.create('oidc', email, name, attributes, subject);
     if (local.disabled) {
       throw appError('forbidden', 'identity.user_disabled', 'the account is disabled');
     }
@@ -186,45 +175,6 @@ export class SsoLoginService {
       );
     }
     users.setSubject(local.id, subject);
-    return this.refresh({ ...local, source: 'oidc', subject }, email, name, attributes);
-  }
-
-  private create(
-    email: string,
-    name: string | null,
-    attributes: User['attributes'],
-    subject: NonNullable<User['subject']>,
-  ): User {
-    const trimmed = email.trim();
-    const user: User = {
-      id: this.deps.random.id(),
-      email: trimmed,
-      name: name ?? trimmed.split('@')[0] ?? trimmed,
-      attributes,
-      source: 'oidc',
-      subject,
-      disabled: false,
-      createdAt: this.deps.clock.now(),
-      lastLoginAt: null,
-    };
-    this.deps.users.insert(user);
-    return user;
-  }
-
-  /** Replaces the email, the name and the attributes with what the provider says now. */
-  private refresh(
-    user: User,
-    email: string | null,
-    name: string | null,
-    attributes: User['attributes'],
-  ): User {
-    const next = email !== null && isEmail(email) ? email.trim() : user.email;
-    const other = this.deps.users.byEmail(next);
-    if (other && other.id !== user.id) {
-      throw conflict('identity.sso_email_taken', `${next} belongs to another account`);
-    }
-    const changed = { ...user, email: next, name: name ?? user.name, attributes };
-    this.deps.users.setProfile(user.id, changed.email, changed.name, attributes);
-    return changed;
+    return accounts.refresh({ ...local, source: 'oidc', subject }, email, name, attributes);
   }
 }

@@ -123,6 +123,9 @@ const SAMPLES: Record<Method, unknown> = {
   auth_oidc_info: {},
   auth_oidc_begin: { returnTo: '/runs' },
   auth_oidc_complete: { query: 'code=c&state=s' },
+  auth_saml_begin: { returnTo: '/runs' },
+  auth_saml_complete: { samlResponse: 'PHJlc3BvbnNlLz4=', relayState: 's' },
+  auth_saml_metadata: {},
   login_link_create: { email: 'a@example.com' },
   whoami: {},
   users_list: {},
@@ -188,9 +191,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 117 methods, each in the request schema once', () => {
+  it('has 120 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(117);
+    expect(methods).toHaveLength(120);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

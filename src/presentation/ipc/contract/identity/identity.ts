@@ -30,6 +30,18 @@ export const identityRequests = [
     params: z.object({ query: z.string().max(8192) }),
   }),
   z.object({
+    method: z.literal('auth_saml_begin'),
+    params: z.object({ returnTo: z.string().max(2048).optional() }),
+  }),
+  z.object({
+    method: z.literal('auth_saml_complete'),
+    params: z.object({
+      samlResponse: z.string().min(1).max(1_000_000),
+      relayState: z.string().max(512).default(''),
+    }),
+  }),
+  z.object({ method: z.literal('auth_saml_metadata'), params: z.object({}).default({}) }),
+  z.object({
     method: z.literal('login_link_create'),
     params: z.object({
       email,
@@ -94,6 +106,9 @@ export const remoteDenied: readonly string[] = [
   'auth_oidc_info',
   'auth_oidc_begin',
   'auth_oidc_complete',
+  'auth_saml_begin',
+  'auth_saml_complete',
+  'auth_saml_metadata',
 ];
 
 export interface UserView {

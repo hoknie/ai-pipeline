@@ -172,6 +172,7 @@ export const packagePlaces: Record<string, readonly string[]> = {
   '@modelcontextprotocol/sdk': ['presentation/mcp', 'presentation/cli'],
   'openid-client': ['feature/identity/clients'],
   ws: ['presentation/web'],
+  '@node-saml/node-saml': ['feature/identity/clients'],
 };
 
 /** Classes that may be created with `new` only in `app` and `<feature>/services/create.ts`. */

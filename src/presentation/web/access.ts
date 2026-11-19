@@ -23,9 +23,10 @@ export function assertServerHost(
   incoming: IncomingMessage,
   gate: ServerGate,
   exempt = false,
+  skipOrigin = false,
 ): void {
   if (!serverHostAllowed(incoming, gate.options)) throw panel('forbidden', 'forbidden host');
-  if (!serverOriginAllowed(incoming, gate.options, exempt)) {
+  if (!skipOrigin && !serverOriginAllowed(incoming, gate.options, exempt)) {
     throw panel('forbidden', 'forbidden origin');
   }
 }

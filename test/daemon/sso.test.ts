@@ -57,6 +57,7 @@ describe('OIDC methods of the daemon', () => {
     const h = await start({ AIP_OIDC_SECRET: FAKE_CLIENT_SECRET });
     expect(await call(h, 'auth_oidc_info', {})).toEqual({
       sso: { label: 'SSO', ready: true, unavailable: false },
+      saml: null,
     });
     const { url } = (await call(h, 'auth_oidc_begin', { returnTo: '/queue' })) as { url: string };
     expect(url.startsWith(`${provider!.issuer}/authorize?`)).toBe(true);
@@ -95,6 +96,7 @@ describe('OIDC methods of the daemon', () => {
     const h = await start({ AIP_OIDC_SECRET: '' });
     expect(await call(h, 'auth_oidc_info', {})).toEqual({
       sso: { label: 'SSO', ready: false, unavailable: false },
+      saml: null,
     });
     expect(logs.filter((line) => line.includes('AIP_OIDC_SECRET'))).toHaveLength(1);
     const error = await rejection(call(h, 'auth_oidc_begin', {}));

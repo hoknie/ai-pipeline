@@ -35,18 +35,38 @@ export interface SsoLink {
   unavailable?: boolean;
 }
 
-function ssoBlock(sso: SsoLink | null | undefined, returnTo?: string): string {
+/** The sign-in providers of the login page; a missing one has no button. */
+export interface SsoLinks {
+  oidc?: SsoLink | null;
+  saml?: SsoLink | null;
+}
+
+function ssoButton(
+  sso: SsoLink | null | undefined,
+  path: string,
+  name: string,
+  returnTo?: string,
+): string {
   if (!sso) return '';
-  if (!sso.ready) return '<p>Sign-in through SSO is not configured on this server.</p>';
+  if (!sso.ready) return `<p>Sign-in through ${name} is not configured on this server.</p>`;
   const target = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
-  const notice = sso.unavailable ? '<p>SSO provider is not available. Try again later.</p>' : '';
-  return `${notice}<p><a class="button" href="/auth/oidc/start${escape(target)}">Sign in with ${escape(sso.label)}</a></p>`;
+  const notice = sso.unavailable
+    ? `<p>${name} provider is not available. Try again later.</p>`
+    : '';
+  return `${notice}<p><a class="button" href="${path}${escape(target)}">Sign in with ${escape(sso.label)}</a></p>`;
+}
+
+function ssoBlock(links: SsoLinks | null | undefined, returnTo?: string): string {
+  return (
+    ssoButton(links?.oidc, '/auth/oidc/start', 'SSO', returnTo) +
+    ssoButton(links?.saml, '/auth/saml/start', 'SAML', returnTo)
+  );
 }
 
 export function loginPage(
   response: ServerResponse,
   message?: string,
-  sso?: SsoLink | null,
+  sso?: SsoLinks | null,
   returnTo?: string,
 ): void {
   sendPage(

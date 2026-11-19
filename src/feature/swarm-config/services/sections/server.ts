@@ -9,6 +9,7 @@ import {
   readString,
   readStrings,
 } from '../validate-context.ts';
+import { checkSaml } from './server-saml.ts';
 import { type FieldError } from '../../types/errors.ts';
 import {
   DEFAULT_OIDC_SCOPES,
@@ -28,7 +29,7 @@ const SERVER_KEYS = [
   'sso',
 ];
 
-const SSO_KEYS = ['oidc'];
+const SSO_KEYS = ['oidc', 'saml'];
 
 const OIDC_KEYS = [
   'issuer',
@@ -154,6 +155,7 @@ function checkSso(ctx: ValidateContext, value: unknown, server: ServerSettings):
   if (!mapping) return;
   for (const [key, field] of readEntries(ctx, mapping, path, SSO_KEYS)) {
     if (key === 'oidc') server.sso.oidc = checkOidc(ctx, field, join(path, key));
+    if (key === 'saml') server.sso.saml = checkSaml(ctx, field, join(path, key));
   }
 }
 

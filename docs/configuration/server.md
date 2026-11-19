@@ -22,7 +22,7 @@ server:
 | `trusted_proxies` | none | IP addresses of reverse proxies whose `X-Forwarded-For`, `-Proto` and `-Host` headers are trusted; from other addresses they are ignored |
 | `session_ttl` | `12h` | Lifetime of a panel session, `<n>h` or `<n>d` |
 | `token_max_ttl` | `90d` | The longest lifetime of a personal token, `<n>d` |
-| `sso` | none | Sign-in through a corporate provider: see [sso.md](sso.md) |
+| `sso` | none | Sign-in through a corporate provider: see [sso.md](sso.md) (OpenID Connect) and [sso-saml.md](sso-saml.md) (SAML 2.0) |
 
 The section is set in the shared `settings.yaml` only; in a project `aip/settings.yaml` it is a validation error (`swarm.server`). In server mode `web.auth: none` and `web.autostart: false` are validation errors. A change takes effect after the daemon restarts.
 

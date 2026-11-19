@@ -105,12 +105,10 @@ export class UsersRepository {
   }
 
   /** Hands a local user over to the provider. */
-  setSubject(id: string, subject: UserSubject): void {
+  setSubject(id: string, subject: UserSubject, source: 'oidc' | 'saml' = 'oidc'): void {
     this.database
-      .prepare(
-        "UPDATE users SET source = 'oidc', source_issuer = ?, source_subject = ? WHERE id = ?",
-      )
-      .run(subject.issuer, subject.subject, id);
+      .prepare('UPDATE users SET source = ?, source_issuer = ?, source_subject = ? WHERE id = ?')
+      .run(source, subject.issuer, subject.subject, id);
   }
 
   setAttributes(id: string, attributes: Attributes): void {

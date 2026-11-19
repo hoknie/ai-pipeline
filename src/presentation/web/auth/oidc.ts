@@ -1,27 +1,30 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { IpcError } from '../../ipc/client/index.ts';
-import { errorPage, loginPage, type SsoLink } from './pages.ts';
+import { errorPage, loginPage, type SsoLink, type SsoLinks } from './pages.ts';
 import { call, cookie, redirect, statusOf, type ServerGate } from './gate.ts';
 
-/** What the login page says about the provider; `null` when none is configured or the daemon fails. */
-export async function ssoLink(gate: ServerGate): Promise<SsoLink | null> {
+/** What the login page says about the providers; a provider that is not configured (or a failing daemon) has no entry. */
+export async function ssoLinks(gate: ServerGate): Promise<SsoLinks> {
   try {
-    const result = (await call(gate, 'auth_oidc_info', {})) as { sso: SsoLink | null };
-    return result.sso;
+    const result = (await call(gate, 'auth_oidc_info', {})) as {
+      sso: SsoLink | null;
+      saml?: SsoLink | null;
+    };
+    return { oidc: result.sso, saml: result.saml ?? null };
   } catch {
-    return null;
+    return {};
   }
 }
 
-/** The login page with the SSO button when a provider is configured. */
+/** The login page with the buttons of the configured providers. */
 export async function renderLogin(
   gate: ServerGate,
   response: ServerResponse,
   message?: string,
   returnTo?: string,
 ): Promise<void> {
-  loginPage(response, message, await ssoLink(gate), returnTo);
+  loginPage(response, message, await ssoLinks(gate), returnTo);
 }
 
 function failure(response: ServerResponse, error: unknown): void {

@@ -173,7 +173,10 @@ async function handleServerMode(
   response: ServerResponse,
 ): Promise<void> {
   const url = new URL(incoming.url ?? '/', 'http://panel');
-  assertServerHost(incoming, gate, url.pathname === '/auth/cli/token');
+  // the ACS is posted by the browser from the site of the provider, so its `Origin` is the provider's;
+  // the signature, the stored request and the replay check protect it instead
+  const acs = url.pathname === '/auth/saml/acs' && incoming.method === 'POST';
+  assertServerHost(incoming, gate, url.pathname === '/auth/cli/token', acs);
   if (await authRoute(gate, incoming, response, url)) return;
   const verb = incoming.method ?? 'GET';
   if (url.pathname.startsWith('/assets/')) {

@@ -80,7 +80,8 @@ export const identityHandlers = {
   },
   auth_oidc_info: async (_params, context) => {
     serverOnly(context);
-    return { sso: context.services.identity.sso.info() };
+    const { sso, saml } = context.services.identity;
+    return { sso: sso.info(), saml: saml.info() };
   },
   auth_oidc_begin: async (params, context) => {
     serverOnly(context);
@@ -95,6 +96,24 @@ export const identityHandlers = {
       returnTo: result.returnTo,
       user: userView(result.user),
     };
+  },
+  auth_saml_begin: async (params, context) => {
+    serverOnly(context);
+    return context.services.identity.saml.begin({ returnTo: params.returnTo });
+  },
+  auth_saml_complete: async (params, context) => {
+    serverOnly(context);
+    const result = await context.services.identity.saml.complete(params);
+    return {
+      session: result.session,
+      expiresAt: result.expiresAt,
+      returnTo: result.returnTo,
+      user: userView(result.user),
+    };
+  },
+  auth_saml_metadata: async (_params, context) => {
+    serverOnly(context);
+    return context.services.identity.saml.metadata();
   },
   whoami: async (_params, context) => {
     const { actor } = context;

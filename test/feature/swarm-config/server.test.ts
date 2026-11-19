@@ -46,7 +46,7 @@ describe('server settings', () => {
       trustedProxies: [],
       sessionTtl: '12h',
       tokenMaxTtl: '90d',
-      sso: { oidc: null },
+      sso: { oidc: null, saml: null },
     });
   });
 

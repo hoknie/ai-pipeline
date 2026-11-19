@@ -477,6 +477,7 @@ src/feature/<фича>/
 | `commander`                 | `presentation/cli`                       |
 | `@modelcontextprotocol/sdk` | `presentation/mcp`, `presentation/cli`   |
 | `openid-client`             | `feature/identity/clients`               |
+| `@node-saml/node-saml`      | `feature/identity/clients`               |
 
 В `presentation/cli` пакет `yaml` читает файл групп (`--groups`) и печатает проверенную конфигурацию.
 Таблицу проверяет `test/layout`: пакет вне своих мест — нарушение. Пока переход не закончен, старые

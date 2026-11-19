@@ -2,7 +2,9 @@ import { createIdentityServices } from '../feature/identity/services/index.ts';
 import { actorOf, type Actor } from '../feature/identity/types/index.ts';
 import { defaultServer } from '../feature/swarm-config/types/index.ts';
 import type { ConfigService } from '../feature/swarm-config/services/index.ts';
+import type { SamlAssertionStore } from '../feature/identity/ports/index.ts';
 import { createOidcProvider } from './oidc.ts';
+import { createSamlProvider } from './saml.ts';
 import { appError } from '../platform/errors/index.ts';
 import type { Database } from '../platform/sqlite/index.ts';
 
@@ -11,7 +13,7 @@ interface ActorOptions {
   config: ConfigService;
   now: () => number;
   environment: NodeJS.ProcessEnv;
-  options: { log?: ((message: string) => void) | undefined };
+  options: { log?: ((message: string) => void) | undefined; stateDirectory: string };
 }
 
 const stderr = (message: string): void => console.error(`[aip] ${message}`);
@@ -27,14 +29,32 @@ export function createActors({ database, config, now, environment, options }: Ac
     environment,
     log: options.log ?? stderr,
   });
-  // the discovery at the start: the reason of an unavailable provider reaches the log at once
-  if (serverSettings().enabled) void oidc()?.check();
+  // the adapter needs the store of the identity services, which need the adapter: it is read at the first use
+  const assertions: SamlAssertionStore = {
+    remember: (id, expiresAt) => identity.samlAssertions.remember(id, expiresAt),
+  };
+  const saml = createSamlProvider({
+    settings: () => {
+      const { sso, publicUrl } = serverSettings();
+      return { saml: sso.saml, publicUrl };
+    },
+    assertions,
+    stateDirectory: options.stateDirectory,
+    now,
+    log: options.log ?? stderr,
+  });
   const identity = createIdentityServices({
     database,
     settings: serverSettings,
     clock: { now },
     oidc,
+    saml,
   });
+  // the discovery and the metadata at the start: the reason of an unavailable provider reaches the log at once
+  if (serverSettings().enabled) {
+    void oidc()?.check();
+    void saml()?.check();
+  }
   /** `local` without server mode; with it `system` for the socket and the user the panel named. */
   const actorOfRequest = (actorId: string | undefined): Actor => {
     if (!serverSettings().enabled) return { kind: 'local' };
