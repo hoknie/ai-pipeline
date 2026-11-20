@@ -35,6 +35,7 @@ export function ParamsForm({
         {params.map((param) => (
           <ParamField
             key={param.name}
+            kind={connection.kind}
             param={param}
             value={draft[param.name] ?? connection.params[param.name] ?? ''}
             onChange={(value) => setDraft({ ...draft, [param.name]: value })}

@@ -115,6 +115,8 @@ aip notify log --state failed --limit 5
 
 The same journal, the state of every channel and the parameters of the connections are in the group **Integrations** of the shared settings in the [web panel](../web/README.md): the tabs "Connections" and "Notifications".
 A connection is made, switched on and off and removed there.
+The panel labels kinds, parameters and secrets in its own language and shows the technical name (the one used by `aip integration`) in small type under the label; the bot message language is chosen from a list: each language under its own name, or the default (English).
+
 For a missing secret the card shows the command that sets it, with a button to copy it; the secret itself is never typed in the panel.
 
 ## Network

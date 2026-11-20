@@ -143,6 +143,75 @@ export const es: Dictionary = {
       never: 'Aún sin comprobar',
       ok: 'ok, {{count}} herramientas',
       failed: 'error: {{code}}',
+      codes: {
+        unreachable: 'El registry no está disponible',
+        timeout: 'El registry no respondió a tiempo',
+        unauthorized: 'El registry rechazó el token',
+        protocol: 'Respuesta inesperada del registry',
+        too_large: 'La respuesta es demasiado grande',
+        secret_unavailable: 'El token no está disponible',
+        connection_disabled: 'La conexión está desactivada',
+      },
+    },
+    kinds: {
+      telegram: {
+        title: 'Telegram',
+        description: 'Un bot de Telegram que envía avisos y recibe respuestas.',
+        params: {
+          chat_id: {
+            label: 'Chat',
+            hint: 'El id del chat en el que escribe el bot. Añada el bot al chat y envíele /id para ver el id.',
+          },
+          allowed_users: {
+            label: 'Quién puede responder',
+            hint: 'Ids de usuarios de Telegram separados por comas; vacío significa todos en el chat. Cada persona ve su id enviando /id al bot.',
+          },
+          language: {
+            label: 'Idioma de los mensajes del bot',
+            hint: 'El idioma de los textos de las notificaciones y de los botones en el chat.',
+            default: 'Predeterminado (English)',
+            values: { en: 'English', ru: 'Русский' },
+          },
+        },
+        secrets: { bot_token: { label: 'Token del bot' } },
+      },
+      slack: {
+        title: 'Slack',
+        description: 'Una aplicación de Slack que envía avisos y recibe respuestas.',
+        params: {
+          channel_id: {
+            label: 'Canal',
+            hint: 'El id del canal en el que escribe la aplicación. En Slack abra los detalles del canal: el id está al final (C…).',
+          },
+          allowed_users: {
+            label: 'Quién puede responder',
+            hint: 'Ids de usuarios de Slack separados por comas; vacío significa todos en el canal. En Slack abra el perfil y copie el ID de miembro (U…).',
+          },
+          language: {
+            label: 'Idioma de los mensajes del bot',
+            hint: 'El idioma de los textos de las notificaciones y de los botones en el chat.',
+            default: 'Predeterminado (English)',
+            values: { en: 'English', ru: 'Русский' },
+          },
+          team_id: {
+            label: 'Espacio de trabajo',
+            hint: 'El id del espacio de trabajo de Slack (T…). Está en los detalles del espacio y en la administración de Slack.',
+          },
+        },
+        secrets: {
+          bot_token: { label: 'Token del bot' },
+          app_token: { label: 'Token de la aplicación (Socket Mode)' },
+        },
+      },
+      'service-registry': {
+        title: 'Service registry',
+        description: 'Un service registry que da habilidades a los proyectos.',
+        params: {
+          url: { label: 'Dirección', hint: 'La dirección del registro, http(s)://host:puerto.' },
+        },
+        secrets: { token: { label: 'Token de acceso' } },
+      },
+      webhook: { title: 'Webhook' },
     },
     registry: {
       title: 'Service registry',

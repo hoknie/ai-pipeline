@@ -6,6 +6,7 @@ import type { IntegrationTypeView, RepositoryView } from '../../../shared/api/ty
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
+import { kindTitle } from '../kindLabels.ts';
 import { SelectField } from '../SelectField.tsx';
 import { ParamField } from './ParamField.tsx';
 
@@ -49,6 +50,7 @@ function KindParams({
       {type.params.map((param) => (
         <ParamField
           key={param.name}
+          kind={type.kind}
           prefix={prefix}
           param={param}
           value={params[param.name] ?? ''}
@@ -165,7 +167,7 @@ export function NewConnectionForm({
           >
             {kinds.map((one) => (
               <option key={one.kind} value={one.kind}>
-                {one.title}
+                {kindTitle(t, one.kind, one.title)}
               </option>
             ))}
           </SelectField>

@@ -141,6 +141,75 @@ export const en = {
       never: 'Not checked yet',
       ok: 'ok, {{count}} tools',
       failed: 'failed: {{code}}',
+      codes: {
+        unreachable: 'Registry is unreachable',
+        timeout: 'Registry did not answer in time',
+        unauthorized: 'Registry rejected the token',
+        protocol: 'Unexpected answer from the registry',
+        too_large: 'The answer is too large',
+        secret_unavailable: 'The token is not available',
+        connection_disabled: 'The connection is disabled',
+      },
+    },
+    kinds: {
+      telegram: {
+        title: 'Telegram',
+        description: 'A Telegram bot that sends notifications and takes answers.',
+        params: {
+          chat_id: {
+            label: 'Chat',
+            hint: 'The id of the chat the bot writes to. Add the bot to the chat and send it /id to see the id.',
+          },
+          allowed_users: {
+            label: 'Who may answer',
+            hint: 'Telegram user ids separated by commas; empty means everyone in the chat. Each person can see their id by sending the bot /id.',
+          },
+          language: {
+            label: 'Bot message language',
+            hint: 'The language of the notification texts and the buttons in the chat.',
+            default: 'Default (English)',
+            values: { en: 'English', ru: 'Русский' },
+          },
+        },
+        secrets: { bot_token: { label: 'Bot token' } },
+      },
+      slack: {
+        title: 'Slack',
+        description: 'A Slack app that sends notifications and takes answers.',
+        params: {
+          channel_id: {
+            label: 'Channel',
+            hint: 'The id of the channel the app writes to. In Slack open the channel details: the id is at the bottom (C…).',
+          },
+          allowed_users: {
+            label: 'Who may answer',
+            hint: 'Slack user ids separated by commas; empty means everyone in the channel. In Slack open the profile and copy the member ID (U…).',
+          },
+          language: {
+            label: 'Bot message language',
+            hint: 'The language of the notification texts and the buttons in the chat.',
+            default: 'Default (English)',
+            values: { en: 'English', ru: 'Русский' },
+          },
+          team_id: {
+            label: 'Workspace',
+            hint: 'The id of the Slack workspace (T…). Find it in the workspace details or in the Slack admin page.',
+          },
+        },
+        secrets: {
+          bot_token: { label: 'Bot token' },
+          app_token: { label: 'App token (Socket Mode)' },
+        },
+      },
+      'service-registry': {
+        title: 'Service registry',
+        description: 'A service registry that gives projects their skills.',
+        params: {
+          url: { label: 'Address', hint: 'The address of the registry, http(s)://host:port.' },
+        },
+        secrets: { token: { label: 'Access token' } },
+      },
+      webhook: { title: 'Webhook' },
     },
     registry: {
       title: 'Service registry',

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import i18next from 'i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { IntegrationsGroup } from '../src/features/integrations/index.ts';
@@ -44,11 +45,60 @@ describe('the page of integrations', () => {
     expect(within(card).getByText('not set')).toBeTruthy();
     expect(within(card).getByText('aip integration secret set c1 bot_token --stdin')).toBeTruthy();
     // the fields are the non-secret parameters of the kind, and none is for the token
-    expect(within(card).getByLabelText(/^chat_id/)).toBeTruthy();
-    expect(within(card).getByLabelText(/^allowed_users/)).toBeTruthy();
+    expect(within(card).getByLabelText(/^Chat/)).toBeTruthy();
+    expect(within(card).getByLabelText(/^Who may answer/)).toBeTruthy();
     expect(within(card).queryByLabelText(/bot_token/)).toBeNull();
     expect(card.querySelector('input[type="password"]')).toBeNull();
     expect(within(card).queryByDisplayValue(/\d{5,}:/)).toBeNull();
+  });
+
+  it('shows the labels in Russian with the technical names under them and the language choice', async () => {
+    await i18next.changeLanguage('ru');
+    try {
+      const api = await open();
+      const card = screen.getByTestId('connection-c1');
+      const field = within(card).getByLabelText(/^Кто может отвечать/);
+      expect(within(card).getByText('allowed_users').tagName).toBe('CODE');
+      expect(field.getAttribute('aria-describedby')).not.toBeNull();
+      const chat = within(card).getByLabelText(/^Чат/);
+      const hint = document.getElementById(chat.getAttribute('aria-describedby') ?? '');
+      expect(hint?.textContent).toContain('/id');
+      expect(within(card).getByText('Токен бота')).toBeTruthy();
+      const select = within(card).getByLabelText(/^Язык сообщений бота/) as HTMLSelectElement;
+      expect(Array.from(select.options).map((one) => one.textContent)).toEqual([
+        'По умолчанию (English)',
+        'English',
+        'Русский',
+      ]);
+      fireEvent.change(select, { target: { value: 'ru' } });
+      fireEvent.click(within(card).getByRole('button', { name: 'Сохранить параметры' }));
+      await waitFor(() =>
+        expect(api.integrationEdit).toHaveBeenCalledWith('c1', {
+          set: { language: 'ru' },
+          unset: [],
+        }),
+      );
+    } finally {
+      await i18next.changeLanguage('en');
+    }
+  });
+
+  it('labels the secret slot of a Slack card and keeps the technical name and command', async () => {
+    const overview = integrationsOverview();
+    overview.connections[0] = {
+      ...overview.connections[0]!,
+      kind: 'slack',
+      secrets: [
+        { slot: 'bot_token', required: true, present: true },
+        { slot: 'app_token', required: true, present: false },
+      ],
+    };
+    overview.types = [{ ...overview.types[0]!, kind: 'slack', title: 'Slack app' }];
+    await open({ integrations: vi.fn(async () => overview) });
+    const card = screen.getByTestId('connection-c1');
+    expect(within(card).getByText('App token (Socket Mode)')).toBeTruthy();
+    expect(within(card).getAllByText('app_token')[0]!.tagName).toBe('CODE');
+    expect(within(card).getByText('aip integration secret set c1 app_token --stdin')).toBeTruthy();
   });
 
   it('does not show the command for a secret that is set, and shows the channel error', async () => {
@@ -74,8 +124,10 @@ describe('the page of integrations', () => {
     const card = screen.getByTestId('connection-c1');
     const save = within(card).getByRole('button', { name: 'Save parameters' });
     expect((save as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(within(card).getByLabelText(/^chat_id/), { target: { value: '-1001' } });
-    fireEvent.change(within(card).getByLabelText(/^language/), { target: { value: 'ru' } });
+    fireEvent.change(within(card).getByLabelText(/^Chat/), { target: { value: '-1001' } });
+    fireEvent.change(within(card).getByLabelText(/^Bot message language/), {
+      target: { value: 'ru' },
+    });
     fireEvent.click(save);
     await waitFor(() =>
       expect(api.integrationEdit).toHaveBeenCalledWith('c1', {
@@ -92,7 +144,7 @@ describe('the page of integrations', () => {
       }),
     });
     const card = screen.getByTestId('connection-c1');
-    fireEvent.change(within(card).getByLabelText(/^allowed_users/), { target: { value: 'x' } });
+    fireEvent.change(within(card).getByLabelText(/^Who may answer/), { target: { value: 'x' } });
     fireEvent.click(within(card).getByRole('button', { name: 'Save parameters' }));
     expect(await screen.findByText(/allowed_users: not a list of ids/)).toBeTruthy();
     expect(api.integrationEdit).toHaveBeenCalledTimes(1);
@@ -274,7 +326,7 @@ describe('a new connection', () => {
     expect(form.querySelector('input[type="password"]')).toBeNull();
     expect(within(form).queryByLabelText(/bot_token/)).toBeNull();
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'main' } });
-    fireEvent.change(within(form).getByLabelText(/^allowed_users/), { target: { value: '111' } });
+    fireEvent.change(within(form).getByLabelText(/^Who may answer/), { target: { value: '111' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Create connection' }));
     await waitFor(() =>
       expect(api.integrationAdd).toHaveBeenCalledWith({
@@ -308,11 +360,11 @@ describe('a new connection', () => {
     });
     const form = screen.getByRole('form', { name: 'New connection' });
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'main' } });
-    fireEvent.change(within(form).getByLabelText(/^allowed_users/), { target: { value: 'x' } });
+    fireEvent.change(within(form).getByLabelText(/^Who may answer/), { target: { value: 'x' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Create connection' }));
     expect(await screen.findByText(/allowed_users: not a list of ids/)).toBeTruthy();
     expect((within(form).getByLabelText('Name') as HTMLInputElement).value).toBe('main');
-    expect((within(form).getByLabelText(/^allowed_users/) as HTMLInputElement).value).toBe('x');
+    expect((within(form).getByLabelText(/^Who may answer/) as HTMLInputElement).value).toBe('x');
   });
 });
 
@@ -417,7 +469,7 @@ describe('the tab «Service registry»', () => {
     const form = screen.getByRole('form', { name: 'New connection' });
     expect(within(form).queryByLabelText('Kind')).toBeNull();
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'second' } });
-    fireEvent.change(within(form).getByLabelText(/^url/), {
+    fireEvent.change(within(form).getByLabelText(/^Address/), {
       target: { value: 'https://other.example.com' },
     });
     fireEvent.click(within(form).getByRole('button', { name: 'Create connection' }));
@@ -433,7 +485,7 @@ describe('the tab «Service registry»', () => {
   it('shows the url and the token status, and says the check was never run', async () => {
     await openRegistry(svcr());
     const card = screen.getByTestId('connection-r1');
-    expect((within(card).getByLabelText(/^url/) as HTMLInputElement).value).toBe(
+    expect((within(card).getByLabelText(/^Address/) as HTMLInputElement).value).toBe(
       'https://registry.example.com',
     );
     expect(within(card).getByText('set')).toBeTruthy();
@@ -463,8 +515,29 @@ describe('the tab «Service registry»', () => {
       svcr({ lastCheck: { at: 1, ok: false, code: 'unauthorized', count: null } }),
     );
     expect(
-      within(screen.getByTestId('connection-r1')).getByText('failed: unauthorized'),
+      within(screen.getByTestId('connection-r1')).getByText(
+        'Registry rejected the token (unauthorized)',
+      ),
     ).toBeTruthy();
+  });
+
+  it('shows the text of a code in the language of the panel and an unknown code as it is', async () => {
+    await i18next.changeLanguage('ru');
+    try {
+      await openRegistry(
+        svcr({ lastCheck: { at: 1, ok: false, code: 'unauthorized', count: null } }),
+      );
+      expect(
+        within(screen.getByTestId('connection-r1')).getByText(
+          'Registry отклонил токен (unauthorized)',
+        ),
+      ).toBeTruthy();
+      cleanup();
+      await openRegistry(svcr({ lastCheck: { at: 1, ok: false, code: 'weird', count: null } }));
+      expect(within(screen.getByTestId('connection-r1')).getByText('ошибка: weird')).toBeTruthy();
+    } finally {
+      await i18next.changeLanguage('en');
+    }
   });
 
   it('shows the refusal of a check without a token or with a wrong url', async () => {

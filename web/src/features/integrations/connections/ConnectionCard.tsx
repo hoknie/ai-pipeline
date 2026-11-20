@@ -10,6 +10,7 @@ import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 
 import { secretCommand } from '../events.ts';
+import { kindTitle, secretLabel } from '../kindLabels.ts';
 import { CheckStatus } from '../registry/CheckStatus.tsx';
 import { CardActions } from './CardActions.tsx';
 import { ParamsForm } from './ParamsForm.tsx';
@@ -54,7 +55,8 @@ function SecretList({ connection }: { connection: ConnectionView }) {
     <ul className="flex flex-col gap-1 text-sm">
       {connection.secrets.map((secret) => (
         <li key={secret.slot} className="flex flex-wrap items-center gap-2">
-          <span>{secret.slot}</span>
+          <span>{secretLabel(t, connection.kind, secret.slot)}</span>
+          <code className="text-xs text-muted-foreground">{secret.slot}</code>
           <Badge variant={secret.present ? 'ok' : 'warn'}>
             {secret.present ? t('integrations.secret.set') : t('integrations.secret.missing')}
           </Badge>
@@ -103,7 +105,9 @@ export function ConnectionCard({
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold">
           {connection.name}{' '}
-          <span className="font-normal text-muted-foreground">{connection.kind}</span>
+          <span className="font-normal text-muted-foreground">
+            {kindTitle(t, connection.kind, type?.title)}
+          </span>
         </h3>
         <Badge variant="outline">
           {connection.project === null

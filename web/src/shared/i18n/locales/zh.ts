@@ -129,6 +129,73 @@ export const zh: Dictionary = {
       never: '尚未检查',
       ok: 'ok，{{count}} 个工具',
       failed: '失败：{{code}}',
+      codes: {
+        unreachable: 'Registry 无法访问',
+        timeout: 'Registry 响应超时',
+        unauthorized: 'Registry 拒绝了令牌',
+        protocol: 'Registry 返回了意外的响应',
+        too_large: '响应过大',
+        secret_unavailable: '令牌不可用',
+        connection_disabled: '连接已停用',
+      },
+    },
+    kinds: {
+      telegram: {
+        title: 'Telegram',
+        description: '发送通知并接收回复的 Telegram 机器人。',
+        params: {
+          chat_id: {
+            label: '聊天',
+            hint: '机器人发消息的聊天 ID。把机器人加入聊天并向它发送 /id 即可看到 ID。',
+          },
+          allowed_users: {
+            label: '谁可以回复',
+            hint: 'Telegram 用户 ID，以逗号分隔；留空表示聊天中的所有人。每个人向机器人发送 /id 即可查看自己的 ID。',
+          },
+          language: {
+            label: '机器人消息语言',
+            hint: '机器人通知文本和聊天中按钮的语言。',
+            default: '默认（English）',
+            values: { en: 'English', ru: 'Русский' },
+          },
+        },
+        secrets: { bot_token: { label: '机器人令牌' } },
+      },
+      slack: {
+        title: 'Slack',
+        description: '发送通知并接收回复的 Slack 应用。',
+        params: {
+          channel_id: {
+            label: '频道',
+            hint: '应用发消息的频道 ID。在 Slack 中打开频道详情，ID 位于底部（C…）。',
+          },
+          allowed_users: {
+            label: '谁可以回复',
+            hint: 'Slack 用户 ID，以逗号分隔；留空表示频道中的所有人。在 Slack 中打开个人资料并复制成员 ID（U…）。',
+          },
+          language: {
+            label: '机器人消息语言',
+            hint: '机器人通知文本和聊天中按钮的语言。',
+            default: '默认（English）',
+            values: { en: 'English', ru: 'Русский' },
+          },
+          team_id: {
+            label: '工作区',
+            hint: 'Slack 工作区 ID（T…）。可在工作区详情或 Slack 管理页面找到。',
+          },
+        },
+        secrets: {
+          bot_token: { label: '机器人令牌' },
+          app_token: { label: '应用令牌（Socket Mode）' },
+        },
+      },
+      'service-registry': {
+        title: 'Service registry',
+        description: '为项目提供技能的 service registry。',
+        params: { url: { label: '地址', hint: '注册表地址，http(s)://主机:端口。' } },
+        secrets: { token: { label: '访问令牌' } },
+      },
+      webhook: { title: 'Webhook' },
     },
     registry: {
       title: 'Service registry',

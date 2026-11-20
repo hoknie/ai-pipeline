@@ -6,6 +6,7 @@ import type { ConnectionView, RepositoryView } from '../../shared/api/types.ts';
 import { Button } from '../../shared/ui/forms/button.tsx';
 
 import { EventChecks } from './EventChecks.tsx';
+import { kindTitle } from './kindLabels.ts';
 import { SelectField } from './SelectField.tsx';
 
 const ALL = '';
@@ -54,7 +55,7 @@ export function SubscriptionForm({
         >
           {connections.map((one) => (
             <option key={one.id} value={one.id}>
-              {one.name} ({one.kind})
+              {one.name} ({kindTitle(t, one.kind)})
             </option>
           ))}
         </SelectField>
