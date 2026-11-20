@@ -429,7 +429,7 @@ describe('a channel that only sends', () => {
 
   it('does not hold the chats while a slow receiver thinks', async () => {
     const hook = await startReceiver();
-    hook.answers.push({ status: 200, delayMs: 400 });
+    hook.answers.push({ status: 200, delayMs: 300 });
     try {
       const { h, connection } = await subscribed();
       await webhook(h, `${hook.base}/hook`);
@@ -437,7 +437,8 @@ describe('a channel that only sends', () => {
       h.states.set('run000000001', asking(QUESTIONS));
       h.notifications.dispatcher.runChanged(h.states.get('run000000001')!);
       await until(() => h.channels.of(connection).sent.length === 1);
-      expect(Date.now() - started).toBeLessThan(300);
+      // the chat got its message while the receiver was still thinking
+      expect(Date.now() - started).toBeLessThan(200);
       await h.notifications.dispatcher.idle();
       expect(hook.received).toHaveLength(1);
     } finally {

@@ -73,7 +73,8 @@ export const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 /**
  * Every refusal of a request before and around its handler: a fixed code and a fixed text. Any
  * request may carry a secret in any field, whatever its method says, so no part of the input, of a
- * validation message or of a nested exception ever reaches the answer or the log.
+ * generated validation message or of a nested exception ever reaches the answer or the log. The
+ * one text that does is a rule a schema of the contract states itself (see `declaredRule`).
  */
 const IPC_ERRORS = {
   invalid_json: 'request is not valid JSON',
@@ -101,6 +102,16 @@ function failureCode(value: unknown): IpcErrorCode {
   return METHODS.has(method) ? 'invalid_params' : 'unknown_method';
 }
 
+/**
+ * The rule a request broke, when a schema of the contract words it itself: the message of a
+ * `refine`, which is a constant of the source and names no value of the request. Messages zod
+ * generates may quote keys and values, so they are never sent.
+ */
+function declaredRule(error: z.ZodError): string | undefined {
+  const issue = error.issues.find((one) => one.code === 'custom' && one.message !== '');
+  return issue?.message;
+}
+
 export function parseRequest(
   line: string,
 ):
@@ -120,7 +131,11 @@ export function parseRequest(
   const id = envelope.success ? envelope.data.id : -1;
   const actor = envelope.success ? envelope.data.actor : undefined;
   const parsed = requestSchema.safeParse(value);
-  if (!parsed.success) return { id, ...ipcError(failureCode(value)) };
+  if (!parsed.success) {
+    const code = failureCode(value);
+    const rule = code === 'invalid_params' ? declaredRule(parsed.error) : undefined;
+    return rule === undefined ? { id, ...ipcError(code) } : { id, error: rule, code };
+  }
   return actor === undefined ? { id, request: parsed.data } : { id, request: parsed.data, actor };
 }
 

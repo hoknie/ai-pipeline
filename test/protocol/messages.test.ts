@@ -112,6 +112,37 @@ describe('requests', () => {
     expect(report).toEqual({ id: 4, error: 'invalid parameters', code: 'invalid_params' });
   });
 
+  it('names the rule a schema states itself, and nothing of the request', () => {
+    const secret = 'sk-control-secret';
+    const empty = parseRequest(
+      JSON.stringify({ id: 6, method: 'queue_settings', params: { repository: secret } }),
+    );
+    expect(empty).toEqual({
+      id: 6,
+      error: 'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
+      code: 'invalid_params',
+    });
+    const both = parseRequest(
+      JSON.stringify({
+        id: 7,
+        method: 'queue_add',
+        params: { repository: '/r', pipeline: 'feature', task: secret, groups: [] },
+      }),
+    );
+    expect(JSON.stringify(both)).not.toContain(secret);
+    // a wrong type and an unknown key get the text zod would word: the fixed one is sent
+    for (const params of [
+      { repository: '/r', parallel: secret },
+      { repository: '/r', filter: { [secret]: 1 } },
+    ]) {
+      const refused = parseRequest(JSON.stringify({ id: 8, method: 'queue_settings', params }));
+      expect(refused).toEqual({ id: 8, error: 'invalid parameters', code: 'invalid_params' });
+    }
+    // a method that is not known never gets a rule
+    const unknown = parseRequest(JSON.stringify({ id: 9, method: secret, params: {} }));
+    expect(unknown).toEqual({ id: 9, error: 'unknown method', code: 'unknown_method' });
+  });
+
   it('accepts structured questions in a report and rejects too many', () => {
     const request = (questions: unknown) =>
       parseRequest(

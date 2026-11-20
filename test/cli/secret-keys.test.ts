@@ -5,7 +5,8 @@ import { applyKeys } from '../../src/presentation/cli/secret-keys.ts';
 describe('applyKeys', () => {
   it('removes the last character on Backspace', () => {
     const out = applyKeys('', 'abx\u007fc\bd\r', 100);
-    expect(out).toEqual({ done: true, text: 'acd', cancelled: false, tooLong: false });
+    // x is removed, c is typed and removed: a, b and d stay
+    expect(out).toEqual({ done: true, text: 'abd', cancelled: false, tooLong: false });
   });
 
   it('keeps text across chunks and ignores control keys and escape sequences', () => {

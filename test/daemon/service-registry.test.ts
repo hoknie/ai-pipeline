@@ -166,10 +166,15 @@ describe('the forwarding of the bridge', () => {
       pipeline: 'feature',
       task: 'do it',
     });
-    await until('the agent started', () => existsSync(join(h.fakeState, 'argv.jsonl')));
-    const argv = lines(join(h.fakeState, 'argv.jsonl')).find((one) =>
-      (one.argv as string[]).includes('--session-id'),
-    ) as { argv: string[] };
+    // other calls of the fake agent (the naming of the run) are logged before the attempt starts
+    const started = () =>
+      existsSync(join(h.fakeState, 'argv.jsonl'))
+        ? (lines(join(h.fakeState, 'argv.jsonl')).find((one) =>
+            (one.argv as string[]).includes('--session-id'),
+          ) as { argv: string[] } | undefined)
+        : undefined;
+    await until('the agent started', () => started() !== undefined);
+    const argv = started()!;
     const file = argv.argv[argv.argv.indexOf('--mcp-config') + 1]!;
     const config = JSON.parse(readFileSync(file, 'utf8')) as {
       mcpServers: Record<string, { args: string[] }>;

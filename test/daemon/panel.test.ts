@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { unavailable } from '../../src/platform/errors/index.ts';
 import type { PanelControl } from '../../src/presentation/ipc/contract/index.ts';
 import {
   webStartResultSchema,
@@ -72,7 +73,8 @@ describe('web panel control', () => {
   it('passes a controller error to the client', async () => {
     const panel: PanelControl = {
       status: () => running,
-      start: () => Promise.reject(new Error('port 127.0.0.1:1 is already in use')),
+      // as the panel of the daemon words a failed start: an expected failure with its own text
+      start: () => Promise.reject(unavailable('web.daemon', 'port 127.0.0.1:1 is already in use')),
       stop: () => Promise.resolve({ state: 'not_running' }),
     };
     const h = (current = await harness(undefined, {}, { panel }));

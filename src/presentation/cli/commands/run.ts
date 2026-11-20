@@ -19,6 +19,7 @@ import {
   ALLOW_DUPLICATE_HELP,
   attachmentSources,
   authorParameter,
+  checkTitle,
   collect,
   parseDeliveryMode,
   readGroups,
@@ -74,6 +75,7 @@ function startParams(pipeline: string, options: StartOptions) {
   if ((options.task === undefined) === (options.groups === undefined)) {
     throw usage('pass exactly one of --task and --groups');
   }
+  checkTitle(options.title);
   const groups = options.groups ? readGroups(options.groups) : undefined;
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
   const links = linkInputsOf(options, {

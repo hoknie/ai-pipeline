@@ -7,6 +7,7 @@ import { linkInputsOf } from './links.ts';
 import {
   ALLOW_DUPLICATE_HELP,
   attachmentSources,
+  checkTitle,
   collect,
   parseDeliveryMode,
   parseNotes,
@@ -44,6 +45,7 @@ function checkRepos(options: AddOptions, several: boolean): void {
 
 /** The fields of the task that one project and several projects take alike. */
 function taskFields(pipeline: string, options: AddOptions) {
+  checkTitle(options.title);
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
   const links = linkInputsOf(options, {
     after: options.after !== undefined,

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import { parse as parseYaml } from 'yaml';
 
+import { RUN_TITLE_LIMIT } from '../../feature/agents/types/index.ts';
 import { DUPLICATE_TASK_CODE } from '../../feature/queue/types/index.ts';
 import { DELIVERY_MODES, type DeliveryMode } from '../../feature/swarm-config/types/index.ts';
 import { IpcError } from '../ipc/client/index.ts';
@@ -128,5 +129,12 @@ export async function withDuplicateHint<T>(work: () => Promise<T>): Promise<T> {
       });
     }
     throw error;
+  }
+}
+
+/** `--title` as the daemon takes it: refused here with the flag named, before the request. */
+export function checkTitle(title: string | undefined): void {
+  if (title !== undefined && title.trim().length > RUN_TITLE_LIMIT) {
+    throw usage(`--title must be at most ${RUN_TITLE_LIMIT} characters`);
   }
 }

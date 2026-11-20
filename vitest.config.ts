@@ -17,6 +17,9 @@ const endToEnd = [
   'test/install-script.test.ts',
   'test/global-setup.test.ts',
   'test/protocol/autostart.test.ts',
+  // these two start a process for every check: the generated gate script, the keyring tools
+  'test/feature/agents/gates.test.ts',
+  'test/platform/secrets/keyring.test.ts',
 ];
 
 export default defineConfig({
