@@ -93,6 +93,7 @@ export function createCodexRuntime(
     buildOneShot: (request) => oneShot(executable, extra, request),
     createParser: createCodexParser,
     transcript: codexTranscript,
+    loadsExtraSkills: false,
     skillDirectories: (worktree, home) => [
       join(worktree, '.codex', 'skills'),
       join(home, '.codex', 'skills'),

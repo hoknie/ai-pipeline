@@ -22,6 +22,11 @@ export interface LaunchContext {
   attemptDirectory: string;
   /** Where the attachments of the run are laid out; null for a run without attachments. */
   attachmentsDirectory?: string | null;
+  /**
+   * A folder with `.claude/skills/<name>` for the skills of a service registry; null: none. Only a
+   * runtime with `loadsExtraSkills` is given one.
+   */
+  skillsDirectory?: string | null;
   workerCommand: string[];
   /** The generation of the conversation of a CLI with its own history; null for the others. */
   generation?: number | null;
@@ -100,6 +105,8 @@ export interface Runtime {
   /** `times[i]` is the moment (ms) the daemon received `lines[i]`, when known. */
   transcript(lines: string[], times?: (number | null)[]): TranscriptEntry[];
   skillDirectories(worktree: string, home: string): string[];
+  /** Whether the CLI loads skills from an additional folder given for an attempt. */
+  readonly loadsExtraSkills: boolean;
   /** The models a specialist of this runtime can name; never rejects, a failure goes to `error`. */
   listModels(directory: string, run: CommandRunner): Promise<RuntimeModels>;
   /** Tools the agent CLI has without any configuration. */

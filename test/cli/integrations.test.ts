@@ -313,4 +313,46 @@ describe('aip integration with a service registry', () => {
     expect(none.code).toBe(1);
     expect(none.stderr).toContain('this kind has no check');
   });
+
+  it('lists the skills of the registry as registry:<name> with the versions', async () => {
+    const { box, registry } = await setup();
+    registry.skills.push(
+      {
+        id: 'sk-1',
+        name: 'go-testing',
+        title: 'Go testing',
+        tags: ['go'],
+        versions: { '1.2.0': Buffer.alloc(0), '1.4.1': Buffer.alloc(0) },
+      },
+      { id: 'sk-2', name: 'sql-review', versions: { '2.0.0': Buffer.alloc(0) } },
+    );
+    const id = await connection(box, registry.base, registry.token);
+    const all = await aip(box, 'integration', 'skills', id);
+    expect(all.code).toBe(0);
+    expect(all.stdout).toContain('registry:go-testing');
+    expect(all.stdout).toContain('1.4.1, 1.2.0');
+    expect(all.stdout).toContain('registry:sql-review');
+    const found = JSON.parse(
+      (await aip(box, 'integration', 'skills', id, '--query', 'go', '--json')).stdout,
+    ) as {
+      name: string;
+      versions: string[];
+    }[];
+    expect(found.map((one) => one.name)).toEqual(['go-testing']);
+    expect(found[0]?.versions).toEqual(['1.4.1', '1.2.0']);
+    expect(all.stdout + all.stderr).not.toContain(registry.token);
+    const help = (await aip(box, 'integration', 'skills', '--help')).stdout;
+    expect(help).toContain('$ aip integration skills');
+  });
+
+  it('refuses a disabled connection and a kind that is not a registry', async () => {
+    const { box, registry } = await setup();
+    const id = await connection(box, registry.base, registry.token);
+    await aip(box, 'integration', 'disable', id);
+    const disabled = await aip(box, 'integration', 'skills', id);
+    expect(disabled.code).toBe(1);
+    expect(disabled.stderr).toContain('cannot list skills');
+    const unknown = await aip(box, 'integration', 'skills', 'nope');
+    expect(unknown.code).toBe(1);
+  });
 });

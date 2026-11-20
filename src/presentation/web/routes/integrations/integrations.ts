@@ -48,6 +48,16 @@ export function integrationsRoutes({ call }: RouteKit): Route[] {
       }),
     },
     {
+      // The skills of the registry of the current project, for the hints of the specialist form.
+      method: 'GET',
+      pattern: /^\/api\/integrations\/skills$/,
+      handle: async (_match, _body, repository, query) =>
+        call('integration_skills', {
+          repository,
+          ...(query.get('query') ? { query: query.get('query')!.slice(0, 200) } : {}),
+        }),
+    },
+    {
       method: 'POST',
       pattern: /^\/api\/integrations\/edit$/,
       handle: async (_match, body) => call('integration_edit', parseBody(editConnection, body)),

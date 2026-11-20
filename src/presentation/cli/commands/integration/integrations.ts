@@ -11,6 +11,8 @@ import type { ConnectionView, IntegrationTypeView } from '../../../ipc/contract/
 import { bind, call } from '../../context.ts';
 import { usage, type CliIo } from '../../io.ts';
 
+import { addSkillsCommand } from './skills.ts';
+
 /** The longest secret the daemon accepts, plus room for a newline. */
 const STDIN_LIMIT = 16 * 1024 + 2;
 
@@ -239,4 +241,5 @@ export function registerIntegrations(program: Command, io: CliIo, style: Style):
   addWriteCommands(kit);
   addEditCommand(kit);
   addSecretCommands(kit);
+  addSkillsCommand(kit.root, kit);
 }

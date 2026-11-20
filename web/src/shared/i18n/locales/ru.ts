@@ -555,6 +555,7 @@ export const ru: Dictionary = {
         path: 'Путь',
         time: 'Время',
         tokens: 'Токены',
+        skills: 'Навыки',
       },
       tags: 'Теги запуска',
       label: 'запуск',
@@ -1398,6 +1399,7 @@ export const ru: Dictionary = {
     header: 'действия со специалистом',
     replacesDefaults: 'Инструменты специалиста заменяют инструменты из defaults.',
     notInCatalog: 'нет в каталоге',
+    registrySkills: 'Навыки registry',
     mcpForAll: 'Серверы для всех специалистов, выбор не нужен: {{names}}.',
     mcpTab: 'Вкладка «MCP-серверы»',
     catalogError:

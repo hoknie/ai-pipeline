@@ -22,6 +22,11 @@ interface Action {
   link?: Record<string, string>;
   /** Paths whose contents (or null) are appended to reads.jsonl in the state directory. */
   read?: string[];
+  /**
+   * Names of skills looked up as `.claude/skills/<name>/SKILL.md` in every folder given with
+   * `--add-dir`; each text (or null) goes to skills.jsonl in the state directory.
+   */
+  skills?: string[];
   outside?: Record<string, string>;
   split?: { title: string; task: string }[];
   /**
@@ -479,6 +484,22 @@ if (action.read) {
     }),
   );
   appendFileSync(join(state, 'reads.jsonl'), `${JSON.stringify({ step, group, contents })}\n`);
+}
+if (action.skills) {
+  const folders = args.flatMap((value, index) => (args[index - 1] === '--add-dir' ? [value] : []));
+  const found = Object.fromEntries(
+    action.skills.map((name) => {
+      const texts = folders.flatMap((folder) => {
+        const file = join(folder, '.claude', 'skills', name, 'SKILL.md');
+        return existsSync(file) ? [readFileSync(file, 'utf8')] : [];
+      });
+      return [name, texts[0] ?? null];
+    }),
+  );
+  appendFileSync(
+    join(state, 'skills.jsonl'),
+    `${JSON.stringify({ step, group, found, folders })}\n`,
+  );
 }
 for (const [path, content] of Object.entries(action.write ?? {})) {
   mkdirSync(dirname(join(worker.cwd, path)), { recursive: true });

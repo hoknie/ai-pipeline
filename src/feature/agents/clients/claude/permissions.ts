@@ -44,9 +44,14 @@ export function claudeTools(context: LaunchContext): string[] {
   return [...new Set([...base, ...(skills.length > 0 ? ['Skill'] : []), ...tools])];
 }
 
-/** The rule that lets the specialist read the attachments folder; `//` marks an absolute path. */
+/**
+ * The rules that let the specialist read the attachments folder and the folder of the registry
+ * skills (their scripts and references); `//` marks an absolute path.
+ */
 export function attachmentReadRules(context: LaunchContext): string[] {
-  return !context.attachmentsDirectory ? [] : [`Read(/${context.attachmentsDirectory}/**)`];
+  return [context.attachmentsDirectory, context.skillsDirectory].flatMap((directory) =>
+    directory ? [`Read(/${directory}/**)`] : [],
+  );
 }
 
 export function claudeAllowedTools(context: LaunchContext): string[] {

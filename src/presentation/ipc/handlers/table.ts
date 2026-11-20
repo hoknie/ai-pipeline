@@ -10,6 +10,7 @@ import {
   notificationHandlers,
   remoteHandlers,
   webhookHandlers,
+  skillHandlers,
 } from './integrations/index.ts';
 import { observerHandlers } from './observers.ts';
 import { providerHandlers } from './providers.ts';
@@ -25,6 +26,7 @@ export const handlers: HandlerTable = {
   ...systemHandlers,
   ...repositoryHandlers,
   ...integrationHandlers,
+  ...skillHandlers,
   ...notificationHandlers,
   ...remoteHandlers,
   ...webhookHandlers,

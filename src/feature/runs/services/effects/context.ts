@@ -8,6 +8,7 @@ import type {
   QueueAdvancePort,
   RunCommitsPort,
   RunPushPort,
+  RegistrySkillsPort,
   RemoteMcpPort,
   RunAttachmentsPort,
   RunsPublishPort,
@@ -48,6 +49,8 @@ export interface EffectDependencies {
   /** Path of the daemon socket the worker MCP servers connect to. */
   socket: string;
   environment: NodeJS.ProcessEnv;
+  /** The clock of the daemon, in ms. */
+  now: () => number;
   /** The command that starts `aip`; the worker MCP server is started with it. */
   entry: string[];
   /** Time between the stop signal and SIGKILL for an agent. */
@@ -59,6 +62,8 @@ export interface EffectDependencies {
   attachments: RunAttachmentsPort;
   /** The connections the MCP servers of a specialist go through. */
   remoteMcp: RemoteMcpPort;
+  /** The skills of a service registry for the specialists. */
+  registrySkills: RegistrySkillsPort;
   commits: RunCommitsPort;
   push: RunPushPort;
   publish: Pick<RunsPublishPort, 'logGrew'>;

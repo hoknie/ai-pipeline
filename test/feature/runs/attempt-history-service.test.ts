@@ -67,6 +67,7 @@ describe('RunAttemptHistoryService', () => {
       agentExit: {} as never,
       attachments: {} as never,
       remoteMcp: {} as never,
+      registrySkills: {} as never,
       commits: {} as never,
       push: {} as never,
     });

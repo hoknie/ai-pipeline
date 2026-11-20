@@ -162,6 +162,7 @@ export function createCopilotRuntime(
     buildOneShot: (request) => oneShot(executable, extra, request),
     createParser: () => createCopilotParser(expected),
     transcript: copilotTranscript,
+    loadsExtraSkills: false,
     skillDirectories: (worktree, home) => [
       join(worktree, '.github', 'skills'),
       join(home, '.copilot', 'skills'),

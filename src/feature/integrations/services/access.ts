@@ -50,6 +50,24 @@ export class ConnectionAccess {
     );
   }
 
+  /**
+   * The connections of a kind that may act for the project now: ready, enabled, with every secret
+   * set and nothing pending, its own and the shared ones.
+   */
+  serving(kind: string, project: string): Connection[] {
+    return this.dependencies.connections
+      .all()
+      .filter(
+        (one) =>
+          one.kind === kind &&
+          one.state === 'ready' &&
+          one.enabled &&
+          connectionServes(one, project) &&
+          !this.dependencies.secrets.pending(one) &&
+          this.complete(one),
+      );
+  }
+
   /** Whether every required secret of the connection is set. */
   complete(connection: Connection): boolean {
     const { catalog, secrets } = this.dependencies;

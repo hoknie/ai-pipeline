@@ -8,6 +8,7 @@ export {
   formatCheckResult,
   formatConnections,
   formatIntegrationTypes,
+  formatRegistrySkills,
 } from './integration/index.ts';
 export { formatAccessActions, formatAccessCheck } from './access/index.ts';
 export { formatAudit } from './audit/index.ts';

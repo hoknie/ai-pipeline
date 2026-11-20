@@ -1,0 +1,263 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  breakdownNames,
+  breakdownRows,
+  bucketSeries,
+  dailySeries,
+  dayOf,
+  median,
+  outcomesOf,
+  parseStatsPeriod,
+  perTaskOf,
+  resolveBucket,
+  totalsOf,
+  type StatsReport,
+} from '../../../src/feature/stats/types/index.ts';
+import { attemptRecord, taskRecord } from './helpers.ts';
+
+const MINUTE = 60_000;
+
+describe('statistics aggregates', () => {
+  it('takes the median beside the mean: 10, 20 and 300 thousand tokens', () => {
+    const tasks = [10_000, 20_000, 300_000].map((tokens, index) =>
+      taskRecord({ runId: `t${index}` }),
+    );
+    const attempts = [10_000, 20_000, 300_000].map((tokens, index) =>
+      attemptRecord({ runId: `t${index}`, inputTokens: tokens, outputTokens: 0 }),
+    );
+    const { tokens } = perTaskOf(attempts, tasks);
+    expect(tokens.mean).toBeCloseTo(110_000);
+    expect(tokens.median).toBe(20_000);
+    expect(median([1, 2, 3, 4])).toBe(2.5);
+    expect(median([])).toBe(0);
+  });
+
+  it('counts agent work without command time, and naming without time', () => {
+    const attempts = [
+      attemptRecord({ durationMs: 20 * MINUTE }),
+      attemptRecord({
+        runtime: 'command',
+        durationMs: 5 * MINUTE,
+        inputTokens: 0,
+        outputTokens: 0,
+      }),
+      attemptRecord({ kind: 'naming', durationMs: 0, inputTokens: 800, outputTokens: 40 }),
+    ];
+    const totals = totalsOf(attempts, []);
+    expect(totals.agentMs).toBe(20 * MINUTE);
+    expect(totals.commandMs).toBe(5 * MINUTE);
+    expect(totals.inputTokens).toBe(900);
+    expect(totals.outputTokens).toBe(90);
+    expect(totals.tokens).toBe(990);
+  });
+
+  it('counts the tasks by outcome', () => {
+    expect(
+      outcomesOf([
+        taskRecord(),
+        taskRecord({ outcome: 'failed' }),
+        taskRecord({ outcome: 'failed' }),
+        taskRecord({ outcome: 'cancelled' }),
+      ]),
+    ).toEqual({ finished: 1, failed: 2, cancelled: 1 });
+  });
+
+  it('breaks the attempts down by a field, the biggest consumers first', () => {
+    const rows = breakdownRows(
+      [
+        attemptRecord({ model: 'sonnet', inputTokens: 100, outputTokens: 0 }),
+        attemptRecord({ model: 'opus', inputTokens: 900, outputTokens: 100 }),
+        attemptRecord({ model: 'sonnet', inputTokens: 300, outputTokens: 0 }),
+      ],
+      (record) => record.model ?? 'unknown',
+    );
+    expect(rows.map((row) => [row.key, row.attempts, row.tokens])).toEqual([
+      ['opus', 1, 1000],
+      ['sonnet', 2, 400],
+    ]);
+    expect(rows[1]?.tokensPerAttempt).toBe(200);
+  });
+
+  it('puts names of the map into the rows and null where there is none', () => {
+    const attempts = [
+      attemptRecord({ specialist: 'coder' }),
+      attemptRecord({ specialist: 'other' }),
+    ];
+    const rows = breakdownRows(
+      attempts,
+      (record) => record.specialist,
+      new Map([['coder', 'Coder']]),
+    );
+    expect(Object.fromEntries(rows.map((row) => [row.key, row.name]))).toEqual({
+      coder: 'Coder',
+      other: null,
+    });
+    expect(breakdownRows(attempts, (record) => record.specialist)[0]?.name).toBeNull();
+  });
+
+  describe('names of a breakdown', () => {
+    const attempt = (repository: string) => attemptRecord({ repository, specialist: 'coder' });
+    const keyOf = (record: { specialist: string }) => record.specialist;
+
+    it('takes the name, but not one equal to the key', () => {
+      const attempts = [attempt('/a')];
+      expect(breakdownNames(attempts, keyOf, () => 'Coder').get('coder')).toBe('Coder');
+      expect(breakdownNames(attempts, keyOf, () => 'coder').has('coder')).toBe(false);
+      expect(breakdownNames(attempts, keyOf, () => null).has('coder')).toBe(false);
+    });
+
+    it('prefers the project with more attempts, then the smaller path', () => {
+      const names = (repository: string) => (repository === '/a' ? 'A' : 'B');
+      const unequal = [attempt('/a'), attempt('/a'), ...[1, 2, 3, 4, 5].map(() => attempt('/b'))];
+      expect(breakdownNames(unequal, keyOf, names).get('coder')).toBe('B');
+      const equal = [attempt('/b'), attempt('/b'), attempt('/a'), attempt('/a')];
+      expect(breakdownNames(equal, keyOf, names).get('coder')).toBe('A');
+    });
+
+    it('tries the next project when the first has no name', () => {
+      const attempts = [attempt('/a'), attempt('/a'), attempt('/b')];
+      const names = breakdownNames(attempts, keyOf, (repository) =>
+        repository === '/b' ? 'B' : undefined,
+      );
+      expect(names.get('coder')).toBe('B');
+    });
+  });
+
+  it('draws seven days with zeros where nothing happened', () => {
+    const day = 86_400_000;
+    const end = new Date(2026, 5, 10, 15).getTime();
+    const attempts = [
+      attemptRecord({ finishedAt: end - day, repository: '/work/app' }),
+      attemptRecord({ finishedAt: end, repository: '/work/lib' }),
+    ];
+    const from = new Date(2026, 5, 4).getTime();
+    const series = dailySeries(attempts, [taskRecord({ finishedAt: end })], from, end);
+    expect(series).toHaveLength(7);
+    expect(series.filter((entry) => entry.tokens === 0)).toHaveLength(5);
+    expect(series.at(-1)).toMatchObject({ day: dayOf(end), tasks: 1, tokens: 150 });
+    expect(series.at(-1)?.projects.map((project) => project.repository)).toEqual([
+      '/work/app',
+      '/work/lib',
+    ]);
+    expect(series[0]).toMatchObject({ tokens: 0, tasks: 0, projects: [], models: [] });
+  });
+
+  it('splits a day by model: the models add up to the day', () => {
+    const at = new Date(2026, 5, 10, 12).getTime();
+    const make = (model: string | null, tokens: number) =>
+      attemptRecord({ finishedAt: at, model, inputTokens: tokens, outputTokens: 0 });
+    const attempts = [
+      make('sonnet', 20_000),
+      make('sonnet', 10_000),
+      make('opus', 10_000),
+      make(null, 5_000),
+    ];
+    const [today] = dailySeries(attempts, [], at, at);
+    expect(today?.models.map((entry) => entry.model)).toEqual(['opus', 'sonnet', 'unknown']);
+    expect(today?.models.map((entry) => entry.tokens)).toEqual([10_000, 30_000, 5_000]);
+    expect(today?.models.map((entry) => entry.attempts)).toEqual([1, 2, 1]);
+    const add = (pick: (entry: { tokens: number; agentMs: number }) => number) =>
+      today?.models.reduce((total, entry) => total + pick(entry), 0);
+    expect(add((entry) => entry.tokens)).toBe(today?.tokens);
+    expect(add((entry) => entry.agentMs)).toBe(today?.agentMs);
+  });
+
+  it('keeps a record between a mid-day start and the next midnight in the series', () => {
+    const from = new Date(2026, 5, 9, 14).getTime();
+    const end = new Date(2026, 5, 10, 15).getTime();
+    const early = attemptRecord({ finishedAt: new Date(2026, 5, 9, 20).getTime() });
+    const series = dailySeries([early], [], from, end);
+    expect(series.map((entry) => entry.day)).toEqual([dayOf(from), dayOf(end)]);
+    expect(series[0]?.tokens).toBe(150);
+  });
+
+  it('parses the period of aip stats', () => {
+    const now = new Date(2026, 5, 10, 15).getTime();
+    expect(parseStatsPeriod('7d', now)).toEqual({
+      ok: true,
+      since: new Date(2026, 5, 4).getTime(),
+    });
+    expect(parseStatsPeriod('12h', now)).toEqual({ ok: true, since: now - 12 * 3_600_000 });
+    expect(parseStatsPeriod('2w', now)).toEqual({
+      ok: true,
+      since: new Date(2026, 5, -3).getTime(),
+    });
+    expect(parseStatsPeriod('all', now)).toEqual({ ok: true, since: null });
+    for (const bad of ['soon', '0d', '-1d', '7', '7m', '']) {
+      expect(parseStatsPeriod(bad, now)).toMatchObject({ ok: false });
+    }
+  });
+
+  it('keeps no cost field in the totals, the rows and the series', () => {
+    const attempts = [attemptRecord()];
+    const tasks = [taskRecord({ runId: attempts[0]!.runId })];
+    const perTask = perTaskOf(attempts, tasks);
+    const report = {
+      settings: { enabled: true, exclude: [], backfilledAt: null },
+      since: null,
+      until: null,
+      repository: null,
+      totals: totalsOf(attempts, tasks),
+      perTask,
+      outcomes: outcomesOf(tasks),
+      projects: [{ repository: '/work/app', totals: totalsOf(attempts, tasks), perTask }],
+      bySpecialist: breakdownRows(attempts, (record) => record.specialist),
+      byModel: [],
+      byPipeline: [],
+      byRuntime: [],
+      series: dailySeries(attempts, tasks, 1000, 2000),
+    } satisfies StatsReport;
+    expect(report.series.flatMap((entry) => entry.models).length).toBeGreaterThan(0);
+    expect(JSON.stringify(report)).not.toMatch(/cost/i);
+    expect(report.totals.tokens).toBe(150);
+    expect(report.bySpecialist[0]?.tokens).toBe(150);
+  });
+
+  it('resolves bucket granularity across 10, 11, 120 and 121 day boundaries', () => {
+    const DAY = 86_400_000;
+    expect(resolveBucket(0, 10 * DAY, 'auto')).toBe('6h');
+    expect(resolveBucket(0, 11 * DAY, 'auto')).toBe('day');
+    expect(resolveBucket(0, 120 * DAY, 'auto')).toBe('day');
+    expect(resolveBucket(0, 121 * DAY, 'auto')).toBe('week');
+    expect(resolveBucket(null, 1000, 'auto')).toBe('day');
+    expect(resolveBucket(1000, null, 'auto')).toBe('day');
+    expect(resolveBucket(0, 10 * DAY, undefined)).toBe('day');
+    expect(resolveBucket(0, 10 * DAY, 'week')).toBe('week');
+    expect(resolveBucket(0, 200 * DAY, '6h')).toBe('6h');
+  });
+
+  it('builds 6h buckets with empty slots having zeros and models/projects empty', () => {
+    const start = new Date(2026, 5, 10, 0).getTime();
+    const end = new Date(2026, 5, 10, 18).getTime();
+    const at = new Date(2026, 5, 10, 13).getTime();
+    const attempt = attemptRecord({
+      finishedAt: at,
+      repository: '/work/app',
+      inputTokens: 50,
+      outputTokens: 0,
+    });
+    const series = bucketSeries([attempt], [], start, end, '6h');
+    expect(series).toHaveLength(4);
+    expect(series.map((item) => item.day.slice(-5))).toEqual(['00:00', '06:00', '12:00', '18:00']);
+    expect(series[2]?.tokens).toBe(50);
+    expect(series[2]?.projects[0]?.repository).toBe('/work/app');
+    expect(series[0]).toMatchObject({ tokens: 0, tasks: 0, projects: [], models: [] });
+    expect(series[3]).toMatchObject({ tokens: 0, tasks: 0, projects: [], models: [] });
+  });
+
+  it('navigates weeks starting on Mondays and handles DST transitions', () => {
+    const wednesday = new Date(2026, 5, 10).getTime();
+    const nextFriday = new Date(2026, 5, 19).getTime();
+    const weekly = bucketSeries([], [], wednesday, nextFriday, 'week');
+    expect(weekly).toHaveLength(2);
+    expect(new Date(weekly[0]!.start).getDay()).toBe(1);
+    expect(new Date(weekly[1]!.start).getDay()).toBe(1);
+
+    const springDstStart = new Date(2026, 2, 29, 0).getTime();
+    const springDstEnd = new Date(2026, 2, 30, 0).getTime();
+    const dst6h = bucketSeries([], [], springDstStart, springDstEnd, '6h');
+    expect(dst6h.length).toBeGreaterThanOrEqual(4);
+    expect(dst6h.at(-1)?.day.endsWith('00:00')).toBe(true);
+  });
+});

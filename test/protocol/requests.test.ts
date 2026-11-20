@@ -110,6 +110,7 @@ const SAMPLES: Record<Method, unknown> = {
   integration_enable: { id: 'c1' },
   integration_disable: { id: 'c1' },
   integration_check: { id: 'c1' },
+  integration_skills: { id: 'c1', query: 'go' },
   mcp_remote_forward: { token: 't', server: 'registry', message: { jsonrpc: '2.0', id: 1 } },
   integration_secret_set: { id: 'c1', slot: 'token', value: 'v' },
   integration_secret_remove: { id: 'c1', slot: 'token' },
@@ -217,9 +218,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 146 methods, each in the request schema once', () => {
+  it('has 147 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(146);
+    expect(methods).toHaveLength(147);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -90,6 +90,15 @@ export function RunSummary({
       label: t('runs.header.summary.time'),
       value: duration(runClockEnd(run, now) - run.createdAt),
     },
+    ...(run.pinnedSkills.length > 0
+      ? [
+          {
+            key: 'skills',
+            label: t('runs.header.summary.skills'),
+            value: run.pinnedSkills.map((skill) => `${skill.name} ${skill.version}`).join(', '),
+          },
+        ]
+      : []),
     ...(tokens ? [{ key: 'tokens', label: t('runs.header.summary.tokens'), value: tokens }] : []),
   ];
   return (

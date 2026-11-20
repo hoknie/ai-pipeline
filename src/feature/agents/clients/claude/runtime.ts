@@ -79,6 +79,7 @@ function launchOptions(context: LaunchContext, mcpConfigPath: string): string[] 
     ...session,
     ...model,
     ...(!context.attachmentsDirectory ? [] : ['--add-dir', context.attachmentsDirectory]),
+    ...(!context.skillsDirectory ? [] : ['--add-dir', context.skillsDirectory]),
     '--append-system-prompt',
     systemPrompt(context.specialist, context.input),
     '--tools',
@@ -140,6 +141,7 @@ export function createClaudeRuntime(
     transcript: claudeTranscript,
     createParser: createClaudeParser,
     builtinTools: [...CLAUDE_BUILTIN_TOOLS],
+    loadsExtraSkills: true,
     listModels: () => Promise.resolve({ models: [...CLAUDE_MODELS], error: null }),
     skillDirectories(worktree: string, home: string): string[] {
       return [

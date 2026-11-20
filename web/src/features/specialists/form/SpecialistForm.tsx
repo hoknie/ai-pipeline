@@ -17,6 +17,7 @@ import { SpecialistFields } from './SpecialistFields.tsx';
 import { LevelHint, SpecialistNotices } from './SpecialistNotices.tsx';
 import { SpecialistHeader, type HeaderProps } from './SpecialistHeader.tsx';
 import { SpecialistTagsInput } from './SpecialistTagsInput.tsx';
+import { useRegistrySkills } from './useRegistrySkills.ts';
 import { UsageBlock, describeReference, type SharedOnly } from './SpecialistUsage.tsx';
 
 export { valueOf, describeReference };
@@ -135,6 +136,7 @@ export function SpecialistForm(props: SpecialistFormProps) {
   const locked = props.locked ?? false;
   const { t } = useTranslation();
   const editor = useEditorActions(props);
+  const registrySkills = useRegistrySkills(props.api);
   const { level, draft, slug, saveAs, busy, sources, readOnly } = editor;
   const tags = (
     <SpecialistTagsInput
@@ -193,6 +195,7 @@ export function SpecialistForm(props: SpecialistFormProps) {
         catalogError={catalogError}
         chains={view.chains}
         mcpServers={view.mcpServers}
+        registrySkills={registrySkills}
         tags={tags}
         tagsHelp={level === 'global' ? t('specialists.tags.sharedOnly') : undefined}
         mainStart={

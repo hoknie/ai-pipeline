@@ -125,6 +125,8 @@ function createLower(context: Context) {
     // read at every request, so a changed `network.proxy` applies without a restart
     proxyFor: (url) => probeProxy(url, network.proxy(), environment),
     integrations: () => integrations,
+    stateDirectory: options.stateDirectory,
+    now,
   });
   const integrations = createIntegrationsServices({
     ...{ database, registry, now },
@@ -185,6 +187,7 @@ function createRuns(context: Context, lower: Lower) {
     diff: ports.diff.port,
     attachments: ports.attachments.port,
     remoteMcp: ports.remoteMcp.port,
+    registrySkills: ports.registrySkills.port,
     commits: ports.commits.port,
     push: ports.push.port,
     agentExit: processes,

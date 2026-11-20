@@ -57,7 +57,7 @@ function bound(repository: string | null): Api {
     ...systemApi(),
     ...configApi(repository),
     ...statsApi(),
-    ...integrationsApi(),
+    ...integrationsApi((path) => withRepository(path, repository)),
     ...webhooksApi(),
     ...attachmentsApi(),
     observerHistory,

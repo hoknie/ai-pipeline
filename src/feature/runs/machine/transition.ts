@@ -1,6 +1,12 @@
 import { isRejected, rejected } from '../../../platform/errors/index.ts';
 import { addUsage } from '../../agents/types/index.ts';
-import { type RunState, isRunFinished, pointStalled, retryableGroups } from '../types/index.ts';
+import {
+  type PinnedSkill,
+  type RunState,
+  isRunFinished,
+  pointStalled,
+  retryableGroups,
+} from '../types/index.ts';
 import {
   answerQuestion,
   messageAttempt,
@@ -63,6 +69,16 @@ function runNamed(m: Ctx, event: Extract<Event, { kind: 'run_named' }>): void {
   m.state.run.namingUsage = addUsage(m.state.run.namingUsage, event.usage);
 }
 
+/** The first version fixed for a skill wins: attempts of parallel groups may pin the same one. */
+function pinSkills(m: Ctx, pins: Record<string, PinnedSkill>): void {
+  const kept = { ...m.state.run.pinnedSkills };
+  for (const [name, pin] of Object.entries(pins)) {
+    if (!Object.hasOwn(kept, name))
+      kept[name] = { version: pin.version, connection: pin.connection };
+  }
+  m.state.run.pinnedSkills = kept;
+}
+
 function autoDeliveryCancelled(m: Ctx): void {
   const run = m.state.run;
   if (run.finishedAt !== null) {
@@ -108,6 +124,7 @@ const HANDLERS: Handlers = {
   hold: (m, e) => holdRun(m, e.hold),
   repair_start: (m, e) => repairStart(m, e.incident, e.specialist),
   repair_allowed: (m, e) => repairAllowed(m, e.allowed),
+  skills_pinned: (m, e) => pinSkills(m, e.pins),
   interrupted: (m) => interrupted(m),
 };
 

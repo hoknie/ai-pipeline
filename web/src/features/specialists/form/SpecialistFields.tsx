@@ -10,6 +10,7 @@ import type {
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
+import type { PickerOption } from '../../../shared/ui/forms/ValuesPicker.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
 import { fieldOf, type Draft, type FieldName } from './draft.ts';
 import {
@@ -121,6 +122,8 @@ interface SpecialistFieldsProps {
   chains?: EditorChain[];
   /** The servers of the MCP catalog; the field `mcp_servers` is not shown without them. */
   mcpServers?: EditorMcpServer[];
+  /** The skills of the registry of the project as hints of the field `skills`. */
+  registrySkills?: PickerOption[];
   /** Fields that are not shown. */
   omit?: FieldName[];
   /** The control of the field `tags`; the field is not shown without it. */
@@ -198,6 +201,7 @@ export function SpecialistFields(props: SpecialistFieldsProps) {
                       tags,
                       chains,
                       ...(props.mcpServers ? { mcpServers: props.mcpServers } : {}),
+                      ...(props.registrySkills ? { registrySkills: props.registrySkills } : {}),
                     }}
                     errors={errorsOf(field)}
                     tagsHelp={tagsHelp}

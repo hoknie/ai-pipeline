@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { isRegistrySkill } from '../../swarm-config/types/index.ts';
+
 export function skillCandidates(name: string, directories: string[]): string[] {
   const parts = name.split(':');
   const leaf = parts.at(-1) ?? name;
@@ -13,8 +15,11 @@ export function skillCandidates(name: string, directories: string[]): string[] {
   ]);
 }
 
+/** Local skills with no file in the directories; `registry:` skills are the business of the run. */
 export function missingSkills(skills: string[], directories: string[]): string[] {
   return skills.filter(
-    (skill) => !skillCandidates(skill, directories).some((path) => existsSync(path)),
+    (skill) =>
+      !isRegistrySkill(skill) &&
+      !skillCandidates(skill, directories).some((path) => existsSync(path)),
   );
 }

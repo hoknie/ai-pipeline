@@ -82,6 +82,13 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
   return table(withRepository ? rows : rows.map((row) => row.slice(0, -1)), style, { flex: 4 });
 }
 
+/** The versions of the registry skills fixed for the run; no line before the first. */
+function skillsLine(run: RunView, style: Style): string[] {
+  if (run.pinnedSkills.length === 0) return [];
+  const skills = run.pinnedSkills.map((skill) => `${skill.name} ${skill.version}`).join(', ');
+  return [`${style.muted('Skills:')} ${skills}`];
+}
+
 export function formatRun(
   run: RunView,
   now: number,
@@ -102,6 +109,7 @@ export function formatRun(
             .join(', ')}`,
         ]
       : []),
+    ...skillsLine(run, style),
     ...(run.tags && run.tags.length > 0
       ? [`${style.muted('Tags:')} ${formatTagLabels(run.tags, style)}`]
       : []),

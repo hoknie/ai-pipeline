@@ -15,6 +15,7 @@ import {
 import { checkMcpServers } from './sections/mcp-servers.ts';
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
 import { MAX_RANGE } from '../types/settings.ts';
+import { isRegistrySkill, parseRegistrySkill } from '../types/skills/index.ts';
 import {
   type Defaults,
   type Permissions,
@@ -26,6 +27,24 @@ import {
   modelIdProblem,
   variantProblem,
 } from '../types/specialist.ts';
+
+/** The `registry:` items of `skills`: a valid name and range, one item per name. */
+function checkRegistrySkills(ctx: ValidateContext, field: unknown, fieldPath: string): void {
+  if (!Array.isArray(field)) return;
+  const seen = new Set<string>();
+  for (const [index, item] of field.entries()) {
+    if (typeof item !== 'string' || !isRegistrySkill(item)) continue;
+    const path = `${fieldPath}[${index}]`;
+    const parsed = parseRegistrySkill(item);
+    if (!parsed.ok) {
+      addError(ctx, path, parsed.problem);
+    } else if (seen.has(parsed.ref.name)) {
+      addError(ctx, path, `the registry skill "${parsed.ref.name}" is listed twice`);
+    } else {
+      seen.add(parsed.ref.name);
+    }
+  }
+}
 
 export const SPECIALIST_KEYS = [
   'name',
@@ -158,6 +177,7 @@ function checkSpecialistField(
       break;
     case 'skills':
       specialist.skills = readStrings(ctx, field, fieldPath);
+      checkRegistrySkills(ctx, field, fieldPath);
       break;
     case 'prompt':
       specialist.prompt = readString(ctx, field, fieldPath);

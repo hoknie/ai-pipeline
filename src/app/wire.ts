@@ -66,6 +66,12 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
     },
     attemptEnded: (token) => void services.serviceRegistry.forwarder.close(token),
   });
+  // The skills of a registry for the specialists: chosen, cached and laid out by the registry feature.
+  ports.registrySkills.set({
+    pin: (project, references) => services.serviceRegistry.skills.pin(project, references),
+    materialize: (project, pinned, directory) =>
+      services.serviceRegistry.skills.materialize(project, pinned, directory),
+  });
   ports.queue.set(services.queue.advance);
   ports.observe.set(services.observers);
   ports.repair.set(services.observers);

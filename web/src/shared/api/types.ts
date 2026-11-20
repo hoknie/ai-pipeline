@@ -5,6 +5,7 @@ export type {
   ConnectionView,
   DeliveryView,
   IntegrationTypeView,
+  RegistrySkillView,
   SubscriptionView,
   WebhookAttemptView,
   WebhookDeliveryView,

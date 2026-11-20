@@ -9,7 +9,23 @@ export interface FakeRegistryRequest {
   body: Record<string, unknown> | null;
 }
 
+/** A skill the fake registry serves: `versions` maps a version to the bytes of its archive. */
+export interface FakeSkill {
+  id: string;
+  name: string;
+  versions: Record<string, Buffer>;
+  title?: string;
+  description?: string;
+  tags?: string[];
+}
+
 export interface FakeRegistry {
+  /** The skills `list_skills` finds and the archives the REST endpoint serves. */
+  skills: FakeSkill[];
+  /** `<id>@<version>` of every archive downloaded. */
+  downloads: string[];
+  /** The page size of `list_skills`; default 50. */
+  pageSize: number;
   /** The root address, `http://127.0.0.1:<port>`. */
   base: string;
   port: number;
@@ -42,6 +58,9 @@ export async function startFakeRegistry(
     tools: ['list_projects', 'get_doc', 'list_specs'],
     rawBody: null as string | null,
     delayMs: 0,
+    skills: [] as FakeSkill[],
+    downloads: [] as string[],
+    pageSize: 50,
   };
   let sessions = 0;
 
@@ -87,6 +106,20 @@ export async function startFakeRegistry(
     if (request.headers.authorization !== secret || failure !== undefined) {
       response.writeHead(failure ?? 401, { 'content-type': 'text/plain' });
       response.end(`secret detail ${token}`);
+      return;
+    }
+    const archive = /^\/api\/v1\/skills\/([^/]+)\/archive\?version=(.+)$/u.exec(request.url ?? '');
+    if (request.method === 'GET' && archive !== null) {
+      const id = decodeURIComponent(archive[1] ?? '');
+      const version = decodeURIComponent(archive[2] ?? '');
+      const bytes = state.skills.find((skill) => skill.id === id)?.versions[version];
+      if (bytes === undefined) {
+        response.writeHead(404).end();
+        return;
+      }
+      state.downloads.push(`${id}@${version}`);
+      response.writeHead(200, { 'content-type': 'application/zip' });
+      response.end(bytes);
       return;
     }
     if (request.url !== '/api/mcp') {
@@ -136,6 +169,36 @@ export async function startFakeRegistry(
         return;
       case 'tools/call': {
         const params = (body.params ?? {}) as { name?: string; arguments?: unknown };
+        if (params.name === 'list_skills') {
+          const args = (params.arguments ?? {}) as { query?: string; page?: number };
+          const found = state.skills.filter(
+            (skill) => args.query === undefined || skill.name.includes(args.query),
+          );
+          const page = args.page ?? 1;
+          const items = found
+            .slice((page - 1) * state.pageSize, page * state.pageSize)
+            .map((skill) => ({
+              id: skill.id,
+              name: skill.name,
+              title: skill.title ?? skill.name,
+              description: skill.description ?? '',
+              tags: skill.tags ?? [],
+              versions: Object.keys(skill.versions),
+            }));
+          answer(response, {
+            jsonrpc: '2.0',
+            id,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ items, has_more: page * state.pageSize < found.length }),
+                },
+              ],
+            },
+          });
+          return;
+        }
         answer(response, {
           jsonrpc: '2.0',
           id,

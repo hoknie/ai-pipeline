@@ -150,6 +150,7 @@ export function createAgyRuntime(
     buildOneShot: (request) => oneShot(executable, extra, request),
     createParser: createAgyParser,
     transcript: agyTranscript,
+    loadsExtraSkills: false,
     skillDirectories(worktree, home) {
       return [
         join(worktree, '.agents', 'skills'),

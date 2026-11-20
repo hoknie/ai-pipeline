@@ -11,6 +11,7 @@ export * from './pipeline.ts';
 export * from './prompt.ts';
 export * from './providers/provider.ts';
 export * from './settings.ts';
+export * from './skills/index.ts';
 export * from './specialist.ts';
 export * from './tag-names.ts';
 export * from './variants/index.ts';

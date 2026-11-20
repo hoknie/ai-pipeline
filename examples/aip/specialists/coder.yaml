@@ -1,3 +1,6 @@
 name: Coder
 model: sonnet
 max: 1
+# a team skill from the service registry (see mcp_servers in settings.yaml for the connection `main`)
+skills:
+  - registry:go-testing@^1

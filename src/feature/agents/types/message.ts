@@ -1,7 +1,18 @@
-import type { Specialist } from '../../swarm-config/types/index.ts';
+import {
+  isRegistrySkill,
+  parseRegistrySkill,
+  type Specialist,
+} from '../../swarm-config/types/index.ts';
 
 import { describePermissions } from './runtime.ts';
 import type { StepInput } from './step-input.ts';
+
+/** A skill of a registry is named by its name alone, as the agent sees it. */
+function skillLabel(skill: string): string {
+  if (!isRegistrySkill(skill)) return skill;
+  const parsed = parseRegistrySkill(skill);
+  return parsed.ok ? parsed.ref.name : skill;
+}
 
 export function systemPrompt(specialist: Specialist, input: StepInput): string {
   const lines = [
@@ -17,7 +28,7 @@ export function systemPrompt(specialist: Specialist, input: StepInput): string {
     'Always pass a short summary of what you did. Without swarm_report the step counts as failed.',
   ];
   if (specialist.skills.length > 0) {
-    lines.push(`Use these skills for this step: ${specialist.skills.join(', ')}.`);
+    lines.push(`Use these skills for this step: ${specialist.skills.map(skillLabel).join(', ')}.`);
   }
   if (input.humanReview) {
     lines.push(

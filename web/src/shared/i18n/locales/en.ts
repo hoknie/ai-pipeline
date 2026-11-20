@@ -543,6 +543,7 @@ export const en = {
         path: 'Path',
         time: 'Time',
         tokens: 'Tokens',
+        skills: 'Skills',
       },
       tags: 'Run tags',
       label: 'run',
@@ -1370,6 +1371,7 @@ export const en = {
     header: 'specialist actions',
     replacesDefaults: 'The tools of the specialist replace the ones from defaults.',
     notInCatalog: 'not in the catalog',
+    registrySkills: 'Skills of the registry',
     mcpForAll: 'Servers for all specialists, no choice needed: {{names}}.',
     mcpTab: 'MCP servers tab',
     catalogError:

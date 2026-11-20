@@ -13,6 +13,9 @@ export interface ConnectionView extends BaseConnectionView {
   channel: ChannelStateView | null;
 }
 
+/** A skill of a service registry as `integration_skills` lists it. */
+export type { RegistrySkill as RegistrySkillView } from '../../../../feature/service-registry/types/index.ts';
+
 /** The answer of `integration_remove`: the connection and its secrets are gone. */
 export interface IntegrationRemoved {
   removed: string;
@@ -55,6 +58,18 @@ export const integrationsRequests = [
   z.object({ method: z.literal('integration_enable'), params: z.object({ id: connectionId }) }),
   z.object({ method: z.literal('integration_disable'), params: z.object({ id: connectionId }) }),
   z.object({ method: z.literal('integration_check'), params: z.object({ id: connectionId }) }),
+  z.object({
+    method: z.literal('integration_skills'),
+    params: z
+      .object({
+        id: connectionId.optional(),
+        repository: queueRepository.optional(),
+        query: z.string().max(200).optional(),
+      })
+      .refine((params) => (params.id === undefined) !== (params.repository === undefined), {
+        message: 'pass either a connection id or a repository',
+      }),
+  }),
   z.object({
     method: z.literal('integration_secret_set'),
     params: z.object({

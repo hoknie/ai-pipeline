@@ -207,6 +207,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     groups: [groupRow()],
     system: [],
     attachments: [],
+    pinnedSkills: [],
     decisions: [],
     ...overrides,
   };
@@ -1159,6 +1160,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     webhookTest: vi.fn(async () => ({ ok: true, statusCode: 200, durationMs: 12, error: null })),
     webhookLog: vi.fn(async () => []),
     webhookRedeliver: vi.fn(async () => webhookDeliveryView()),
+    registrySkills: vi.fn(async () => []),
     ...overrides,
   };
   /** Methods that record the repository they were bound to, then call the shared mock. */

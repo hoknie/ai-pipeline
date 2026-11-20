@@ -68,4 +68,6 @@ export const LATER_MIGRATIONS: string[] = [
     code TEXT,
     count INTEGER
   )`,
+  // the versions of registry skills fixed for a run (JSON by skill name); old rows have none
+  `ALTER TABLE runs ADD COLUMN pinned_skills_json TEXT`,
 ];

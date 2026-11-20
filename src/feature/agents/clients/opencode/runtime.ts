@@ -179,6 +179,7 @@ export function createOpencodeRuntime(
     buildLaunch: (context) => launch(executable, extra, context),
     transcript: opencodeTranscript,
     createParser: createOpencodeParser,
+    loadsExtraSkills: false,
     skillDirectories(worktree: string, home: string): string[] {
       return [
         join(home, '.config', 'opencode', 'skills'),

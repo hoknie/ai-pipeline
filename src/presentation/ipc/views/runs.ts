@@ -245,6 +245,10 @@ function runHead(state: RunState, observers: RepairPolicy) {
     links: [],
     linkedBy: [],
     attachments: state.run.attachments.map((file) => ({ ...file })),
+    pinnedSkills: Object.entries(state.run.pinnedSkills ?? {}).map(([name, pin]) => ({
+      name,
+      version: pin.version,
+    })),
   };
 }
 

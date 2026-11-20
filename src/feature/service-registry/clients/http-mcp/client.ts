@@ -14,7 +14,7 @@ export const REQUEST_TIMEOUT_MS = 120_000;
 
 const pathOf = (base: string): string => `${base}/api/mcp`;
 
-function codeOfStatus(status: number): RegistryCode | null {
+export function codeOfStatus(status: number): RegistryCode | null {
   if (status === 401 || status === 403) return 'unauthorized';
   if (status === 429 || status >= 500) return 'unreachable';
   if (status < 200 || status >= 300) return 'protocol';
@@ -22,7 +22,7 @@ function codeOfStatus(status: number): RegistryCode | null {
 }
 
 /** Only a proxy that tunnels with an HTTP `CONNECT` can carry the request. */
-function usableProxy(proxy: string | null): string | null {
+export function usableProxy(proxy: string | null): string | null {
   if (proxy === null) return null;
   let parsed: URL;
   try {
@@ -147,5 +147,39 @@ export async function mcpClose(endpoint: McpEndpoint): Promise<void> {
   }
 }
 
+/** One GET of a file of the registry (the archive of a skill) with the bearer token. */
+export async function registryDownload(
+  endpoint: McpEndpoint,
+  path: string,
+  maxBytes: number,
+): Promise<Buffer> {
+  const url = `${endpoint.base}${path}`;
+  const proxy = usableProxy(endpoint.proxyFor(url));
+  let response;
+  try {
+    response = await httpRequest({
+      url,
+      method: 'GET',
+      headers: { authorization: `Bearer ${endpoint.token}`, accept: 'application/zip' },
+      timeoutMs: endpoint.timeoutMs ?? 60_000,
+      maxResponseBytes: maxBytes,
+      proxy,
+      ...(endpoint.signal === undefined ? {} : { signal: endpoint.signal }),
+    });
+  } catch (error) {
+    const failure = httpFailureCode(error);
+    throw new RegistryFailure(
+      failure === 'timeout' ? 'timeout' : failure === 'too_large' ? 'too_large' : 'unreachable',
+    );
+  }
+  const failure = codeOfStatus(response.status);
+  if (failure !== null) throw new RegistryFailure(failure);
+  return Buffer.from(response.body);
+}
+
 /** The HTTP client of a registry as the port of the feature. */
-export const httpMcpTransport: RegistryTransportPort = { post: mcpPost, close: mcpClose };
+export const httpMcpTransport: RegistryTransportPort = {
+  post: mcpPost,
+  close: mcpClose,
+  download: registryDownload,
+};

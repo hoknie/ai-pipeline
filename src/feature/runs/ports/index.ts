@@ -8,3 +8,8 @@ export type { PushOutcome, RunPushPort } from './push.ts';
 export type { RemoteMcpPort, RemoteMcpRefusal, RemoteMcpResolution } from './remote-mcp.ts';
 export type { QueueAdvancePort } from './queue-advance.ts';
 export type { RunNotifyPort } from './notify.ts';
+export type {
+  RegistrySkillPin,
+  RegistrySkillsPinned,
+  RegistrySkillsPort,
+} from './registry-skills.ts';

@@ -64,7 +64,19 @@ prompt: >
 - The connection is found by name for the project of the run: the connection of the project first, then the shared one. If there is none, or it is disabled, or has no token, the step does not start and says which server and connection to fix. Switching the connection off during a step makes the next calls of the agent fail with `connection_disabled`; the step goes on.
 - A failure of the registry reaches the agent as an error with a fixed code: `unreachable`, `timeout` (a request lasts at most 120 s), `unauthorized`, `protocol` or `too_large` (an answer above 4 MiB). It does not end the step.
 - Requests follow [`network.proxy`](network.md), otherwise `HTTPS_PROXY`/`HTTP_PROXY` of the daemon unless `NO_PROXY` names the registry; a change of `network.proxy` applies at once. Only proxies that tunnel with HTTP `CONNECT` work; SOCKS gives `unreachable`.
-- Publish skills and specifications to the registry with the registry's own tools (Git sources, documentation collection); `aip` only reads from it.
+- Publish skills and specifications to the registry with the registry's own tools (Git sources, documentation collection; a skill kept in the repository is imported by a Git source); `aip` only reads from it.
+
+### Skills
+
+Specialists use the skills of the registry as `registry:<name>[@<range>]` in `skills` (see [Skills of a service registry](specialists.md#skills-of-a-service-registry)).
+
+The daemon asks the registry for the skill and its versions and downloads the zip archive of the chosen version with the token of the connection (up to 10 MiB, 60 s). It checks the archive before keeping it: paths only inside the skill folder, at most 500 files, 5 MiB per file and 50 MiB in total.
+A `SKILL.md` must name the skill. An archive that breaks a rule is not kept.
+
+```
+aip integration skills <id>               # registry:<name>, the title and the versions, highest first
+aip integration skills <id> --query go
+```
 
 ## Where secrets are kept
 

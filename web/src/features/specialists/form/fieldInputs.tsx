@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '../../../shared/ui/forms/select.tsx';
 import { Textarea } from '../../../shared/ui/forms/textarea.tsx';
-import { ValuesPicker } from '../../../shared/ui/forms/ValuesPicker.tsx';
+import { ValuesPicker, type PickerOption } from '../../../shared/ui/forms/ValuesPicker.tsx';
 import { ModelField } from '../../../shared/ui/forms/picker/ModelField.tsx';
 import { isList, type Draft, type FieldName, type ListField } from './draft.ts';
 
@@ -75,6 +75,8 @@ export interface InputProps {
   chains?: EditorChain[];
   /** The servers of the MCP catalog; the field `mcp_servers` offers them. */
   mcpServers?: EditorMcpServer[];
+  /** The skills of the registry of the project; the field `skills` offers them as `registry:<name>`. */
+  registrySkills?: PickerOption[];
 }
 
 /** The choice of the servers of the MCP catalog; a name the catalog lacks stays with a note. */
@@ -109,6 +111,7 @@ function ListInput({
   invalid,
   defaults,
   catalog,
+  registrySkills = [],
 }: InputProps & { field: ListField }) {
   const { t } = useTranslation();
   const runtime = draft.runtime || String(defaults['defaults.runtime'] ?? 'claude');
@@ -119,6 +122,8 @@ function ListInput({
       : null;
   const mark = (value: string): string | null => {
     if (!known) return null;
+    // a registry skill is not in the folders of the runtime: the daemon looks it up in the registry
+    if (field === 'skills' && value.startsWith('registry:')) return null;
     if (!known.some((entry) => entry.name === value)) return t('picker.notFound');
     return field === 'tools' &&
       runtime === 'claude' &&
@@ -133,7 +138,12 @@ function ListInput({
       label={fieldLabel(field, t)}
       values={draft[field]}
       onChange={(items) => onDraft((current) => ({ ...current, [field]: items }))}
-      options={field === 'allow_commands' ? [] : (known ?? [])}
+      options={
+        field === 'allow_commands'
+          ? []
+          : [...(known ?? []), ...(field === 'skills' ? registrySkills : [])]
+      }
+      headings={field === 'skills' ? { other: t('specialists.registrySkills') } : undefined}
       inherited={field === 'tools' && draft.tools.length === 0 ? inheritedToolsOf(defaults) : []}
       mark={field === 'allow_commands' ? undefined : mark}
       disabled={disabled}

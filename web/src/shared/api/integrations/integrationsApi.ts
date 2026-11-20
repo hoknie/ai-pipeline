@@ -3,9 +3,10 @@ import type {
   ConnectionView,
   DeliveryView,
   IntegrationTypeView,
+  RegistrySkillView,
   SubscriptionView,
 } from '../types.ts';
-import { call, post } from '../http.ts';
+import { call, enc, post } from '../http.ts';
 
 /** Everything the page of integrations shows at once. */
 export interface IntegrationsOverview {
@@ -42,10 +43,16 @@ export interface IntegrationsApi {
   subscriptionRemove(id: string): Promise<void>;
   subscriptionTest(id: string): Promise<DeliveryView>;
   deliveries(query?: DeliveryQuery): Promise<DeliveryView[]>;
+  /** The skills of the registry of the project this API is bound to, for the hints of the form. */
+  registrySkills(query?: string): Promise<RegistrySkillView[]>;
 }
 
-export function integrationsApi(): IntegrationsApi {
+export function integrationsApi(
+  scoped: (path: string) => string = (path) => path,
+): IntegrationsApi {
   return {
+    registrySkills: (query) =>
+      call(scoped(`/api/integrations/skills${query ? `?query=${enc(query)}` : ''}`)),
     integrations: () => call('/api/integrations'),
     integrationEdit: (id, change) => post('/api/integrations/edit', { id, ...change }),
     subscriptionAdd: (subscription) =>

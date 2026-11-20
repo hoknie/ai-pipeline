@@ -29,6 +29,7 @@ export function createLifecycle(
     notifications,
   } = services;
   const auditPruner = createAuditPruner(services, log);
+  const skillCachePruner = createSkillCachePruner(services, log);
   return {
     async start() {
       network.start();
@@ -62,10 +63,12 @@ export function createLifecycle(
       await notifications.dispatcher.start();
       await notifications.channels.start();
       auditPruner.start();
+      skillCachePruner.start();
       warnAboutUsersWithoutRole(services, log);
     },
     async stop() {
       auditPruner.stop();
+      skillCachePruner.stop();
       await notifications.channels.stop();
       await notifications.dispatcher.stop();
       runs.engine.halt();
@@ -105,6 +108,40 @@ export function createAuditPruner(
       return services.audit.prune(services.now() - retention);
     } catch (error) {
       log(`audit: cannot clear the journal: ${error instanceof Error ? error.message : error}`);
+      return 0;
+    }
+  };
+  return {
+    prune,
+    start() {
+      prune();
+      timer = setInterval(prune, intervalMs);
+      timer.unref();
+    },
+    stop() {
+      if (timer !== null) clearInterval(timer);
+      timer = null;
+    },
+  };
+}
+
+/** How often the cache of the skills of the registries is cleared. */
+export const SKILL_CACHE_PRUNE_MS = DAY;
+
+/** Removes the cached skill versions nobody used for 30 days: at the start and then every day. */
+export function createSkillCachePruner(
+  services: Pick<DaemonServices, 'serviceRegistry'>,
+  log: (message: string) => void,
+  intervalMs = SKILL_CACHE_PRUNE_MS,
+): { prune(): number; start(): void; stop(): void } {
+  let timer: NodeJS.Timeout | null = null;
+  const prune = (): number => {
+    try {
+      return services.serviceRegistry.skills.cache.prune();
+    } catch (error) {
+      log(
+        `service-registry: cannot clear the skill cache: ${error instanceof Error ? error.message : error}`,
+      );
       return 0;
     }
   };

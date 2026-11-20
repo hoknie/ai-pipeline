@@ -40,6 +40,13 @@ export interface RunAttachment {
   mediaType: string;
 }
 
+/** A version of a registry skill fixed for the run, and the connection it came through. */
+export interface PinnedSkill {
+  version: string;
+  /** The id of the connection of the registry. */
+  connection: string;
+}
+
 export interface Run {
   id: string;
   repository: string;
@@ -85,6 +92,11 @@ export interface Run {
   repair: RunRepair;
   /** Files attached to the task; fixed when the run is created. */
   attachments: RunAttachment[];
+  /**
+   * The versions of the registry skills the run uses, by skill name; fixed by the first attempt
+   * that needs a skill and never changed. Absent in a run from before registry skills.
+   */
+  pinnedSkills?: Record<string, PinnedSkill>;
 }
 
 /** A state of a group an observer repairs; `key` includes the attempts of the group. */

@@ -555,6 +555,7 @@ export const es: Dictionary = {
         path: 'Ruta',
         time: 'Tiempo',
         tokens: 'Tokens',
+        skills: 'Habilidades',
       },
       tags: 'Etiquetas de la ejecución',
       label: 'ejecución',
@@ -1397,6 +1398,7 @@ export const es: Dictionary = {
     header: 'acciones del especialista',
     replacesDefaults: 'Las herramientas del especialista sustituyen a las de defaults.',
     notInCatalog: 'no está en el catálogo',
+    registrySkills: 'Habilidades del registro',
     mcpForAll: 'Servidores para todos los especialistas, sin elegir: {{names}}.',
     mcpTab: 'Pestaña Servidores MCP',
     catalogError:

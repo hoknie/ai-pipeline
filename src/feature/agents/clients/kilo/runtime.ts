@@ -94,6 +94,7 @@ export function createKiloRuntime(
     buildOneShot: (request) => oneShot(executable, extra, request),
     createParser: createOpencodeParser,
     transcript: opencodeTranscript,
+    loadsExtraSkills: false,
     skillDirectories: (worktree, home) => [
       join(worktree, '.kilo', 'skills'),
       join(home, '.config', 'kilo', 'skills'),

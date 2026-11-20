@@ -1,10 +1,8 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
 import {
   launchProcess,
-  missingSkills,
   timesPath,
   type ProcessExit,
   type SupervisedProcess,
@@ -37,7 +35,8 @@ import {
   withBridges,
   workerCommand,
 } from './conversations.ts';
-import { runtimeProblem, withProxy } from './runtime-check.ts';
+import { logSkillWarnings, startWithSkills, type AttemptSkills } from './skills/index.ts';
+import { networkFailure, runtimeProblem, withProxy } from './runtime-check.ts';
 import type { OutsideChanges } from './outside.ts';
 import type { RunningAgents } from './running.ts';
 import type { UsageBuffers } from './usage.ts';
@@ -77,21 +76,36 @@ export class AttemptStarter {
   async start(state: RunState, slug: string, seq: number): Promise<void> {
     const prepared = await this.prepare(state, slug, seq);
     if (prepared === null) return;
-    const { group, key, specialist, runtime, worktree } = prepared;
+    const { key, specialist, runtime } = prepared;
     const directory = attemptDirectory(workspaceOf(state), state.run.id, slug, seq);
-    const log = logPath(state, slug, seq);
     mkdirSync(directory, { recursive: true });
-    for (const skill of missingSkills(
-      specialist.skills,
-      runtime.skillDirectories(worktree, homedir()),
-    )) {
-      appendFileSync(log, `[aip] warning: skill not found: ${skill}\n`);
-    }
+    // the network of the registry runs outside the serial queue, inside `startWithSkills`
+    await startWithSkills(
+      this.dependencies,
+      state,
+      key,
+      specialist,
+      runtime,
+      directory,
+      (skills) => this.begin(prepared, directory, logPath(state, slug, seq), skills),
+      (message) => this.fail(state, key, { kind: 'spawn', message }),
+    );
+  }
+
+  /** Writes the warnings, issues the token and launches the agent. */
+  private async begin(
+    prepared: Prepared,
+    directory: string,
+    log: string,
+    skills: AttemptSkills,
+  ): Promise<void> {
+    const { state, group, key, specialist, runtime, worktree } = prepared;
+    logSkillWarnings(log, specialist, runtime, worktree, skills);
     const token = this.parts.running.issueToken(key);
     await this.parts.outside.begin(state, key);
     let process: SupervisedProcess;
     try {
-      process = this.launch(prepared, directory, token);
+      process = this.launch(prepared, directory, token, skills.directory);
     } catch (error) {
       this.release(token);
       await this.fail(state, key, { kind: 'spawn', message: (error as Error).message });
@@ -100,7 +114,9 @@ export class AttemptStarter {
     const timer = setTimeout(() => {
       if (this.dependencies.context.stopping) return;
       const { context } = this.dependencies;
-      void context.serial(() => context.apply(state, { kind: 'timed_out', group: slug, seq }));
+      void context.serial(() =>
+        context.apply(state, { kind: 'timed_out', group: key.group, seq: key.seq }),
+      );
     }, specialist.timeoutSeconds * this.dependencies.timings.timeoutUnitMs);
     this.parts.running.add(key, process, timer);
     void process.exited.then((exit) => {
@@ -112,7 +128,7 @@ export class AttemptStarter {
       }
       this.release(token);
       if (this.dependencies.context.stopping) return undefined;
-      return this.networkFailure(state, key, exit).then((network) =>
+      return networkFailure(this.dependencies.network, state, key, exit).then((network) =>
         this.dependencies.context.serial(() => this.exited(state, group, key, exit, network)),
       );
     });
@@ -212,7 +228,12 @@ export class AttemptStarter {
     this.dependencies.remoteMcp.attemptEnded(token);
   }
 
-  private launch(prepared: Prepared, directory: string, token: string): SupervisedProcess {
+  private launch(
+    prepared: Prepared,
+    directory: string,
+    token: string,
+    skillsDirectory: string | null,
+  ): SupervisedProcess {
     const { state, group, attempt, key, runtime, worktree, specialist } = prepared;
     const { context, entry, socket, environment, graceMs, timings } = this.dependencies;
     const launch = runtime.buildLaunch({
@@ -222,6 +243,7 @@ export class AttemptStarter {
       environment,
       attemptDirectory: directory,
       attachmentsDirectory: prepared.attachments,
+      skillsDirectory,
       workerCommand: workerCommand(entry, token, socket, group, specialist),
       generation: attempt.generation,
       conversationDirectory: conversationFolder(state, group.slug, attempt),
@@ -252,29 +274,6 @@ export class AttemptStarter {
       onUsage: (usage) => this.parts.usage.report(state, key, usage),
       onLog: () => this.dependencies.publish.logGrew(key),
     });
-  }
-
-  /**
-   * Why an agent that ended without a report may have ended because of the network: the problem,
-   * or null. The check runs after the exit and outside the queue, so a slow probe holds nothing.
-   */
-  private async networkFailure(
-    state: RunState,
-    key: AttemptKey,
-    exit: ProcessExit,
-  ): Promise<string | null> {
-    if (exit.spawnError || exit.outcome.usageLimit) return null;
-    const attempt = findGroup(state, key.group)?.attempts.find((item) => item.seq === key.seq);
-    if (!attempt || attempt.status !== 'running' || attempt.reason !== null) return null;
-    if (attempt.report !== null) return null;
-    if (exit.outcome.networkError) return exit.outcome.networkError;
-    let snapshot;
-    try {
-      snapshot = await this.dependencies.network.checkNow();
-    } catch {
-      return null;
-    }
-    return snapshot.state === 'down' ? (snapshot.problem ?? 'network is down') : null;
   }
 
   /** The exit of the agent as an event: its session, usage, failure and changes outside. */

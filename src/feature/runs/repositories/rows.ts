@@ -64,6 +64,7 @@ export function hydrateRun(database: Database, row: Row): RunState {
       skippedSteps: row.skipped_steps_json ? parse(row.skipped_steps_json) : [],
       repair: hydrateRepair(row.repair_json ?? null),
       attachments: row.attachments_json ? parse(row.attachments_json) : [],
+      ...pinned(row.pinned_skills_json ?? null),
     },
     split: groups.find((group) => group.slug === SPLIT_GROUP) ?? null,
     groups: groups.filter(
@@ -76,6 +77,12 @@ export function hydrateRun(database: Database, row: Row): RunState {
     repair: groups.find((group) => group.slug === REPAIR_GROUP) ?? null,
     actions: groups.filter(isActionGroup),
   };
+}
+
+/** `pinnedSkills` of a row; a run from before registry skills has none. */
+function pinned(value: SQLInputValue): Pick<RunState['run'], 'pinnedSkills'> {
+  const found = nullable<NonNullable<RunState['run']['pinnedSkills']>>(value);
+  return found === null ? {} : { pinnedSkills: found };
 }
 
 function hydrateRepair(value: SQLInputValue): RunState['run']['repair'] {

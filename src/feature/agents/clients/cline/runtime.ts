@@ -144,6 +144,7 @@ export function createClineRuntime(
     buildOneShot: (request) => oneShot(executable, extra, request),
     createParser: createClineParser,
     transcript: clineTranscript,
+    loadsExtraSkills: false,
     skillDirectories: (worktree, home) => [
       join(worktree, '.cline', 'skills'),
       join(home, '.cline', 'skills'),

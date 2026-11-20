@@ -213,6 +213,8 @@ export interface RunView {
   linkedBy: TaskLinkView[];
   /** Files attached to the task of the run. */
   attachments: AttachmentView[];
+  /** The versions of the registry skills fixed for the run, by skill name; empty before the first. */
+  pinnedSkills: { name: string; version: string }[];
   tags: TagView[];
   counts: string;
   total: number;

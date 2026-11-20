@@ -29,6 +29,8 @@ describe('integration requests', () => {
       ['integration_enable', { id: 'c1' }],
       ['integration_disable', { id: 'c1' }],
       ['integration_check', { id: 'c1' }],
+      ['integration_skills', { id: 'c1', query: 'go' }],
+      ['integration_skills', { repository: '/repo' }],
       ['integration_secret_set', { id: 'c1', slot: 'token', value: 'v' }],
       ['integration_secret_remove', { id: 'c1', slot: 'token' }],
     ] as const) {
@@ -62,6 +64,7 @@ describe('integration requests', () => {
       'integration_remove',
       'integration_secret_remove',
       'integration_secret_set',
+      'integration_skills',
       'integration_types',
     ]);
   });

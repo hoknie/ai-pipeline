@@ -100,6 +100,26 @@ A group that the scheduler does not start yet has the status `waiting`, with a r
 
 The panel suggests skills from these directories (`SKILL.md` in subdirectories, and command files `.md`, nested ones as `directory:command`) and marks whether each comes from the repository or the home directory.
 
+### Skills of a service registry
+
+`registry:<name>` takes a team skill from a [service registry](integrations.md#service-registry); `registry:<name>@<range>` limits the version:
+
+```yaml
+skills:
+  - registry:go-testing@^1.2   # the highest 1.x from 1.2 up
+  - registry:sql-review        # the highest available version
+  - review                     # a local skill
+```
+
+- The name is lowercase letters, digits and dashes (up to 64). The range is npm syntax: `1.4.0`, `^1`, `~1.2`, `1.x`, `>=1 <3`, `a || b`. A pre-release (`2.0.0-rc.1`) is chosen only when the range names one. A wrong name or range, or the same name twice, is an error at `swarm.specialists.<slug>.skills[<index>]`.
+- The prefix `registry:` is reserved: a local skill or command cannot start with it.
+- The connection is the project's own `service-registry` connection, otherwise the only shared one. With several shared connections and none of the project's, add one to the project.
+- The first attempt that needs a skill picks the version and fixes it in the run (`aip runs show`, the run page). Retries and steps returned for rework use the same version even if a newer one appears. The files are downloaded once into the state directory of the daemon and used without the network after that; versions unused for 30 days are removed.
+- The skill is laid out in a folder of the attempt outside the worktree and handed to the runtime; the worktree and `~/.claude` stay untouched. Only `claude` loads it. Another runtime starts the step with the warning `registry skills are not supported by runtime <runtime>: <names>`.
+- If the registry cannot be reached and the version is not downloaded yet, the step starts without the skill with the warning `skill not found: registry:<name> (<code>)`, and the next attempt tries again.
+
+The panel suggests `registry:<name>` with the latest version from the registry of the project; `aip integration skills <id>` lists them.
+
 ## Tools
 
 `tools` are Claude tools added to the set for the [permission level](permissions.md#tools-of-a-claude-specialist), for example `WebFetch`, `WebSearch` or `Task`. A value on a specialist replaces the value from `defaults`. Antigravity and OpenCode do not consume this field.

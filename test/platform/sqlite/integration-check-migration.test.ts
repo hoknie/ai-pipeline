@@ -7,8 +7,8 @@ import { MIGRATIONS, SCHEMA_VERSION, migrate } from '../../../src/platform/sqlit
 describe('migration that adds the result of the last check of a connection', () => {
   it('adds the table of results to an older database, keeps its connections and is repeatable', () => {
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -1).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    MIGRATIONS.slice(0, -2).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     old
       .prepare(
         `INSERT INTO integration_connections
@@ -22,7 +22,8 @@ describe('migration that adds the result of the last check of a connection', () 
     ]);
     expect(old.prepare('SELECT * FROM integration_connection_checks').all()).toEqual([]);
     // a database whose version was set back runs the migration again without harm
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.exec('ALTER TABLE runs DROP COLUMN pinned_skills_json');
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     migrate(old);
     expect(
       (old.prepare('PRAGMA user_version').get() as { user_version: number }).user_version,
