@@ -50,6 +50,23 @@ export interface Connection {
   state: ConnectionState;
   createdAt: number;
   updatedAt: number;
+  /** The outcome of the last connection check; null: never checked. */
+  lastCheck: ConnectionCheck | null;
+}
+
+/** The recorded outcome of a connection check: a static code and a count, never a response text. */
+export interface ConnectionCheck {
+  at: number;
+  ok: boolean;
+  code: string | null;
+  count: number | null;
+}
+
+/** What an adapter's check reports; `code` is one of its own static codes. */
+export interface CheckResult {
+  ok: boolean;
+  code?: string;
+  count?: number;
 }
 
 export interface SecretStatus {
@@ -71,6 +88,7 @@ export interface ConnectionView {
   secrets: SecretStatus[];
   /** A secret operation or a cleanup is not finished: the connection does no work. */
   pending: boolean;
+  lastCheck: ConnectionCheck | null;
 }
 
 export interface CatalogEntry {

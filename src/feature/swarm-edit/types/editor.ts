@@ -257,6 +257,8 @@ export interface SettingsFileView {
 export interface EditorMcpServer {
   name: string;
   command: string;
+  /** The connection of an integration the server goes through; then `command` is empty. */
+  connection?: string;
   args: string[];
   /** Sorted names of the variables of `env`. */
   envNames: string[];
@@ -272,6 +274,8 @@ export interface EditorMcpServer {
 
 export interface EditorMcpServerValues {
   command: string;
+  /** The connection of an integration the server goes through; then `command` is empty. */
+  connection?: string;
   args: string[];
   envNames: string[];
   allSpecialists: boolean;

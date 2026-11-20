@@ -6,6 +6,8 @@ import {
   findGroup,
   limitHolds,
   parseRunReference,
+  specialistOfStep,
+  stepsOf,
   type Group,
   type RunState,
 } from '../types/index.ts';
@@ -52,6 +54,35 @@ export class RunReads {
       ? { seq: last.seq, lines: readTail(effects.logPath(state, group.slug, last.seq), tailLines) }
       : null;
     return { state, group, worktree: effects.worktreePath(state, group), log };
+  }
+
+  /**
+   * `mcp_remote_forward`: the project and the connection behind a server of the running attempt of
+   * this token. The server must be in the final set of servers of the specialist of the attempt.
+   */
+  remoteServer(
+    token: string,
+    server: string,
+  ):
+    | { ok: true; project: string; connection: string }
+    | { ok: false; code: 'attempt_finished' | 'server_not_allowed' } {
+    const { states, effects } = this.dependencies;
+    const key = effects.attemptFor(token);
+    const state = key ? states.lookup(key.run) : undefined;
+    const group = key && state ? findGroup(state, key.group) : undefined;
+    const attempt = key && group ? group.attempts.find((one) => one.seq === key.seq) : undefined;
+    if (!state || !group || !attempt || attempt.status !== 'running') {
+      return { ok: false, code: 'attempt_finished' };
+    }
+    const step = stepsOf(state.run, group)[attempt.stepIndex];
+    const specialist = specialistOfStep(
+      state.run,
+      group,
+      step ?? { specialist: attempt.specialist },
+    );
+    const connection = specialist?.mcp?.[server]?.connection;
+    if (connection === undefined) return { ok: false, code: 'server_not_allowed' };
+    return { ok: true, project: state.run.repository, connection };
   }
 
   /**

@@ -55,4 +55,12 @@ export const LATER_MIGRATIONS: string[] = [
   // the branch of a run in the remote repository once it is sent there (JSON); old rows have none
   `ALTER TABLE runs ADD COLUMN remote_branch_json TEXT`,
   NOTIFICATIONS_MIGRATION,
+  // the outcome of the last check of an integration connection; a connection never checked has no row
+  `CREATE TABLE IF NOT EXISTS integration_connection_checks (
+    connection_id TEXT PRIMARY KEY REFERENCES integration_connections (id) ON DELETE CASCADE,
+    checked_at INTEGER NOT NULL,
+    ok INTEGER NOT NULL,
+    code TEXT,
+    count INTEGER
+  )`,
 ];

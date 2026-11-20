@@ -54,6 +54,7 @@ export const integrationsRequests = [
   z.object({ method: z.literal('integration_remove'), params: z.object({ id: connectionId }) }),
   z.object({ method: z.literal('integration_enable'), params: z.object({ id: connectionId }) }),
   z.object({ method: z.literal('integration_disable'), params: z.object({ id: connectionId }) }),
+  z.object({ method: z.literal('integration_check'), params: z.object({ id: connectionId }) }),
   z.object({
     method: z.literal('integration_secret_set'),
     params: z.object({

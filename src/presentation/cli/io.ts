@@ -25,6 +25,11 @@ export interface CliIo {
    * longer. The secret of `aip integration secret set` comes this way, never as an argument.
    */
   readStdin?(limitBytes: number): Promise<string | null>;
+  /**
+   * The streams of the process for a command that relays lines (`aip mcp --remote`): the input of
+   * the agent and the output it reads. Unset: the command refuses to run.
+   */
+  relay?(): { input: NodeJS.ReadableStream; output: NodeJS.WritableStream };
   /** Sets the exit code of the process . */
   setExitCode(code: number): void;
   /** Ends the process at once. */

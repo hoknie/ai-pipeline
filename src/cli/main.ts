@@ -61,6 +61,7 @@ const io: CliIo = {
     }
   },
   readStdin,
+  relay: () => ({ input: process.stdin, output: process.stdout }),
   setExitCode: (code) => {
     process.exitCode = code;
   },

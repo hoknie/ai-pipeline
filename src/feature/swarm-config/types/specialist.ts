@@ -61,10 +61,16 @@ export type SpecialistLevel = 'global' | 'project';
 
 /** An MCP server started for one specialist, next to the `aip` server. */
 export interface McpServer {
+  /** The program to start; empty for a server that goes through a connection. */
   command: string;
   args: string[];
   env: Record<string, string>;
+  /** The name of an integration connection (a service registry): then there is no `command`. */
+  connection?: string;
 }
+
+/** The names of connections of integrations: the same pattern as `aip integration add`. */
+export const CONNECTION_NAME = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 
 /** A server of the `mcp_servers` catalog; `allSpecialists` connects it to every specialist. */
 export interface CatalogMcpServer extends McpServer {

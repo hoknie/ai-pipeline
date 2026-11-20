@@ -11,6 +11,10 @@ delivery:
 claude:
   mcp: isolated
   settings: isolated
+# a service registry connection: aip integration add service-registry main --global --param url=...
+mcp_servers:
+  registry:
+    connection: main
 defaults:
   runtime: claude
   permissions: edit

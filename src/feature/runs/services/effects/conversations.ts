@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { conversationName } from '../../../agents/types/index.ts';
 import type { Runtime as RuntimeName } from '../../../swarm-config/types/index.ts';
 import { attemptDirectory } from '../../../../platform/git/index.ts';
-import type { Specialist } from '../../../swarm-config/types/index.ts';
+import { expandMcpServers } from '../../../agents/types/index.ts';
+import type { McpServer, Specialist } from '../../../swarm-config/types/index.ts';
+import type { RemoteMcpPort } from '../../ports/index.ts';
 import {
   SPLIT_GROUP,
   findGroup,
@@ -99,4 +101,88 @@ export function workerCommand(
     ...(specialist.queue === true ? ['--queue'] : []),
     ...(isRepairGroup(group) ? ['--repair'] : []),
   ];
+}
+
+/**
+ * The servers that go through a connection become ordinary stdio servers of the agent: the bridge
+ * of this attempt (`aip mcp --remote <name>`), which knows the token of the attempt and nothing of
+ * the connection. The servers with a command stay as they are.
+ */
+export function bridgedServers(
+  servers: Readonly<Record<string, McpServer>>,
+  entry: string[],
+  token: string,
+  socket: string,
+): Record<string, McpServer> {
+  return Object.fromEntries(
+    Object.entries(servers).map(([name, server]) => [
+      name,
+      server.connection === undefined
+        ? server
+        : {
+            command: entry[0] ?? 'aip',
+            args: [
+              ...entry.slice(1),
+              'mcp',
+              '--remote',
+              name,
+              '--worker',
+              token,
+              '--socket',
+              socket,
+            ],
+            env: {},
+          },
+    ]),
+  );
+}
+
+/** The specialist with its connection servers replaced by the bridge of the attempt. */
+export function withBridges(
+  specialist: Specialist,
+  entry: string[],
+  token: string,
+  socket: string,
+): Specialist {
+  if (specialist.mcp === undefined) return specialist;
+  return { ...specialist, mcp: bridgedServers(specialist.mcp, entry, token, socket) };
+}
+
+/**
+ * The refusal to start for a server whose connection does not serve the project, or null. The
+ * text names the server and the connection, never a secret.
+ */
+export function unavailableConnection(
+  port: RemoteMcpPort,
+  project: string,
+  servers: Readonly<Record<string, McpServer>>,
+): string | null {
+  for (const [name, server] of Object.entries(servers)) {
+    if (server.connection === undefined) continue;
+    const found = port.resolve(project, server.connection);
+    if (found.ok) continue;
+    return found.reason === 'disabled'
+      ? `MCP server ${name}: connection ${server.connection} is disabled`
+      : `MCP server ${name}: connection ${server.connection} is not available for this project`;
+  }
+  return null;
+}
+
+/**
+ * The specialist with `${NAME}` of its MCP servers replaced and every connection checked, or the
+ * reason the attempt cannot start. The snapshot of the run keeps the text: this is the only place.
+ */
+export function connectedSpecialist(
+  port: RemoteMcpPort,
+  project: string,
+  specialist: Specialist,
+  variables: Readonly<Record<string, string | undefined>>,
+): { specialist: Specialist } | { error: string } {
+  if (specialist.mcp === undefined) return { specialist };
+  const expanded = expandMcpServers(specialist.mcp, variables);
+  if (!expanded.ok) return { error: expanded.error };
+  const refused = unavailableConnection(port, project, expanded.servers);
+  return refused === null
+    ? { specialist: { ...specialist, mcp: expanded.servers } }
+    : { error: refused };
 }

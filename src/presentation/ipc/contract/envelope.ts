@@ -7,6 +7,7 @@ import { groupsRequests } from './groups.ts';
 import { auditRequests } from './identity/audit.ts';
 import { identityRequests } from './identity/identity.ts';
 import { integrationsRequests } from './integrations/integrations.ts';
+import { mcpRemoteRequests } from './integrations/remote.ts';
 import { notificationsRequests } from './notifications/notifications.ts';
 import { observersRequests } from './observers.ts';
 import { networkStatusSchema, panelRequests } from './panel.ts';
@@ -25,6 +26,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   ...queueRequests,
   ...repositoriesRequests,
   ...integrationsRequests,
+  ...mcpRemoteRequests,
   ...notificationsRequests,
   ...tagsRequests,
   ...statsRequests,

@@ -140,6 +140,7 @@ mcp:
 - Values in `env` and items of `args` may refer to the environment of the daemon with `${NAME}`; `$${NAME}` is the literal text. The configuration and the run snapshot keep the reference; the value is substituted when the agent starts, from the environment of the daemon and then `runtimes.<runtime>.env`. A missing variable fails the attempt before the agent starts.
 - The substituted value lies in the files of the attempt (readable by you only) and is available to the agent process. Set secrets with `${NAME}`, not as text.
 - The panel shows the catalog without the values of `env`. The field `mcp` of a specialist is part of its file and is shown as written, so give secrets there as `${NAME}` as well, or move the server to the catalog.
+- A catalog server or a server of the field `mcp` may instead have `connection: <name>`, the name of an [integration connection](integrations.md#service-registry), in place of `command`. Give exactly one of the two; `args` and `env` are not allowed with `connection`, and `${NAME}` is not expanded in it. The connection is looked up when the step starts, not when the configuration is checked.
 - All tools of these servers run without a permission request. Antigravity sees a server under the name `aip-<session>-<name>`: see [runtimes](runtimes.md#mcp-servers-of-a-specialist).
 - To give a `claude` specialist all your own servers, see [`claude.mcp`](runtimes.md#claudemcp).
 

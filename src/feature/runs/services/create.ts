@@ -9,6 +9,7 @@ import type {
   DiffPort,
   ObservePort,
   QueueAdvancePort,
+  RemoteMcpPort,
   RunAttachmentsPort,
   RunNotifyPort,
   RunCommitsPort,
@@ -50,6 +51,7 @@ export interface RunsDependencies {
   diff: DiffPort;
   agentExit: AgentExitPort;
   attachments: RunAttachmentsPort;
+  remoteMcp: RemoteMcpPort;
   commits: RunCommitsPort;
   push: RunPushPort;
 }

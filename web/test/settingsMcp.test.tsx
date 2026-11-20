@@ -7,7 +7,7 @@ import { agentTabOf } from '../src/shared/lib/nav/settingsGroups.ts';
 import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
 import type { EditorMcpServer } from '../src/shared/api/types.ts';
 
-import { configView, fakeApi, openFake, queueOf } from './fixtures.ts';
+import { configView, fakeApi, integrationsOverview, openFake, queueOf } from './fixtures.ts';
 
 afterEach(() => {
   cleanup();
@@ -99,6 +99,71 @@ describe('the tab MCP servers', () => {
     expect(row.getByText('Shared')).toBeTruthy();
     expect(row.getByText('All specialists')).toBeTruthy();
     expect(row.getByText('1 specialist')).toBeTruthy();
+  });
+
+  it('shows the connection of a server and how it works now, without a secret', async () => {
+    const overview = integrationsOverview();
+    overview.connections = [
+      {
+        ...overview.connections[0]!,
+        kind: 'service-registry',
+        name: 'main',
+        params: { url: 'https://registry.example.com' },
+        enabled: true,
+        secrets: [{ slot: 'token', required: true, present: true }],
+        lastCheck: { at: 1_700_000_000_000, ok: true, code: null, count: 14 },
+      },
+    ];
+    const api = show(
+      '#settings/global/agents/mcp',
+      [
+        server({
+          name: 'registry',
+          command: '',
+          connection: 'main',
+          shared: { command: '', connection: 'main', args: [], envNames: [], allSpecialists: true },
+        }),
+      ],
+      { integrations: vi.fn(async () => overview) },
+    );
+    const row = within(await screen.findByRole('list', { name: 'MCP servers' }));
+    expect(row.getByText('registry')).toBeTruthy();
+    expect(row.getByText('Connection: main')).toBeTruthy();
+    expect(row.queryByText('/bin/graph')).toBeNull();
+    const status = await row.findByTestId('connection-status');
+    expect(status.textContent).toBe('enabled · token set · ok, 14 tools');
+    expect(api.integrations).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so when the connection is missing or failed, and asks nothing for servers with a command', async () => {
+    const overview = integrationsOverview();
+    overview.connections = [
+      {
+        ...overview.connections[0]!,
+        kind: 'service-registry',
+        name: 'team',
+        enabled: false,
+        secrets: [{ slot: 'token', required: true, present: false }],
+        lastCheck: { at: 1, ok: false, code: 'unauthorized', count: null },
+      },
+    ];
+    const connected = (name: string, connection: string) =>
+      server({
+        name,
+        command: '',
+        connection,
+        shared: { command: '', connection, args: [], envNames: [], allSpecialists: false },
+      });
+    show('#settings/global/agents/mcp', [connected('lost', 'nowhere'), connected('reg', 'team')], {
+      integrations: vi.fn(async () => overview),
+    });
+    const list = within(await screen.findByRole('list', { name: 'MCP servers' }));
+    expect(await list.findByText('no such connection on this machine')).toBeTruthy();
+    expect(list.getByText('disabled · token missing · check failed: unauthorized')).toBeTruthy();
+    cleanup();
+    const api = show('#settings/global/agents/mcp', [server()]);
+    await screen.findByRole('list', { name: 'MCP servers' });
+    expect(api.integrations).not.toHaveBeenCalled();
   });
 
   it('writes a new server to the level of the tab', async () => {

@@ -1,6 +1,11 @@
 import type { Command } from 'commander';
 
-import { formatConnections, formatIntegrationTypes, type Style } from '../../../format/index.ts';
+import {
+  formatCheckResult,
+  formatConnections,
+  formatIntegrationTypes,
+  type Style,
+} from '../../../format/index.ts';
 import { repositoryArgument } from '../../../ipc/client/index.ts';
 import type { ConnectionView, IntegrationTypeView } from '../../../ipc/contract/index.ts';
 import { bind, call } from '../../context.ts';
@@ -122,7 +127,7 @@ function addEditCommand(kit: Kit): void {
 }
 
 function addWriteCommands(kit: Kit): void {
-  const { root, examples, context, show, print, io } = kit;
+  const { root, examples, context, show, print, io, output } = kit;
   root
     .command('add')
     .description('Create a connection of a built-in kind; it starts disabled, without secrets')
@@ -176,6 +181,16 @@ function addWriteCommands(kit: Kit): void {
         show(options.json, [(await call(context(), method, { id })) as ConnectionView]);
       });
   }
+  root
+    .command('check')
+    .description('Reach the other system with the connection and show whether it works')
+    .argument('<id>', 'connection id')
+    .option('--json', 'print JSON')
+    .addHelpText('after', examples(['aip integration check c1a2b3c4d5e6']))
+    .action(async (id: string, options: { json?: boolean }) => {
+      const view = (await call(context(), 'integration_check', { id })) as ConnectionView;
+      output(options.json, formatCheckResult(view), view);
+    });
   root
     .command('remove')
     .description('Remove a connection and its secrets; repeat it if the cleanup was cut short')

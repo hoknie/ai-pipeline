@@ -238,7 +238,7 @@ describe('validation', () => {
     );
     expectError(errors, 'swarm.specialists.a.mcp.aip', 'reserved');
     expectError(errors, 'swarm.specialists.a.mcp.b c', 'letters');
-    expectError(errors, 'swarm.specialists.a.mcp.d.command', 'required');
+    expectError(errors, 'swarm.specialists.a.mcp.d', 'exactly one');
     expectError(errors, 'swarm.specialists.a.mcp.e.command', 'absolute path');
     expectError(errors, 'swarm.specialists.a.mcp.f.url', 'unknown key');
   });

@@ -38,6 +38,7 @@ const REFUSALS = {
   operation_denied: ['forbidden', 'operation is not allowed for this connection'],
   internal: ['internal', 'integration request failed'],
   timeout: ['unavailable', 'operation timed out; the outcome is unknown'],
+  no_check: ['invalid', 'this kind has no check'],
 } as const satisfies Record<string, readonly [ErrorKind, string]>;
 
 export type IntegrationFailure = keyof typeof REFUSALS;

@@ -15,6 +15,7 @@ import type { InboundLimits } from '../types/index.ts';
 
 import { ConnectionAccess } from './access.ts';
 import { AdapterCatalog } from './catalog.ts';
+import { ConnectionChecks } from './checks.ts';
 import { ConnectionService } from './connections.ts';
 import { InboundService } from './dispatch.ts';
 import { OutboundService } from './outbound.ts';
@@ -23,6 +24,7 @@ import { SecretService, type SecretStep } from './secrets.ts';
 export interface IntegrationsServices {
   catalog: AdapterCatalog;
   connections: ConnectionService;
+  checks: ConnectionChecks;
   access: ConnectionAccess;
   secrets: SecretService;
   inbound: InboundService;
@@ -43,6 +45,7 @@ export interface IntegrationsDependencies {
   now: () => number;
   limits?: Partial<InboundLimits>;
   outboundTimeoutMs?: number;
+  checkTimeoutMs?: number;
   /** A seam of the tests: called after every step of a secret operation. */
   secretStep?: (step: SecretStep) => void;
   newGeneration?: () => string;
@@ -81,6 +84,17 @@ export function createIntegrationsServices(
   return {
     catalog,
     connections: service,
+    checks: new ConnectionChecks({
+      connections,
+      catalog,
+      access,
+      secretService: secrets,
+      views: service,
+      now,
+      ...(dependencies.checkTimeoutMs === undefined
+        ? {}
+        : { timeoutMs: dependencies.checkTimeoutMs }),
+    }),
     access,
     secrets,
     inbound: new InboundService({

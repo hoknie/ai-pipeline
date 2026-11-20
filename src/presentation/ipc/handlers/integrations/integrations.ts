@@ -61,6 +61,8 @@ export const integrationHandlers = {
     ),
   integration_disable: (params, { services }) =>
     guarded(() => withChannel(services, services.integrations.connections.disable(params.id))),
+  integration_check: (params, { services }) =>
+    guarded(async () => withChannel(services, await services.integrations.checks.check(params.id))),
   integration_secret_set: (params, { services }) =>
     guarded(async () =>
       withChannel(

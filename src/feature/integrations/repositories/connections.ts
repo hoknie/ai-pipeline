@@ -1,5 +1,10 @@
 import type { Database } from '../../../platform/sqlite/index.ts';
-import type { Connection, ConnectionScope, ConnectionState } from '../types/index.ts';
+import type {
+  Connection,
+  ConnectionCheck,
+  ConnectionScope,
+  ConnectionState,
+} from '../types/index.ts';
 
 interface Row {
   id: string;
@@ -12,10 +17,17 @@ interface Row {
   state: string;
   created_at: number;
   updated_at: number;
+  checked_at: number | null;
+  check_ok: number | null;
+  check_code: string | null;
+  check_count: number | null;
 }
 
-const COLUMNS =
+const INSERTED =
   'id, kind, name, scope, project_path, params_json, enabled, state, created_at, updated_at';
+const SELECTED = `SELECT c.id, c.kind, c.name, c.scope, c.project_path, c.params_json, c.enabled, c.state,
+  c.created_at, c.updated_at, k.checked_at, k.ok AS check_ok, k.code AS check_code, k.count AS check_count
+  FROM integration_connections c LEFT JOIN integration_connection_checks k ON k.connection_id = c.id`;
 
 function toConnection(row: Row): Connection {
   return {
@@ -29,6 +41,15 @@ function toConnection(row: Row): Connection {
     state: row.state as ConnectionState,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    lastCheck:
+      row.checked_at === null
+        ? null
+        : {
+            at: row.checked_at,
+            ok: row.check_ok === 1,
+            code: row.check_code,
+            count: row.check_count,
+          },
   };
 }
 
@@ -42,15 +63,13 @@ export class ConnectionRepository {
 
   all(): Connection[] {
     const rows = this.database
-      .prepare(`SELECT ${COLUMNS} FROM integration_connections ORDER BY created_at, rowid`)
+      .prepare(`${SELECTED} ORDER BY c.created_at, c.rowid`)
       .all() as unknown as Row[];
     return rows.map(toConnection);
   }
 
   find(id: string): Connection | undefined {
-    const row = this.database
-      .prepare(`SELECT ${COLUMNS} FROM integration_connections WHERE id = ?`)
-      .get(id) as Row | undefined;
+    const row = this.database.prepare(`${SELECTED} WHERE c.id = ?`).get(id) as Row | undefined;
     return row === undefined ? undefined : toConnection(row);
   }
 
@@ -58,7 +77,7 @@ export class ConnectionRepository {
   insert(connection: Connection): void {
     this.database
       .prepare(
-        `INSERT INTO integration_connections (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO integration_connections (${INSERTED}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         connection.id,
@@ -84,6 +103,17 @@ export class ConnectionRepository {
     this.database
       .prepare('UPDATE integration_connections SET params_json = ?, updated_at = ? WHERE id = ?')
       .run(JSON.stringify(params), now, id);
+  }
+
+  setLastCheck(id: string, check: ConnectionCheck): void {
+    this.database
+      .prepare(
+        `INSERT INTO integration_connection_checks (connection_id, checked_at, ok, code, count)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (connection_id) DO UPDATE SET
+           checked_at = excluded.checked_at, ok = excluded.ok, code = excluded.code, count = excluded.count`,
+      )
+      .run(id, check.at, check.ok ? 1 : 0, check.code, check.count);
   }
 
   /** The tombstone of a removal: the connection stops working and waits for its cleanup. */

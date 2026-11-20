@@ -28,6 +28,7 @@ describe('integration requests', () => {
       ['integration_remove', { id: 'c1' }],
       ['integration_enable', { id: 'c1' }],
       ['integration_disable', { id: 'c1' }],
+      ['integration_check', { id: 'c1' }],
       ['integration_secret_set', { id: 'c1', slot: 'token', value: 'v' }],
       ['integration_secret_remove', { id: 'c1', slot: 'token' }],
     ] as const) {
@@ -53,6 +54,7 @@ describe('integration requests', () => {
     const methods = requestSchema.options.map((option) => option.shape.method.value);
     expect(methods.filter((method) => method.startsWith('integration_')).sort()).toEqual([
       'integration_add',
+      'integration_check',
       'integration_disable',
       'integration_edit',
       'integration_enable',

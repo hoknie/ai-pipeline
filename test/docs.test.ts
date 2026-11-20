@@ -174,6 +174,28 @@ describe('documentation examples', () => {
     expect(example.providers[1]?.models.think).toEqual({ model: 'glm-5.3' });
   });
 
+  it('the service registry examples of the docs and of the examples directory go through a connection', () => {
+    const blocks = yamlBlocks('docs/configuration/integrations.md');
+    const catalog = blocks.find((block) => block.startsWith('# settings.yaml')) ?? '';
+    const analyst = blocks.find((block) => block.startsWith('# specialists/analyst.yaml')) ?? '';
+    const docs = configFromFiles({
+      settings: catalog,
+      specialists: { analyst },
+      pipelines: { feature: 'name: F\nsteps:\n  - { id: a, specialist: analyst }\n' },
+    });
+    expect(findSpecialist(docs, 'analyst')?.mcp?.registry).toMatchObject({ connection: 'main' });
+    expect(findSpecialist(docs, 'analyst')?.prompt).toContain('list_specs');
+
+    const read = (file: string): string => readFileSync(join(root, 'examples/aip', file), 'utf8');
+    const example = configFromFiles({
+      settings: read('settings.yaml'),
+      specialists: { plan: read('specialists/plan.yaml') },
+      pipelines: { feature: 'name: F\nsteps:\n  - { id: plan, specialist: plan }\n' },
+    });
+    expect(example.mcpServers.registry).toMatchObject({ connection: 'main' });
+    expect(findSpecialist(example, 'plan')?.mcp?.registry?.connection).toBe('main');
+  });
+
   it('the epic example of docs/configuration/pipelines.md splits into another pipeline', () => {
     const epic =
       yamlBlocks('docs/configuration/pipelines.md').find((b) =>

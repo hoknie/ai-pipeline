@@ -1,4 +1,9 @@
-import type { AcceptedEvent, AdapterDescriptor, OperationResult } from '../types/index.ts';
+import type {
+  AcceptedEvent,
+  AdapterDescriptor,
+  CheckResult,
+  OperationResult,
+} from '../types/index.ts';
 
 import type { SecretReader } from './secrets.ts';
 
@@ -37,9 +42,22 @@ export interface OutboundPort {
   perform(request: OutboundRequest): Promise<OperationResult>;
 }
 
-/** A built-in adapter: what it declares and what it does. The first version registers none. */
+export interface CheckRequest {
+  params: Readonly<Record<string, string>>;
+  secrets: SecretReader;
+  signal: AbortSignal;
+}
+
+/** A check of a connection: reaches the other system and reports a safe result. */
+export interface CheckPort {
+  check(request: CheckRequest): Promise<CheckResult>;
+}
+
+/** A built-in adapter: what it declares and what it does. */
 export interface IntegrationAdapterPort {
   descriptor: AdapterDescriptor;
   verifier?: InboundVerifierPort;
   outbound?: OutboundPort;
+  /** Absent: the kind has no connection check. */
+  check?: CheckPort;
 }

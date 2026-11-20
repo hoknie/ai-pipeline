@@ -14,6 +14,8 @@ import type { SettingsScope } from '../../../shared/lib/nav/settingsGroups.ts';
 export interface McpRow {
   name: string;
   command: string;
+  /** The connection of an integration the server goes through; null for a program. */
+  connection: string | null;
   args: string[];
   envNames: string[];
   allSpecialists: boolean;
@@ -33,6 +35,7 @@ export function mcpRows(servers: EditorMcpServer[], scope: SettingsScope): McpRo
     rows.push({
       name: server.name,
       command: values.command,
+      connection: values.connection ?? null,
       args: values.args,
       envNames: values.envNames,
       allSpecialists: values.allSpecialists,

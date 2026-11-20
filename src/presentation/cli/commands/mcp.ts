@@ -8,13 +8,34 @@ import { usage, type CliIo } from '../io.ts';
 
 interface McpOptions {
   worker?: string;
+  remote?: string;
   socket?: string;
   split?: boolean;
   queue?: boolean;
   repair?: boolean;
 }
 
+/** The bridge of an attempt to a server that goes through a connection: no MCP server of its own. */
+async function runRemote(options: McpOptions, io: CliIo): Promise<void> {
+  if (!options.worker || !options.socket || !options.remote) {
+    throw usage('--remote needs --worker and --socket');
+  }
+  const socket = options.socket;
+  if (io.relay === undefined) throw usage('this terminal cannot relay messages');
+  const { input, output } = io.relay();
+  const { runRemoteBridge } = await import('../../mcp/index.ts');
+  await runRemoteBridge({
+    token: options.worker,
+    server: options.remote,
+    input,
+    output,
+    // The registry may hold a request for 120 s; the daemon answers after that at the latest.
+    send: (method, params) => request(socket, method as Method, params as never, 130_000),
+  });
+}
+
 async function runMcp(options: McpOptions, io: CliIo, style: Style): Promise<void> {
+  if (options.remote !== undefined) return runRemote(options, io);
   // Imported on demand: every attempt of a specialist starts a worker server.
   const [{ createHostServer, createWorkerServer }, { StdioServerTransport }] = await Promise.all([
     import('../../mcp/index.ts'),
@@ -47,6 +68,7 @@ export function registerMcp(program: Command, io: CliIo, style: Style): void {
     .command('mcp')
     .description('Run the MCP server for Claude Code or OpenCode over stdio')
     .option('--worker <token>', 'serve swarm_report for one attempt (started by the daemon)')
+    .option('--remote <server>', 'relay the messages of an agent to a server of a connection')
     .option('--socket <path>', 'daemon socket (worker mode)')
     .option('--split', 'also serve swarm_split (split step)')
     .option('--queue', 'also serve swarm_queue_add (specialist with queue: true)')

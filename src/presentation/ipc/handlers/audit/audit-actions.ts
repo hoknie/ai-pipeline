@@ -159,6 +159,10 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
     action: 'integration.disable',
     info: (p) => ({ resource: resource('integration', p.id) }),
   },
+  integration_check: {
+    action: 'integration.check',
+    info: (p) => ({ resource: resource('integration', p.id) }),
+  },
   integration_secret_set: {
     action: 'integration.secret_set',
     info: (p) => ({ resource: resource('integration', p.id), details: pick(p, 'slot') }),

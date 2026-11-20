@@ -55,7 +55,12 @@ export function expandMcpServers(
       }
       set(expanded);
     }
-    result[name] = { command: server.command, args, env };
+    result[name] = {
+      command: server.command,
+      args,
+      env,
+      ...(server.connection === undefined ? {} : { connection: server.connection }),
+    };
   }
   return { ok: true, servers: result };
 }

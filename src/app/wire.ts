@@ -58,6 +58,14 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
     },
   });
   ports.attachments.set({ materialize: (run) => services.attachments.materialize(run) });
+  // The MCP servers of a specialist that go through a connection of a service registry.
+  ports.remoteMcp.set({
+    resolve: (project, connection) => {
+      const found = services.serviceRegistry.forwarder.resolve(project, connection);
+      return found === 'ok' ? { ok: true } : { ok: false, reason: found };
+    },
+    attemptEnded: (token) => void services.serviceRegistry.forwarder.close(token),
+  });
   ports.queue.set(services.queue.advance);
   ports.observe.set(services.observers);
   ports.repair.set(services.observers);

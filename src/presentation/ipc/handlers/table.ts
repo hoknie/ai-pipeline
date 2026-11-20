@@ -5,7 +5,7 @@ import { configHandlers } from './config.ts';
 import { groupHandlers } from './groups.ts';
 import { accessHandlers, guard } from './access/index.ts';
 import { identityHandlers } from './identity/index.ts';
-import { integrationHandlers, notificationHandlers } from './integrations/index.ts';
+import { integrationHandlers, notificationHandlers, remoteHandlers } from './integrations/index.ts';
 import { observerHandlers } from './observers.ts';
 import { providerHandlers } from './providers.ts';
 import { queueHandlers } from './queue.ts';
@@ -21,6 +21,7 @@ export const handlers: HandlerTable = {
   ...repositoryHandlers,
   ...integrationHandlers,
   ...notificationHandlers,
+  ...remoteHandlers,
   ...observerHandlers,
   ...configHandlers,
   ...providerHandlers,

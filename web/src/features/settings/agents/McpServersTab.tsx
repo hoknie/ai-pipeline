@@ -8,17 +8,55 @@ import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Dialog, DialogContent, DialogTitle } from '../../../shared/ui/overlays/dialog.tsx';
 import { McpServerForm, type McpFormMode } from './McpServerForm.tsx';
+import type { ConnectionView } from '../../../shared/api/types.ts';
+import { useConnectionStates } from './useConnectionStates.ts';
 import { useMcpServers, type McpRow } from './useMcpServers.ts';
 import { useMcpServersTab, type OpenForm } from './useMcpServersTab.ts';
+
+/** How the connection of a server works now: enabled, the token, the last check. */
+function ConnectionStatus({ connection }: { connection: ConnectionView | undefined }) {
+  const { t } = useTranslation();
+  if (connection === undefined) {
+    return (
+      <span className="text-xs text-destructive">{t('settingsPage.mcp.connectionUnknown')}</span>
+    );
+  }
+  const token = connection.secrets.find((secret) => secret.slot === 'token');
+  const check = connection.lastCheck;
+  const parts = [
+    t(
+      connection.enabled
+        ? 'settingsPage.mcp.connectionEnabled'
+        : 'settingsPage.mcp.connectionDisabled',
+    ),
+    t(token?.present ? 'settingsPage.mcp.tokenSet' : 'settingsPage.mcp.tokenMissing'),
+    check === null
+      ? t('settingsPage.mcp.notChecked')
+      : check.ok
+        ? t('settingsPage.mcp.checkOk', { count: check.count ?? 0 })
+        : t('settingsPage.mcp.checkFailed', { code: check.code ?? 'unknown' }),
+  ];
+  return (
+    <span
+      className="text-xs text-muted-foreground"
+      data-testid="connection-status"
+      aria-label={t('settingsPage.mcp.connectionLabel')}
+    >
+      {parts.join(' · ')}
+    </span>
+  );
+}
 
 function Row({
   row,
   scope,
+  connections,
   onOpen,
   onRestore,
 }: {
   row: McpRow;
   scope: SettingsScope;
+  connections: ReadonlyMap<string, ConnectionView> | null;
   onOpen: (mode: McpFormMode) => void;
   onRestore: () => void;
 }) {
@@ -27,7 +65,18 @@ function Row({
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
       <span className="font-medium">{row.name}</span>
-      <code className="text-xs text-muted-foreground">{row.command}</code>
+      {row.connection === null ? (
+        <code className="text-xs text-muted-foreground">{row.command}</code>
+      ) : (
+        <>
+          <code className="text-xs text-muted-foreground">
+            {t('settingsPage.mcp.connection')}: {row.connection}
+          </code>
+          {connections === null ? null : (
+            <ConnectionStatus connection={connections.get(row.connection)} />
+          )}
+        </>
+      )}
       <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
         {t(`settingsPage.mcp.source.${row.level}`)}
       </span>
@@ -40,7 +89,7 @@ function Row({
         {t('settingsPage.mcp.specialists', { count: row.specialists })}
       </span>
       <span className="ml-auto flex gap-1">
-        {row.editable ? (
+        {row.connection !== null ? null : row.editable ? (
           <Button
             type="button"
             size="sm"
@@ -156,6 +205,7 @@ export function McpServersTab({
     remove,
     onDirty,
   );
+  const connections = useConnectionStates(api, rows);
   const current = open?.name ? (rows.find((row) => row.name === open.name) ?? null) : null;
 
   return (
@@ -183,6 +233,7 @@ export function McpServersTab({
               key={row.name}
               row={row}
               scope={scope}
+              connections={connections}
               onOpen={(mode) => void guarded({ mode, name: row.name })}
               onRestore={() => void removeServer(row.name, true)}
             />

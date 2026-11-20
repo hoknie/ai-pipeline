@@ -88,6 +88,7 @@ export class ConnectionService {
       state: 'ready',
       createdAt: now(),
       updatedAt: now(),
+      lastCheck: null,
     };
     try {
       connections.insert(connection);
@@ -210,6 +211,7 @@ export class ConnectionService {
       state: connection.state,
       secrets: declared,
       pending: secretService.pending(connection),
+      lastCheck: connection.lastCheck,
     };
   }
 

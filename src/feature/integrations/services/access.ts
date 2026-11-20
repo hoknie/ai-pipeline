@@ -36,6 +36,20 @@ export class ConnectionAccess {
     return connection;
   }
 
+  /**
+   * The ready connection of a kind and name that serves the project: its own first, then the
+   * shared one. Whether it is enabled is for the caller to ask.
+   */
+  named(kind: string, name: string, project: string): Connection | undefined {
+    const found = this.dependencies.connections
+      .all()
+      .filter((one) => one.kind === kind && one.name === name && one.state === 'ready');
+    return (
+      found.find((one) => one.scope === 'project' && one.projectPath === project) ??
+      found.find((one) => one.scope === 'global')
+    );
+  }
+
   /** Whether every required secret of the connection is set. */
   complete(connection: Connection): boolean {
     const { catalog, secrets } = this.dependencies;

@@ -1,10 +1,14 @@
 import { execFile } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { startFakeRegistry, type FakeRegistry } from '../fakes/registry-api.ts';
 import { SENTINEL } from '../feature/integrations/helpers.ts';
 
-import { aip, aipInput, main, sandbox } from './sandbox.ts';
+import { aip, aipInput, main, sandbox, type Sandbox } from './sandbox.ts';
 
 describe('aip integration', () => {
   it('shows the built-in catalog and no connections, and refuses an unknown kind', async () => {
@@ -16,7 +20,8 @@ describe('aip integration', () => {
     const json = JSON.parse((await aip(box, 'integration', 'types', '--json')).stdout) as {
       kind: string;
     }[];
-    expect(json.map((one) => one.kind)).toEqual(['telegram']);
+    expect(json.map((one) => one.kind).sort()).toEqual(['service-registry', 'slack', 'telegram']);
+    expect(types.stdout).toContain('service-registry');
     const list = await aip(box, 'integration', 'list');
     expect(list.stdout).toContain('No integration connections yet.');
     expect((await aip(box, 'integration', 'list', '--json')).stdout.trim()).toBe('[]');
@@ -191,5 +196,116 @@ describe('aip integration', () => {
     expect(required.code).toBe(1);
     const list = (await aip(box, 'integration', 'list', '--json')).stdout;
     expect(list).toContain('"allowed_users": "111"');
+  });
+});
+
+describe('aip integration with a service registry', () => {
+  let fake: FakeRegistry | null = null;
+  afterEach(async () => {
+    await fake?.close();
+    fake = null;
+  });
+
+  async function setup(): Promise<{ box: Sandbox; registry: FakeRegistry }> {
+    const registry = (fake = await startFakeRegistry());
+    const box = sandbox();
+    const keyFile = join(mkdtempSync(join(tmpdir(), 'aip-registry-key-')), 'key');
+    writeFileSync(keyFile, 'cd'.repeat(32), { mode: 0o600 });
+    box.env = { ...box.env, AIP_SECRETS_BACKEND: 'file', AIP_SECRETS_KEY_FILE: keyFile };
+    return { box, registry };
+  }
+
+  async function connection(box: Sandbox, url: string, token: string): Promise<string> {
+    const added = await aip(
+      box,
+      ...['integration', 'add', 'service-registry', 'main', '--global', '--json'],
+      ...['--param', `url=${url}`],
+    );
+    expect(added.stderr).toBe('');
+    const [{ id }] = JSON.parse(added.stdout) as [{ id: string }];
+    expect(
+      (await aipInput(box, `${token}\n`, 'integration', 'secret', 'set', id, 'token', '--stdin'))
+        .code,
+    ).toBe(0);
+    expect((await aip(box, 'integration', 'enable', id)).code).toBe(0);
+    return id;
+  }
+
+  it('lists the kind and refuses a wrong address without a network call', async () => {
+    const { box, registry } = await setup();
+    const types = await aip(box, 'integration', 'types');
+    expect(types.stdout).toContain('service-registry');
+    expect(types.stdout).toContain('url*');
+    expect(types.stdout).toContain('token*');
+    for (const url of ['ftp://registry.example.com', 'https://user:pass@registry.example.com']) {
+      const bad = await aip(
+        box,
+        'integration',
+        'add',
+        'service-registry',
+        'main',
+        '--global',
+        '--param',
+        `url=${url}`,
+      );
+      expect(bad.code).toBe(1);
+      expect(bad.stderr).toContain('invalid connection parameters: url');
+      expect(bad.stderr).not.toContain('pass');
+    }
+    expect((await aip(box, 'integration', 'list', '--json')).stdout.trim()).toBe('[]');
+    expect(registry.requests).toEqual([]);
+  });
+
+  it('prints ok with the number of tools and shows the result in the list', async () => {
+    const { box, registry } = await setup();
+    const id = await connection(box, registry.base, registry.token);
+    const checked = await aip(box, 'integration', 'check', id);
+    expect(checked.code).toBe(0);
+    expect(checked.stdout.trim()).toBe('ok, 3 tools');
+    const list = await aip(box, 'integration', 'list', '--json');
+    const [view] = JSON.parse(list.stdout) as [{ lastCheck: { ok: boolean; count: number } }];
+    expect(view.lastCheck).toMatchObject({ ok: true, count: 3 });
+    expect((await aip(box, 'integration', 'list')).stdout).toContain('ok, 3 tools');
+    expect(checked.stdout + checked.stderr + list.stdout).not.toContain(registry.token);
+  });
+
+  it('prints the code of the failure and never the token', async () => {
+    const { box, registry } = await setup();
+    const id = await connection(box, registry.base, 'svcp_revoked-token');
+    const checked = await aip(box, 'integration', 'check', id);
+    expect(checked.code).toBe(0);
+    expect(checked.stdout.trim()).toBe('failed: unauthorized');
+    expect(checked.stdout + checked.stderr).not.toContain('svcp_revoked-token');
+    const json = await aip(box, 'integration', 'check', id, '--json');
+    expect(JSON.parse(json.stdout)).toMatchObject({
+      lastCheck: { ok: false, code: 'unauthorized' },
+    });
+  });
+
+  it('refuses a disabled connection and a kind without a check', async () => {
+    const { box, registry } = await setup();
+    const id = await connection(box, registry.base, registry.token);
+    await aip(box, 'integration', 'disable', id);
+    const refused = await aip(box, 'integration', 'check', id);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain('disabled');
+    expect(registry.requests).toEqual([]);
+    const other = await aip(
+      box,
+      'integration',
+      'add',
+      'telegram',
+      'main',
+      '--global',
+      '--json',
+      '--param',
+      'allowed_users=111',
+      '--param',
+      'chat_id=-1',
+    );
+    const [{ id: telegram }] = JSON.parse(other.stdout) as [{ id: string }];
+    const none = await aip(box, 'integration', 'check', telegram);
+    expect(none.code).toBe(1);
+    expect(none.stderr).toContain('this kind has no check');
   });
 });

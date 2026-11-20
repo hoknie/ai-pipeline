@@ -66,6 +66,7 @@ describe('RunAttemptHistoryService', () => {
       diff: {} as never,
       agentExit: {} as never,
       attachments: {} as never,
+      remoteMcp: {} as never,
       commits: {} as never,
       push: {} as never,
     });

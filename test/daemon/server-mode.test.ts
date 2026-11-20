@@ -206,7 +206,14 @@ describe('remote transport', () => {
     const h = await start();
     const value = await token(h, 'admin@example.com', true);
     expect((await ipc(value, 'nope')).status).toBe(400);
-    for (const method of ['shutdown', 'shutdown_idle', 'web_stop', 'process_kill', 'report']) {
+    for (const method of [
+      'shutdown',
+      'shutdown_idle',
+      'web_stop',
+      'process_kill',
+      'report',
+      'mcp_remote_forward',
+    ]) {
       expect((await ipc(value, method)).status, method).toBe(403);
     }
     await expect(h.call('status', {})).resolves.toBeDefined();

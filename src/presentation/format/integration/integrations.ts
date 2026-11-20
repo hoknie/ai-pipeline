@@ -33,6 +33,24 @@ function stateOf(connection: ConnectionView): string {
   return connection.enabled ? 'enabled' : 'disabled';
 }
 
+/** The outcome of the last check: when it ran, whether it passed, the count or the static code. */
+export function formatCheck(check: ConnectionView['lastCheck']): string {
+  if (check === null) return '—';
+  const when = new Date(check.at).toISOString().slice(0, 16).replace('T', ' ');
+  const what = check.ok
+    ? `ok${check.count === null ? '' : `, ${check.count} tools`}`
+    : `failed: ${check.code ?? 'unknown'}`;
+  return `${what} (${when})`;
+}
+
+/** The answer of `integration check`: one line, never a response text. */
+export function formatCheckResult(connection: ConnectionView): string {
+  const check = connection.lastCheck;
+  if (check === null) return `No check result for ${connection.id}`;
+  if (check.ok) return `ok${check.count === null ? '' : `, ${check.count} tools`}`;
+  return `failed: ${check.code ?? 'unknown'}`;
+}
+
 /** The connections with the presence of their secrets, never the values. */
 export function formatConnections(
   connections: readonly ConnectionView[],
@@ -41,7 +59,7 @@ export function formatConnections(
   if (connections.length === 0) return 'No integration connections yet.';
   return table(
     [
-      ['ID', 'KIND', 'NAME', 'SCOPE', 'STATE', 'PARAMS', 'SECRETS', 'CHANNEL'],
+      ['ID', 'KIND', 'NAME', 'SCOPE', 'STATE', 'PARAMS', 'SECRETS', 'CHANNEL', 'CHECK'],
       ...connections.map((connection) => [
         style.argument(connection.id),
         connection.kind,
@@ -55,6 +73,7 @@ export function formatConnections(
           .map((secret) => `${secret.slot}:${secret.present ? 'set' : 'missing'}`)
           .join(' ') || '—',
         formatChannelState(connection.channel),
+        formatCheck(connection.lastCheck),
       ]),
     ],
     style,

@@ -846,6 +846,7 @@ export function integrationsOverview(
         state: 'ready',
         secrets: [{ slot: 'bot_token', required: true, present: false }],
         pending: false,
+        lastCheck: null,
         channel: null,
       },
     ],

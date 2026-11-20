@@ -9,8 +9,12 @@ import {
   type ProcessExit,
   type SupervisedProcess,
 } from '../../../agents/services/index.ts';
-import { expandMcpServers, type Runtime } from '../../../agents/types/index.ts';
-import { modelIdProblem, type Specialist } from '../../../swarm-config/types/index.ts';
+import type { Runtime } from '../../../agents/types/index.ts';
+import {
+  modelIdProblem,
+  type McpServer,
+  type Specialist,
+} from '../../../swarm-config/types/index.ts';
 import { attemptDirectory } from '../../../../platform/git/index.ts';
 import {
   findGroup,
@@ -29,6 +33,8 @@ import {
   conversationFolder,
   effectiveSpecialist,
   purgeConversations,
+  connectedSpecialist,
+  withBridges,
   workerCommand,
 } from './conversations.ts';
 import { runtimeProblem, withProxy } from './runtime-check.ts';
@@ -87,7 +93,7 @@ export class AttemptStarter {
     try {
       process = this.launch(prepared, directory, token);
     } catch (error) {
-      this.parts.running.dropToken(token);
+      this.release(token);
       await this.fail(state, key, { kind: 'spawn', message: (error as Error).message });
       return;
     }
@@ -104,7 +110,7 @@ export class AttemptStarter {
       if (process.pid !== undefined) {
         this.dependencies.agentExit.agentGone({ pid: process.pid, ...key });
       }
-      this.parts.running.dropToken(token);
+      this.release(token);
       if (this.dependencies.context.stopping) return undefined;
       return this.networkFailure(state, key, exit).then((network) =>
         this.dependencies.context.serial(() => this.exited(state, group, key, exit, network)),
@@ -131,7 +137,7 @@ export class AttemptStarter {
       await this.fail(state, key, problem);
       return null;
     }
-    const { config, agents, environment } = this.dependencies;
+    const { config, agents } = this.dependencies;
     const settings = config.runtimeSettings(state.run.repository);
     if (typeof settings === 'string') return null;
     const runtime = agents.runtimeFor(attempt.runtime, settings);
@@ -175,26 +181,42 @@ export class AttemptStarter {
         return null;
       }
     }
-    // `${NAME}` of the MCP servers is replaced only here: the snapshot of the run keeps the text.
-    if (specialist.mcp === undefined)
-      return { state, group, attempt, key, runtime, worktree, specialist, attachments };
-    const expanded = expandMcpServers(specialist.mcp, {
-      ...environment,
-      ...settings[attempt.runtime as Specialist['runtime']].env,
-    });
-    if (!expanded.ok) {
-      await this.fail(state, key, { kind: 'spawn', message: expanded.error });
-      return null;
-    }
-    const resolved = { ...specialist, mcp: expanded.servers };
+    const resolved = await this.withServers(state, key, attempt.runtime, specialist, settings);
+    if (resolved === null) return null;
     return { state, group, attempt, key, runtime, worktree, specialist: resolved, attachments };
+  }
+
+  /** The specialist ready to start (servers expanded, connections checked); null when refused. */
+  private async withServers(
+    state: RunState,
+    key: AttemptKey,
+    runtimeName: string,
+    specialist: Specialist,
+    settings: Readonly<Record<string, { env: Readonly<Record<string, string>> }>>,
+  ): Promise<Specialist | null> {
+    const variables = { ...this.dependencies.environment, ...settings[runtimeName]?.env };
+    const result = connectedSpecialist(
+      this.dependencies.remoteMcp,
+      state.run.repository,
+      specialist,
+      variables,
+    );
+    if ('specialist' in result) return result.specialist;
+    await this.fail(state, key, { kind: 'spawn', message: result.error });
+    return null;
+  }
+
+  /** The token of an attempt stops being valid; so does whatever was kept open for it. */
+  private release(token: string): void {
+    this.parts.running.dropToken(token);
+    this.dependencies.remoteMcp.attemptEnded(token);
   }
 
   private launch(prepared: Prepared, directory: string, token: string): SupervisedProcess {
     const { state, group, attempt, key, runtime, worktree, specialist } = prepared;
     const { context, entry, socket, environment, graceMs, timings } = this.dependencies;
     const launch = runtime.buildLaunch({
-      specialist: effectiveSpecialist(specialist, attempt),
+      specialist: effectiveSpecialist(withBridges(specialist, entry, token, socket), attempt),
       input: attempt.input,
       worktree,
       environment,

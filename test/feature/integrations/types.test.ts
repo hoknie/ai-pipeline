@@ -25,6 +25,7 @@ const connection = (patch: Partial<Connection> = {}): Connection => ({
   state: 'ready',
   createdAt: 1,
   updatedAt: 1,
+  lastCheck: null,
   ...patch,
 });
 

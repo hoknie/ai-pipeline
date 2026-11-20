@@ -4,7 +4,11 @@ export {
   formatDeliveries,
   formatSubscriptions,
 } from './notifications/index.ts';
-export { formatConnections, formatIntegrationTypes } from './integration/index.ts';
+export {
+  formatCheckResult,
+  formatConnections,
+  formatIntegrationTypes,
+} from './integration/index.ts';
 export { formatAccessActions, formatAccessCheck } from './access/index.ts';
 export { formatAudit } from './audit/index.ts';
 export { formatLinks } from './links.ts';

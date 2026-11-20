@@ -5,5 +5,6 @@ export type { DiffPort } from './diff.ts';
 export type { ObservePort } from './observe.ts';
 export type { RunsPublishPort } from './publish.ts';
 export type { PushOutcome, RunPushPort } from './push.ts';
+export type { RemoteMcpPort, RemoteMcpRefusal, RemoteMcpResolution } from './remote-mcp.ts';
 export type { QueueAdvancePort } from './queue-advance.ts';
 export type { RunNotifyPort } from './notify.ts';

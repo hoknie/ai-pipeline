@@ -17,8 +17,11 @@ import { createNetworkServices } from '../feature/network/services/index.ts';
 import { createObserversServices } from '../feature/observers/services/index.ts';
 import { createProcessesServices } from '../feature/processes/services/index.ts';
 import { createQueueServices } from '../feature/queue/services/index.ts';
+import { probeProxy } from '../feature/network/types/index.ts';
 import { createReposServices } from '../feature/repos/services/index.ts';
 import { createRunsServices, type RunsServices } from '../feature/runs/services/index.ts';
+import { httpMcpTransport } from '../feature/service-registry/clients/http-mcp/index.ts';
+import { createServiceRegistryServices } from '../feature/service-registry/services/index.ts';
 import { createStatsServices } from '../feature/stats/services/index.ts';
 import { createSwarmConfigServices } from '../feature/swarm-config/services/index.ts';
 import { createSwarmEditServices } from '../feature/swarm-edit/services/index.ts';
@@ -117,6 +120,12 @@ function createLower(context: Context) {
     agents,
     changed: ports.config.port,
   });
+  const serviceRegistry = createServiceRegistryServices({
+    transport: httpMcpTransport,
+    // read at every request, so a changed `network.proxy` applies without a restart
+    proxyFor: (url) => probeProxy(url, network.proxy(), environment),
+    integrations: () => integrations,
+  });
   const integrations = createIntegrationsServices({
     ...{ database, registry, now },
     ...options.integrations,
@@ -124,7 +133,7 @@ function createLower(context: Context) {
       options.integrations?.secretStore ??
       createSecretStore({ stateDirectory: options.stateDirectory, environment }),
     installation: () => installationId(options.stateDirectory),
-    adapters: options.integrations?.adapters ?? builtInAdapters(),
+    adapters: options.integrations?.adapters ?? [...builtInAdapters(), serviceRegistry.adapter],
     operations: ports.integrations.port,
     changes: ports.integrationChanges.port,
   });
@@ -139,6 +148,7 @@ function createLower(context: Context) {
     edits,
     shared,
     integrations,
+    serviceRegistry,
   };
 }
 
@@ -174,6 +184,7 @@ function createRuns(context: Context, lower: Lower) {
     publish: ports.runs.port,
     diff: ports.diff.port,
     attachments: ports.attachments.port,
+    remoteMcp: ports.remoteMcp.port,
     commits: ports.commits.port,
     push: ports.push.port,
     agentExit: processes,

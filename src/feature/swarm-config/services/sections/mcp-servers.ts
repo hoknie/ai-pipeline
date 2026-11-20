@@ -11,9 +11,14 @@ import {
 } from '../validate-context.ts';
 import { checkEnvironment } from '../validate-runtimes.ts';
 import { parseReferences } from '../../types/mcp/reference.ts';
-import { type CatalogMcpServer, type McpServer, type Specialist } from '../../types/specialist.ts';
+import {
+  CONNECTION_NAME,
+  type CatalogMcpServer,
+  type McpServer,
+  type Specialist,
+} from '../../types/specialist.ts';
 
-const MCP_SERVER_KEYS = ['command', 'args', 'env'];
+const MCP_SERVER_KEYS = ['command', 'args', 'env', 'connection'];
 
 const MCP_SERVER_NAME = /^[A-Za-z0-9_-]+$/;
 
@@ -75,10 +80,39 @@ function checkMcpServer(
     }
     if (key === 'args') server.args = readStrings(ctx, field, fieldPath);
     if (key === 'env') server.env = checkEnvironment(ctx, field, fieldPath);
+    if (key === 'connection') {
+      const name = readString(ctx, field, fieldPath);
+      if (name === null) continue;
+      // the name is never expanded: a `${…}` fails the pattern like any other wrong character
+      if (CONNECTION_NAME.test(name)) server.connection = name;
+      else
+        addError(
+          ctx,
+          fieldPath,
+          'must be the name of a connection: lowercase letters, digits, ".", "-" and "_"',
+        );
+    }
   }
-  if (!('command' in mapping)) addError(ctx, join(path, 'command'), 'is required');
+  checkTransport(ctx, mapping, path);
   checkReferences(ctx, server, path);
   return server;
+}
+
+/** Exactly one of `command` and `connection`; `args` and `env` belong to a started program only. */
+function checkTransport(
+  ctx: ValidateContext,
+  mapping: Record<string, unknown>,
+  path: string,
+): void {
+  const hasCommand = 'command' in mapping;
+  const hasConnection = 'connection' in mapping;
+  if (hasCommand === hasConnection) {
+    addError(ctx, path, 'exactly one of the keys `command` and `connection` is required');
+  }
+  if (!hasConnection) return;
+  for (const key of ['args', 'env']) {
+    if (key in mapping) addError(ctx, join(path, key), 'is not allowed together with `connection`');
+  }
 }
 
 /** Checks `swarm.mcp_servers`: the servers by name with the flag `all_specialists`. */
@@ -113,7 +147,12 @@ export function checkMcpCatalog(
 }
 
 function plain(server: McpServer): McpServer {
-  return { command: server.command, args: [...server.args], env: { ...server.env } };
+  return {
+    command: server.command,
+    args: [...server.args],
+    env: { ...server.env },
+    ...(server.connection === undefined ? {} : { connection: server.connection }),
+  };
 }
 
 /**

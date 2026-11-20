@@ -58,7 +58,7 @@ describe('mcp_servers catalog', () => {
     );
     expectError(errors, 'swarm.mcp_servers.aip', 'reserved');
     expectError(errors, 'swarm.mcp_servers.b c', 'letters');
-    expectError(errors, 'swarm.mcp_servers.d.command', 'required');
+    expectError(errors, 'swarm.mcp_servers.d', 'exactly one');
     expectError(errors, 'swarm.mcp_servers.e.command', 'absolute path');
     expectError(errors, 'swarm.mcp_servers.f.url', 'unknown key');
     expectError(errors, 'swarm.mcp_servers.g.all_specialists', 'true or false');

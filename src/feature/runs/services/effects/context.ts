@@ -8,6 +8,7 @@ import type {
   QueueAdvancePort,
   RunCommitsPort,
   RunPushPort,
+  RemoteMcpPort,
   RunAttachmentsPort,
   RunsPublishPort,
 } from '../../ports/index.ts';
@@ -56,6 +57,8 @@ export interface EffectDependencies {
   agentExit: AgentExitPort;
   queue: QueueAdvancePort;
   attachments: RunAttachmentsPort;
+  /** The connections the MCP servers of a specialist go through. */
+  remoteMcp: RemoteMcpPort;
   commits: RunCommitsPort;
   push: RunPushPort;
   publish: Pick<RunsPublishPort, 'logGrew'>;

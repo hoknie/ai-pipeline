@@ -41,6 +41,11 @@ interface Action {
    */
   realWorker?: boolean;
   /**
+   * Starts the stdio server `server` of the MCP config of the attempt (a bridge to a registry) and
+   * sends it these JSON-RPC requests; each answer, or the code of the error, goes to remote.jsonl.
+   */
+  remote?: { server: string; calls: { method: string; params?: Record<string, unknown> }[] };
+  /**
    * Tool calls made before `split`, `queue` and the report; each answer goes to tools.jsonl as
    * `{ step, group, name, result }`. Lets a test check the text and the errors of a tool.
    */
@@ -126,6 +131,7 @@ async function connectWorker(command: string, commandArgs: string[]) {
   });
   send({ method: 'notifications/initialized' });
   return {
+    request: (method: string, params: Record<string, unknown>) => call(method, params),
     callTool: (request: { name: string; arguments: Record<string, unknown> }) =>
       call('tools/call', request),
     async close() {
@@ -606,6 +612,22 @@ if (!action.noReport) {
     join(state, 'worker.jsonl'),
     `${JSON.stringify({ step, group, via: action.realWorker ? 'mcp' : 'direct' })}\n`,
   );
+  if (action.remote) {
+    const config = JSON.parse(readFileSync(option('--mcp-config')!, 'utf8'));
+    const server = config.mcpServers[action.remote.server];
+    const remote = await connectWorker(server.command, server.args);
+    for (const call of action.remote.calls) {
+      const entry = await remote.request(call.method, call.params ?? {}).then(
+        (result) => ({ result }),
+        (error: Error) => ({ error: error.message }),
+      );
+      appendFileSync(
+        join(state, 'remote.jsonl'),
+        `${JSON.stringify({ step, group, method: call.method, ...entry })}\n`,
+      );
+    }
+    await remote.close();
+  }
   for (const call of action.toolCalls ?? []) {
     const result = await client.callTool(call);
     appendFileSync(

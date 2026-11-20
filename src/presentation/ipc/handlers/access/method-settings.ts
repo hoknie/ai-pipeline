@@ -48,6 +48,7 @@ export const settingsMethods = {
   notify_test: onShared('integration.write'),
   integration_enable: onShared('integration.write'),
   integration_disable: onShared('integration.write'),
+  integration_check: onShared('integration.write'),
   integration_secret_set: onShared('integration.write'),
   integration_secret_remove: onShared('integration.write'),
   stats_report: onProject('stats.read'),

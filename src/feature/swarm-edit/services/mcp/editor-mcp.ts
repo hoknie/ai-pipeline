@@ -22,6 +22,7 @@ function valuesOf(server: CatalogMcpServer | undefined): EditorMcpServerValues |
   if (!server) return null;
   return {
     command: server.command,
+    ...(server.connection === undefined ? {} : { connection: server.connection }),
     args: server.args,
     envNames: Object.keys(server.env).sort(),
     allSpecialists: server.allSpecialists,
@@ -51,6 +52,7 @@ export function editorMcpServers(
       return {
         name,
         command: server.command,
+        ...(server.connection === undefined ? {} : { connection: server.connection }),
         args: server.args,
         envNames: Object.keys(server.env).sort(),
         allSpecialists: server.allSpecialists,

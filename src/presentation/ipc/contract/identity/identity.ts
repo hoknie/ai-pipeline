@@ -108,6 +108,7 @@ export const remoteDenied: readonly string[] = [
   'artifact_publish',
   'worker_run_show',
   'worker_queue_add',
+  'mcp_remote_forward',
   'subscribe',
   'auth_resolve',
   'auth_link_login',

@@ -1,1 +1,1 @@
-export { formatConnections, formatIntegrationTypes } from './integrations.ts';
+export { formatCheckResult, formatConnections, formatIntegrationTypes } from './integrations.ts';

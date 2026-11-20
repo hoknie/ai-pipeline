@@ -34,7 +34,7 @@ export function httpFailureCode(error: unknown): HttpFailure | null {
 
 export interface HttpRequestOptions {
   url: string;
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'DELETE';
   headers?: Record<string, string>;
   body?: string | Uint8Array;
   /** The whole request, from the connection to the end of the body of the answer. */

@@ -12,6 +12,7 @@ import type { QueuePublishPort, RepairPolicyPort } from '../feature/queue/ports/
 import type { ReposPublishPort } from '../feature/repos/ports/index.ts';
 import type {
   DiffPort,
+  RemoteMcpPort,
   ObservePort,
   QueueAdvancePort,
   RunAttachmentsPort,
@@ -78,6 +79,7 @@ export function declarePorts() {
     runs: wiring.port<RunsPublishPort>('runs.publish'),
     diff: wiring.port<DiffPort>('runs.diff'),
     attachments: wiring.port<RunAttachmentsPort>('runs.attachments'),
+    remoteMcp: wiring.port<RemoteMcpPort>('runs.remote-mcp'),
     delivery: wiring.port<DeliveryPublishPort>('delivery.publish'),
     authors: wiring.port<DeliveryAuthorsPort>('delivery.authors'),
     commits: wiring.port<RunCommitsPort>('runs.commits'),
