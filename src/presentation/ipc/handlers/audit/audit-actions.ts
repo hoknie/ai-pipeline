@@ -182,6 +182,13 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
     action: 'integration.remove',
     info: (p) => ({ resource: resource('integration', p.id) }),
   },
+  integration_link: {
+    action: 'integration.link',
+    info: (p) => ({
+      resource: resource('integration', p.id),
+      details: pick(p, 'repository', 'path', 'auto', 'clear'),
+    }),
+  },
   integration_enable: {
     action: 'integration.enable',
     info: (p) => ({ resource: resource('integration', p.id) }),

@@ -30,6 +30,7 @@ describe('daemon timings', () => {
       wakeMarginMs: 1000,
       usageIntervalMs: USAGE_INTERVAL_MS,
       namingTimeoutMs: NAMING_TIMEOUT_MS,
+      registryProjectMs: 15_000,
       processStreamMs: 2000,
       processKillLookMs: 250,
       processCacheMs: 1000,

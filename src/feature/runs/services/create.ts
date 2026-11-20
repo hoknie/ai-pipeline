@@ -11,6 +11,7 @@ import type {
   QueueAdvancePort,
   RegistrySkillsPort,
   RemoteMcpPort,
+  RegistryProjectPort,
   RunAttachmentsPort,
   RunNotifyPort,
   RunCommitsPort,
@@ -54,6 +55,7 @@ export interface RunsDependencies {
   attachments: RunAttachmentsPort;
   remoteMcp: RemoteMcpPort;
   registrySkills: RegistrySkillsPort;
+  registryProject: RegistryProjectPort;
   commits: RunCommitsPort;
   push: RunPushPort;
 }

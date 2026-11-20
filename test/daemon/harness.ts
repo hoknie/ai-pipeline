@@ -30,6 +30,7 @@ export const TEST_TIMINGS: DaemonTimings = {
   wakeMarginMs: 20,
   usageIntervalMs: 20,
   namingTimeoutMs: 10_000,
+  registryProjectMs: 15_000,
   processStreamMs: 2000,
   processKillLookMs: 20,
   processCacheMs: 20,

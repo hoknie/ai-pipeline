@@ -78,6 +78,28 @@ aip integration skills <id>               # registry:<name>, the title and the v
 aip integration skills <id> --query go
 ```
 
+### Linking projects
+
+A project of `aip` is linked to its project in the registry, so a specialist does not have to look for it. The link is kept by the daemon (not in your repository) for each pair of a project and a registry connection that serves it.
+
+- **By origin.** The `origin` of the repository is compared with the `repo_url` of the projects the token can see; `ssh` and `https` addresses of one repository are equal.
+  - Exactly one match makes a link. No match gives `no_match`, several give `ambiguous` with their paths; a registry that does not answer gives `unreachable` or `unauthorized`.
+  - Matching runs when the connection is enabled, with `--auto`, and when an attempt starts without a link (at most once an hour per project and connection; a failure never stops the attempt).
+  - A catalog of more than 25 pages of 200 projects is not read to the end: link the project by hand.
+- **By hand.** `aip integration link <id|name> --repo <project> --path acme/backend/api` asks the registry for the project (`get_project`) and links it; a path the registry does not know is refused and nothing changes. A manual link is never replaced by matching.
+- **Reset.** `--clear` removes the link and switches matching off for the pair until `--auto`.
+
+```
+aip integration link main --repo shop --auto
+aip integration list --repo shop     # shows the link, its source or why there is none
+```
+
+When the specialist of a step has a server that goes through the linked connection, the message of the step names the registry project and that server.
+The agent passes the path to the registry tools (`get_project`, `list_specs`, `list_adrs`, `get_dependencies`).
+A specialist without such a server gets nothing about the registry. The path is fixed when the attempt starts.
+
+The settings of a project in the panel show the same: the status, the path with its source and a link to the project in the registry, a field for the path (checked with the registry; a refusal is shown at the field), «Match again» and «Reset».
+
 ## Where secrets are kept
 
 | Backend | When | Notes |

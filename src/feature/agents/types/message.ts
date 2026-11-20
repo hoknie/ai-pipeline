@@ -30,6 +30,12 @@ export function systemPrompt(specialist: Specialist, input: StepInput): string {
   if (specialist.skills.length > 0) {
     lines.push(`Use these skills for this step: ${specialist.skills.map(skillLabel).join(', ')}.`);
   }
+  if (input.registryProject) {
+    const { path, server } = input.registryProject;
+    lines.push(
+      `Service registry project: \`${path}\` (MCP server \`${server}\`); pass this path to the registry tools.`,
+    );
+  }
   if (input.humanReview) {
     lines.push(
       'After you report "done" a person reviews this step before the work goes on. In the summary list what to check: architecture decisions, risky places, assumptions you made.',

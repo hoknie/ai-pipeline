@@ -78,7 +78,16 @@ export const featureGraph: Record<string, readonly string[]> = {
   identity: ['swarm-config'],
   audit: [],
   access: ['identity', 'swarm-config', 'repos'],
-  compose: ['observers', 'queue', 'runs', 'tags', 'repos', 'integrations', 'notifications'],
+  compose: [
+    'observers',
+    'queue',
+    'runs',
+    'tags',
+    'repos',
+    'integrations',
+    'service-registry',
+    'notifications',
+  ],
 };
 
 /** Presentation sublayers. */

@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -354,5 +354,93 @@ describe('aip integration with a service registry', () => {
     expect(disabled.stderr).toContain('cannot list skills');
     const unknown = await aip(box, 'integration', 'skills', 'nope');
     expect(unknown.code).toBe(1);
+  });
+
+  describe('link', () => {
+    const API = {
+      path: 'acme/backend/api',
+      name: 'api',
+      repo_url: 'https://github.com/acme/api',
+    };
+
+    async function linked(): Promise<{ box: Sandbox; registry: FakeRegistry; id: string }> {
+      const { box, registry } = await setup();
+      registry.projects = [
+        API,
+        { path: 'acme/legacy/api', name: 'legacy', repo_url: 'https://example.com/legacy' },
+      ];
+      execFileSync('git', ['remote', 'add', 'origin', 'git@github.com:acme/api.git'], {
+        cwd: box.repo,
+      });
+      expect((await aip(box, 'repo', 'add', box.repo)).code).toBe(0);
+      const id = await connection(box, registry.base, registry.token);
+      return { box, registry, id };
+    }
+
+    it('matches by origin on --auto and shows the link in the list of the project', async () => {
+      const { box, id } = await linked();
+      const auto = await aip(box, 'integration', 'link', id, '--repo', '.', '--auto');
+      expect(auto.stderr).toBe('');
+      expect(auto.stdout).toContain('acme/backend/api (auto)');
+      const list = await aip(box, 'integration', 'list', '--repo', '.');
+      expect(list.stdout).toContain('acme/backend/api (auto)');
+      const byName = await aip(
+        box,
+        'integration',
+        'link',
+        'main',
+        '--repo',
+        '.',
+        '--auto',
+        '--json',
+      );
+      expect(JSON.parse(byName.stdout)).toMatchObject({ registryPath: 'acme/backend/api' });
+    });
+
+    it('rejects a path that does not exist and keeps a manual link over --auto', async () => {
+      const { box, id } = await linked();
+      const missing = await aip(
+        box,
+        'integration',
+        'link',
+        id,
+        '--repo',
+        '.',
+        '--path',
+        'acme/none',
+      );
+      expect(missing.code).toBe(1);
+      expect(missing.stderr).toContain('project acme/none is not found in the service registry');
+      const manual = await aip(
+        box,
+        'integration',
+        'link',
+        id,
+        '--repo',
+        '.',
+        '--path',
+        'acme/legacy/api',
+      );
+      expect(manual.code).toBe(0);
+      expect(manual.stdout).toContain('acme/legacy/api (manual)');
+      const again = await aip(box, 'integration', 'link', id, '--repo', '.', '--auto');
+      expect(again.stdout).toContain('acme/legacy/api (manual)');
+      const list = await aip(box, 'integration', 'list', '--repo', '.');
+      expect(list.stdout).toContain('acme/legacy/api (manual)');
+    });
+
+    it('clears the link and asks for exactly one action', async () => {
+      const { box, id } = await linked();
+      await aip(box, 'integration', 'link', id, '--repo', '.', '--auto');
+      const cleared = await aip(box, 'integration', 'link', id, '--repo', '.', '--clear');
+      expect(cleared.code).toBe(0);
+      expect(cleared.stdout).toContain('not linked');
+      expect(cleared.stdout).toContain('disabled');
+      const none = await aip(box, 'integration', 'link', id, '--repo', '.');
+      expect(none.code).toBe(1);
+      expect(none.stderr).toContain('exactly one of --path, --auto and --clear');
+      const two = await aip(box, 'integration', 'link', id, '--repo', '.', '--auto', '--clear');
+      expect(two.code).toBe(1);
+    });
   });
 });

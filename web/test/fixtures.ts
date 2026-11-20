@@ -19,6 +19,7 @@ import type {
   EntrySources,
   GroupRow,
   GroupView,
+  ProjectLinkView,
   QueueItemView,
   QueueRunView,
   QueueView,
@@ -885,6 +886,26 @@ export function webhookDeliveryView(
 }
 
 /** A shared Telegram connection without the token, with one subscription of all projects. */
+/** A link of a project to a project of a service registry. */
+export function projectLinkView(
+  connection: string,
+  project: string,
+  overrides: Partial<ProjectLinkView> = {},
+): ProjectLinkView {
+  return {
+    project,
+    connection,
+    connectionName: 'main',
+    registryPath: 'acme/backend/api',
+    source: 'auto',
+    status: 'linked',
+    candidates: [],
+    matchedAt: 1,
+    url: 'https://registry.example.com/catalog?node=acme%2Fbackend%2Fapi',
+    ...overrides,
+  };
+}
+
 export function integrationsOverview(
   overrides: Partial<IntegrationsOverview> = {},
 ): IntegrationsOverview {
@@ -1146,6 +1167,10 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     statsClear: vi.fn(async () => ({ removed: 0 })),
     integrations: vi.fn(async () => integrationsOverview()),
     integrationEdit: vi.fn(async () => integrationsOverview().connections[0]!),
+    integrationLinks: vi.fn(async () => []),
+    integrationLink: vi.fn(async (id: string, repository: string) =>
+      projectLinkView(id, repository),
+    ),
     subscriptionAdd: vi.fn(async () => integrationsOverview().subscriptions[0]!),
     subscriptionEvents: vi.fn(async () => integrationsOverview().subscriptions[0]!),
     subscriptionEnabled: vi.fn(async () => integrationsOverview().subscriptions[0]!),

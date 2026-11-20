@@ -4,10 +4,15 @@ import {
   formatCheckResult,
   formatConnections,
   formatIntegrationTypes,
+  formatProjectLinks,
   type Style,
 } from '../../../format/index.ts';
 import { repositoryArgument } from '../../../ipc/client/index.ts';
-import type { ConnectionView, IntegrationTypeView } from '../../../ipc/contract/index.ts';
+import type {
+  ConnectionView,
+  IntegrationTypeView,
+  ProjectLinkView,
+} from '../../../ipc/contract/index.ts';
 import { bind, call } from '../../context.ts';
 import { usage, type CliIo } from '../../io.ts';
 
@@ -72,10 +77,12 @@ function addReadCommands(kit: Kit): void {
         options.repo === undefined
           ? {}
           : { repository: repositoryArgument(options.repo, kit.io.cwd) };
-      show(
-        options.json,
-        (await call(context(), 'integration_list', repository)) as ConnectionView[],
-      );
+      const views = (await call(context(), 'integration_list', repository)) as ConnectionView[];
+      show(options.json, views);
+      if (options.repo === undefined || options.json === true) return;
+      // The links of the project follow the connections.
+      const links = (await call(context(), 'integration_links', repository)) as ProjectLinkView[];
+      if (links.length > 0) kit.print(`\n${formatProjectLinks(links, activeStyle)}`);
     });
 }
 
@@ -204,6 +211,46 @@ function addWriteCommands(kit: Kit): void {
     });
 }
 
+function addLinkCommand(kit: Kit): void {
+  const { root, examples, context, output, io, activeStyle } = kit;
+  root
+    .command('link')
+    .description('Link a project to its project in a service registry (or show how it is linked)')
+    .argument('<id>', 'id or name of the service registry connection')
+    .option('-r, --repo <project>', 'project path or slug (default: the current repository)')
+    .option('--path <path>', 'link to this project of the registry, checked with the registry')
+    .option('--auto', 'match by the origin of the repository again')
+    .option('--clear', 'remove the link and switch matching off until --auto')
+    .option('--json', 'print JSON')
+    .addHelpText(
+      'after',
+      examples([
+        'aip integration link main --repo shop --auto',
+        'aip integration link main --repo shop --path acme/backend/api',
+        'aip integration link main --repo shop --clear',
+      ]),
+    )
+    .action(
+      async (
+        id: string,
+        options: { repo?: string; path?: string; auto?: boolean; clear?: boolean; json?: boolean },
+      ) => {
+        const chosen = [options.path, options.auto, options.clear].filter(
+          (one) => one !== undefined,
+        );
+        if (chosen.length !== 1) throw usage('pass exactly one of --path, --auto and --clear');
+        const link = (await call(context(), 'integration_link', {
+          id,
+          repository: repositoryArgument(options.repo ?? '.', io.cwd),
+          ...(options.path === undefined ? {} : { path: options.path }),
+          ...(options.auto === true ? { auto: true } : {}),
+          ...(options.clear === true ? { clear: true } : {}),
+        })) as ProjectLinkView;
+        output(options.json, formatProjectLinks([link], activeStyle), link);
+      },
+    );
+}
+
 function addSecretCommands(kit: Kit): void {
   const { root, examples, context, print, io } = kit;
   const secret = root.command('secret').description('Set or remove a secret of a connection');
@@ -240,6 +287,7 @@ export function registerIntegrations(program: Command, io: CliIo, style: Style):
   addReadCommands(kit);
   addWriteCommands(kit);
   addEditCommand(kit);
+  addLinkCommand(kit);
   addSecretCommands(kit);
   addSkillsCommand(kit.root, kit);
 }

@@ -7,7 +7,6 @@ import {
   type ProcessExit,
   type SupervisedProcess,
 } from '../../../agents/services/index.ts';
-import type { Runtime } from '../../../agents/types/index.ts';
 import {
   modelIdProblem,
   type McpServer,
@@ -26,12 +25,13 @@ import {
 import { NETWORK_FRESH_MS } from '../../../network/types/index.ts';
 
 import type { ActionRunner } from './actions.ts';
-import type { AttemptKey, EffectDependencies } from './context.ts';
+import type { AttemptKey, EffectDependencies, Prepared } from './context.ts';
 import {
   conversationFolder,
   effectiveSpecialist,
   purgeConversations,
   connectedSpecialist,
+  startWithRegistryProject,
   withBridges,
   workerCommand,
 } from './conversations.ts';
@@ -41,19 +41,6 @@ import type { OutsideChanges } from './outside.ts';
 import type { RunningAgents } from './running.ts';
 import type { UsageBuffers } from './usage.ts';
 import { ensureGroupWorktree, logPath, workspaceOf } from './worktrees.ts';
-
-/** What an attempt starts with once its runtime, tree and specialist are known. */
-interface Prepared {
-  state: RunState;
-  group: Group;
-  attempt: Attempt;
-  key: AttemptKey;
-  runtime: Runtime;
-  worktree: string;
-  specialist: Specialist;
-  /** The folder the attachments of the run are laid out in; null without attachments. */
-  attachments: string | null;
-}
 
 /** The parts of the effects an attempt of a specialist uses. */
 export interface AttemptParts {
@@ -73,7 +60,14 @@ export class AttemptStarter {
     this.parts = parts;
   }
 
+  /** Starts the attempt; the wait for the registry project happens outside the queue. */
   async start(state: RunState, slug: string, seq: number): Promise<void> {
+    return startWithRegistryProject(this.dependencies, state, slug, seq, () =>
+      this.startNow(state, slug, seq),
+    );
+  }
+
+  private async startNow(state: RunState, slug: string, seq: number): Promise<void> {
     const prepared = await this.prepare(state, slug, seq);
     if (prepared === null) return;
     const { key, specialist, runtime } = prepared;

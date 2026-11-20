@@ -3,6 +3,7 @@ import { IDENTITY_MIGRATION } from './identity-migration.ts';
 import {
   INTEGRATIONS_MIGRATION,
   NOTIFICATIONS_MIGRATION,
+  SERVICE_REGISTRY_LINKS_MIGRATION,
   WEBHOOKS_MIGRATION,
 } from './integrations-migration.ts';
 import { TASK_LINKS_MIGRATION } from './links-migration.ts';
@@ -70,4 +71,5 @@ export const LATER_MIGRATIONS: string[] = [
   )`,
   // the versions of registry skills fixed for a run (JSON by skill name); old rows have none
   `ALTER TABLE runs ADD COLUMN pinned_skills_json TEXT`,
+  SERVICE_REGISTRY_LINKS_MIGRATION,
 ];

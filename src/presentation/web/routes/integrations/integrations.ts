@@ -14,6 +14,17 @@ const editConnection = strict({
   set: z.record(z.string().min(1).max(64), z.string().max(1000)).optional(),
   unset: z.array(z.string().min(1).max(64)).max(50).optional(),
 });
+/** The link of a project to a service registry: exactly one of path, auto and clear. */
+const linkProject = strict({
+  id: z.string().min(1).max(80),
+  repository: z.string().min(1).max(4096),
+  path: z.string().min(1).max(512).optional(),
+  auto: z.literal(true).optional(),
+  clear: z.literal(true).optional(),
+}).refine(
+  (body) => [body.path, body.auto, body.clear].filter((one) => one !== undefined).length === 1,
+  { message: 'pass exactly one of path, auto and clear' },
+);
 const addSubscription = strict({
   connection: id,
   repository: z.string().min(1).max(4096).optional(),
@@ -33,7 +44,8 @@ const subscriptionActions = [
 /**
  * The pages of integrations: connections (read, and their non-secret parameters), subscriptions,
  * the journal and the state of the channels. No route takes or returns a secret, and none creates,
- * removes, enables or disables a connection: that stays with the local CLI.
+ * removes, enables or disables a connection: that stays with the local CLI. The link of a project
+ * to its project in a service registry is a setting of the project and goes through here.
  */
 export function integrationsRoutes({ call }: RouteKit): Route[] {
   return [
@@ -61,6 +73,19 @@ export function integrationsRoutes({ call }: RouteKit): Route[] {
       method: 'POST',
       pattern: /^\/api\/integrations\/edit$/,
       handle: async (_match, body) => call('integration_edit', parseBody(editConnection, body)),
+    },
+    {
+      method: 'GET',
+      pattern: /^\/api\/integrations\/links$/,
+      handle: async (_match, _body, _repository, query) => {
+        const repository = query.get('repository') ?? undefined;
+        return call('integration_links', repository === undefined ? {} : { repository });
+      },
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/integrations\/link$/,
+      handle: async (_match, body) => call('integration_link', parseBody(linkProject, body)),
     },
     {
       method: 'POST',

@@ -19,12 +19,19 @@ export interface FakeSkill {
   tags?: string[];
 }
 
+/** A project of the catalog of a fake registry. */
+export interface FakeProject {
+  path: string;
+  name: string;
+  repo_url: string;
+}
+
 export interface FakeRegistry {
   /** The skills `list_skills` finds and the archives the REST endpoint serves. */
   skills: FakeSkill[];
   /** `<id>@<version>` of every archive downloaded. */
   downloads: string[];
-  /** The page size of `list_skills`; default 50. */
+  /** The page size of `list_skills` and `list_projects`; default 50. */
   pageSize: number;
   /** The root address, `http://127.0.0.1:<port>`. */
   base: string;
@@ -39,6 +46,11 @@ export interface FakeRegistry {
   failWith: number[];
   /** The tools `tools/list` returns. */
   tools: string[];
+  /**
+   * The catalog `list_projects` and `get_project` answer from, as JSON text; null: the tools only
+   * echo the call.
+   */
+  projects: FakeProject[] | null;
   /** Replaces the answer of the next POST with this raw body (content type JSON). */
   rawBody: string | null;
   /** Holds every POST this long before answering. */
@@ -61,6 +73,7 @@ export async function startFakeRegistry(
     skills: [] as FakeSkill[],
     downloads: [] as string[],
     pageSize: 50,
+    projects: null as FakeProject[] | null,
   };
   let sessions = 0;
 
@@ -196,6 +209,37 @@ export async function startFakeRegistry(
                 },
               ],
             },
+          });
+          return;
+        }
+        const catalog = state.projects;
+        if (catalog !== null && params.name === 'list_projects') {
+          const args = (params.arguments ?? {}) as { limit?: number; offset?: number };
+          const size = Math.min(args.limit ?? 200, state.pageSize);
+          const offset = args.offset ?? 0;
+          answer(response, {
+            jsonrpc: '2.0',
+            id,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ items: catalog.slice(offset, offset + size) }),
+                },
+              ],
+            },
+          });
+          return;
+        }
+        if (catalog !== null && params.name === 'get_project') {
+          const wanted = ((params.arguments ?? {}) as { project?: string }).project;
+          const found = catalog.find((project) => project.path === wanted);
+          answer(response, {
+            jsonrpc: '2.0',
+            id,
+            result: found
+              ? { content: [{ type: 'text', text: JSON.stringify(found) }] }
+              : { isError: true, content: [{ type: 'text', text: 'project not found' }] },
           });
           return;
         }

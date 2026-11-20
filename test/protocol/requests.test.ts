@@ -89,6 +89,8 @@ const SAMPLES: Record<Method, unknown> = {
   integration_add: { kind: 'example', name: 'main', global: true },
   integration_edit: { id: 'c1', set: { chat_id: '-1' }, unset: [] },
   integration_remove: { id: 'c1' },
+  integration_link: { id: 'main', repository: '/repo', path: 'acme/backend/api' },
+  integration_links: {},
   notify_list: {},
   notify_add: { connection: 'c1', repository: '/repo', events: ['question'] },
   notify_edit: { id: 'n1', events: ['failed'] },
@@ -218,9 +220,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 147 methods, each in the request schema once', () => {
+  it('has 149 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(147);
+    expect(methods).toHaveLength(149);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

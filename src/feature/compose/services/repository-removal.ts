@@ -4,6 +4,7 @@ import type { SubscriptionService } from '../../notifications/services/index.ts'
 import type { ObserverService } from '../../observers/services/index.ts';
 import type { QueueStore } from '../../queue/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
+import type { RegistryLinks } from '../../service-registry/services/index.ts';
 import type { RunStates } from '../../runs/services/index.ts';
 import { isRunFinished } from '../../runs/types/index.ts';
 
@@ -14,6 +15,7 @@ export interface RepositoryRemovalDependencies {
   observers: ObserverService;
   integrations: ConnectionService;
   notifications: SubscriptionService;
+  links: Pick<RegistryLinks, 'forgetProject'>;
 }
 
 /** Refuses a project with an unfinished run: its worktrees and refs belong to the project's root. */
@@ -50,7 +52,8 @@ export class RepositoryRemoval {
   }
 
   async remove(path: string): Promise<void> {
-    const { registry, states, queues, observers, integrations, notifications } = this.dependencies;
+    const { registry, states, queues, observers, integrations, notifications, links } =
+      this.dependencies;
     const root = await registry.resolve(path);
     checkIdle(root, states, queues);
     // Their secrets would be left without an owner: the connections are removed first.
@@ -58,6 +61,7 @@ export class RepositoryRemoval {
     observers.forgetRepository(root);
     // The subscriptions of shared connections to this project have nothing left to follow.
     notifications.forgetProject(root);
+    links.forgetProject(root);
     registry.forget(root);
   }
 }

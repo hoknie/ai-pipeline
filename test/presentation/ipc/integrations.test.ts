@@ -60,6 +60,8 @@ describe('integration requests', () => {
       'integration_disable',
       'integration_edit',
       'integration_enable',
+      'integration_link',
+      'integration_links',
       'integration_list',
       'integration_remove',
       'integration_secret_remove',

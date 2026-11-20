@@ -32,6 +32,13 @@ export interface InputAttachment {
   mediaType: string;
 }
 
+/** A project of a service registry as the message of a step names it. */
+export interface RegistryProjectRef {
+  path: string;
+  /** The name of the MCP server of the specialist that goes to the registry. */
+  server: string;
+}
+
 export interface StepInput {
   prompt: string;
   groupTitle: string;
@@ -48,6 +55,11 @@ export interface StepInput {
   reviewed?: boolean;
   /** The step stops for a human review after `done`. */
   humanReview?: boolean;
+  /**
+   * The project of the service registry the project of the run is linked to, and the MCP server of
+   * the specialist that goes to that registry; absent without a link or without such a server.
+   */
+  registryProject?: RegistryProjectRef;
   /** Files attached to the task; absent when there are none. */
   attachments?: InputAttachment[];
 }

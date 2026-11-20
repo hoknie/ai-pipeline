@@ -62,13 +62,18 @@ export class ProjectService {
     if (wanted.size === 0) return null;
     for (const project of this.registry.entries()) {
       if (project.enabled === false) continue;
-      const origin = await runGit(project.path, ['remote', 'get-url', 'origin'], {
-        allowFailure: true,
-      });
-      const normal = origin.code === 0 ? normalizeRemote(origin.stdout) : null;
+      const origin = await this.originOf(project.path);
+      const normal = origin === null ? null : normalizeRemote(origin);
       if (normal !== null && wanted.has(normal)) return project;
     }
     return null;
+  }
+
+  /** The address of the `origin` remote of the repository at `path`; null when there is none. */
+  async originOf(path: string): Promise<string | null> {
+    const origin = await runGit(path, ['remote', 'get-url', 'origin'], { allowFailure: true });
+    const url = origin.code === 0 ? origin.stdout.trim() : '';
+    return url === '' ? null : url;
   }
 
   /** A slug the user chose: it fits the pattern and no other project has it. */

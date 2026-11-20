@@ -1,6 +1,8 @@
 import type { AgentsService } from '../../../agents/services/index.ts';
+import type { Runtime } from '../../../agents/types/index.ts';
 import type { NetworkMonitor } from '../../../network/services/index.ts';
 import type { ConfigService } from '../../../swarm-config/services/index.ts';
+import type { Specialist } from '../../../swarm-config/types/index.ts';
 import type { Event } from '../../machine/index.ts';
 import type {
   AgentExitPort,
@@ -10,10 +12,11 @@ import type {
   RunPushPort,
   RegistrySkillsPort,
   RemoteMcpPort,
+  RegistryProjectPort,
   RunAttachmentsPort,
   RunsPublishPort,
 } from '../../ports/index.ts';
-import type { RunState } from '../../types/index.ts';
+import type { Attempt, Group, RunState } from '../../types/index.ts';
 
 /** What the effects take from the engine: the queue, `apply` and `save`. */
 export interface EffectContext {
@@ -24,6 +27,8 @@ export interface EffectContext {
   save(state: RunState): void;
 }
 
+/** The longest an attempt waits for the registry to name its project. */
+export const REGISTRY_PROJECT_TIMEOUT_MS = 15_000;
 export const NAMING_TIMEOUT_MS = 60_000;
 /** The live usage of a run reaches its state at most once per interval. */
 export const USAGE_INTERVAL_MS = 1_000;
@@ -38,6 +43,8 @@ export interface EffectTimings {
   usageIntervalMs: number;
   /** The longest the naming agent may run. */
   namingTimeoutMs: number;
+  /** The longest an attempt waits for the registry to name its project. */
+  registryProjectMs: number;
 }
 
 export interface EffectDependencies {
@@ -64,6 +71,8 @@ export interface EffectDependencies {
   remoteMcp: RemoteMcpPort;
   /** The skills of a service registry for the specialists. */
   registrySkills: RegistrySkillsPort;
+  /** The project of the service registry the project of a run is linked to. */
+  registryProject: RegistryProjectPort;
   commits: RunCommitsPort;
   push: RunPushPort;
   publish: Pick<RunsPublishPort, 'logGrew'>;
@@ -78,4 +87,17 @@ export interface AttemptKey {
 
 export function keyOf(key: AttemptKey): string {
   return `${key.run}/${key.group}/${key.seq}`;
+}
+
+/** What an attempt starts with once its runtime, tree and specialist are known. */
+export interface Prepared {
+  state: RunState;
+  group: Group;
+  attempt: Attempt;
+  key: AttemptKey;
+  runtime: Runtime;
+  worktree: string;
+  specialist: Specialist;
+  /** The folder the attachments of the run are laid out in; null without attachments. */
+  attachments: string | null;
 }

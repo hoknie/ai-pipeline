@@ -7,6 +7,7 @@ import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { MoveDialog } from './MoveDialog.tsx';
 import { ProjectFacts, ProjectLinks } from './ProjectFacts.tsx';
+import { ProjectRegistry } from './ProjectRegistry.tsx';
 import { Field, ProjectFields } from './ProjectFields.tsx';
 import { placeholderName } from './projectDraft.ts';
 import { useProjectForm } from './useProjectForm.ts';
@@ -76,6 +77,7 @@ export function ProjectForm({
         </Button>
       </div>
       <ProjectFacts project={project} />
+      <ProjectRegistry api={actions.api} project={project.path} />
       <ProjectLinks project={project} actions={actions} />
       <MoveDialog
         open={moving}

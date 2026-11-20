@@ -4,6 +4,7 @@ export { formatCounts, runStartedAt, summarize, type RunSummary } from './summar
 export { recoverRuns, type RecoveredRun } from './recovery.ts';
 export {
   NAMING_TIMEOUT_MS,
+  REGISTRY_PROJECT_TIMEOUT_MS,
   USAGE_INTERVAL_MS,
   type AttemptKey,
   type EffectTimings,

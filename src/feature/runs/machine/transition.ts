@@ -12,6 +12,7 @@ import {
   messageAttempt,
   proposeSplit,
   recordUsage,
+  registryProjectResolved,
   reportAttempt,
 } from './answers.ts';
 import { afterDeliveryDone, markDelivered } from './delivery-checks.ts';
@@ -97,6 +98,8 @@ const HANDLERS: Handlers = {
     attemptExited(m, e.group, e.seq, e.exit);
   },
   attempt_usage: (m, e) => recordUsage(m, e.updates),
+  registry_project_resolved: (m, e) =>
+    registryProjectResolved(m, e.group, e.seq, e.registryProject),
   timed_out: (m, e) => timedOut(m, e.group, e.seq),
   action_finished: (m, e) => actionFinished(m, e.group, e.seq, e.outcome),
   message: (m, e) => messageAttempt(m, e.group, e.seq, e.text),

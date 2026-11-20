@@ -68,6 +68,7 @@ describe('RunAttemptHistoryService', () => {
       attachments: {} as never,
       remoteMcp: {} as never,
       registrySkills: {} as never,
+      registryProject: {} as never,
       commits: {} as never,
       push: {} as never,
     });

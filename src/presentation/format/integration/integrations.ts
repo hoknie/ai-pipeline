@@ -1,4 +1,8 @@
-import type { ConnectionView, IntegrationTypeView } from '../../ipc/contract/index.ts';
+import type {
+  ConnectionView,
+  IntegrationTypeView,
+  ProjectLinkView,
+} from '../../ipc/contract/index.ts';
 
 import { type Style, plainStyle } from '../style.ts';
 import { table } from '../table.ts';
@@ -75,6 +79,38 @@ export function formatConnections(
         formatChannelState(connection.channel),
         formatCheck(connection.lastCheck),
       ]),
+    ],
+    style,
+  );
+}
+
+const REASONS: Record<string, string> = {
+  no_match: 'no project of the registry has the origin of this project',
+  ambiguous: 'several projects match; link one with --path',
+  unreachable: 'the registry did not answer',
+  unauthorized: 'the registry refused the token',
+  truncated: 'the catalog is too large to read; link the project with --path',
+  disabled: 'cleared; matching is off until --auto',
+};
+
+/** What one pair is linked to, or why it is not. */
+function linkText(link: ProjectLinkView): string {
+  if (link.registryPath !== null) return `${link.registryPath} (${link.source ?? 'auto'})`;
+  const reason = REASONS[link.status] ?? link.status;
+  const candidates = link.candidates.length > 0 ? `: ${link.candidates.join(', ')}` : '';
+  return `not linked — ${link.status}: ${reason}${candidates}`;
+}
+
+/** The links of projects to the projects of service registries. */
+export function formatProjectLinks(
+  links: readonly ProjectLinkView[],
+  style: Style = plainStyle,
+): string {
+  if (links.length === 0) return 'No project is linked to a service registry yet.';
+  return table(
+    [
+      ['PROJECT', 'CONNECTION', 'REGISTRY PROJECT'],
+      ...links.map((link) => [link.project, style.argument(link.connectionName), linkText(link)]),
     ],
     style,
   );

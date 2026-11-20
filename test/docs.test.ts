@@ -194,6 +194,7 @@ describe('documentation examples', () => {
     });
     expect(example.mcpServers.registry).toMatchObject({ connection: 'main' });
     expect(findSpecialist(example, 'plan')?.mcp?.registry?.connection).toBe('main');
+    expect(findSpecialist(example, 'plan')?.prompt).toContain('get_project');
   });
 
   it('the epic example of docs/configuration/pipelines.md splits into another pipeline', () => {

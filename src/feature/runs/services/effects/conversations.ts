@@ -6,16 +6,20 @@ import type { Runtime as RuntimeName } from '../../../swarm-config/types/index.t
 import { attemptDirectory } from '../../../../platform/git/index.ts';
 import { expandMcpServers } from '../../../agents/types/index.ts';
 import type { McpServer, Specialist } from '../../../swarm-config/types/index.ts';
+import type { AttemptExit } from '../../machine/events.ts';
 import type { RemoteMcpPort } from '../../ports/index.ts';
 import {
   SPLIT_GROUP,
   findGroup,
   isRepairGroup,
+  specialistOfStep,
+  stepsOf,
   type Attempt,
   type Group,
   type RunState,
 } from '../../types/index.ts';
 
+import type { EffectDependencies } from './context.ts';
 import { workspaceOf } from './worktrees.ts';
 
 /**
@@ -185,4 +189,113 @@ export function connectedSpecialist(
   return refused === null
     ? { specialist: { ...specialist, mcp: expanded.servers } }
     : { error: refused };
+}
+
+/**
+ * The servers of a specialist that go through a connection: where the registry may name the
+ * project of the run.
+ */
+export function connectionServers(
+  specialist: Specialist,
+): { server: string; connection: string }[] {
+  return Object.entries(specialist.mcp ?? {}).flatMap(([server, one]) =>
+    one.connection === undefined ? [] : [{ server, connection: one.connection }],
+  );
+}
+
+/**
+ * The project of the service registry the run's project is linked to. The wait is bounded and a
+ * failure or a silence is null. Runs outside the queue of the engine.
+ */
+export async function lookupRegistryProject(
+  dependencies: Pick<EffectDependencies, 'registryProject' | 'timings'>,
+  repository: string,
+  servers: { server: string; connection: string }[],
+): Promise<Awaited<ReturnType<EffectDependencies['registryProject']['projectFor']>>> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      dependencies.registryProject.projectFor(repository, servers),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), dependencies.timings.registryProjectMs);
+      }),
+    ]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The servers through a connection of an attempt that has not been told its project yet. */
+function registryServers(
+  state: RunState,
+  slug: string,
+  seq: number,
+): { server: string; connection: string }[] {
+  const group = findGroup(state, slug);
+  const attempt = group?.attempts.find((candidate) => candidate.seq === seq);
+  if (!group || !attempt || attempt.runtime === 'command') return [];
+  if (attempt.input.registryProject !== undefined) return [];
+  const step = stepsOf(state.run, group)[attempt.stepIndex];
+  const specialist = specialistOfStep(state.run, group, step ?? { specialist: attempt.specialist });
+  return specialist ? connectionServers(specialist) : [];
+}
+
+/**
+ * Starts an attempt through `startNow`. When a server of its specialist goes through a connection
+ * and the input has no registry project yet, the wait for the registry happens outside the queue:
+ * the queue moves on and the attempt continues in it once the answer (or the timeout) is there.
+ */
+export async function startWithRegistryProject(
+  dependencies: Pick<EffectDependencies, 'context' | 'registryProject' | 'timings'>,
+  state: RunState,
+  slug: string,
+  seq: number,
+  startNow: () => Promise<void>,
+): Promise<void> {
+  const servers = registryServers(state, slug, seq);
+  if (servers.length === 0) return startNow();
+  const { context } = dependencies;
+  void lookupRegistryProject(dependencies, state.run.repository, servers)
+    .then((answer) =>
+      context.stopping
+        ? undefined
+        : context.serial(async () => {
+            if (context.stopping) return;
+            const attempt = findGroup(state, slug)?.attempts.find((item) => item.seq === seq);
+            // Cancelled, finished or started while the registry was asked: nothing to start.
+            if (attempt?.status !== 'running') return;
+            const exitWith = (failure: AttemptExit['failure']): Promise<void> =>
+              context.apply(state, {
+                kind: 'attempt_exited',
+                group: slug,
+                seq,
+                exit: { sessionId: null, usage: null, failure, outsideChanges: [] },
+              });
+            try {
+              if (attempt.reason !== null) {
+                // A pause or a message came while the registry was asked: no process exists to
+                // stop, so the attempt ends as if it had been stopped, and the machine goes on.
+                await exitWith(null);
+                return;
+              }
+              if (answer !== null) {
+                await context.apply(state, {
+                  kind: 'registry_project_resolved',
+                  group: slug,
+                  seq,
+                  registryProject: answer,
+                });
+              }
+              await startNow();
+            } catch (error) {
+              const current = findGroup(state, slug)?.attempts.find((item) => item.seq === seq);
+              if (current?.status !== 'running') return;
+              await exitWith({ kind: 'spawn', message: (error as Error).message });
+            }
+          }),
+    )
+    .catch(() => undefined);
+  return undefined;
 }

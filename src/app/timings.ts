@@ -1,4 +1,8 @@
-import { NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS } from '../feature/runs/services/index.ts';
+import {
+  NAMING_TIMEOUT_MS,
+  REGISTRY_PROJECT_TIMEOUT_MS,
+  USAGE_INTERVAL_MS,
+} from '../feature/runs/services/index.ts';
 import { KILL_GRACE_MS } from '../feature/processes/services/index.ts';
 import { DRAIN_MS, STOP_GRACE_MS } from '../feature/agents/services/index.ts';
 
@@ -25,6 +29,8 @@ export interface DaemonTimings {
   usageIntervalMs: number;
   /** The longest the naming agent may run. */
   namingTimeoutMs: number;
+  /** The longest an attempt waits for the registry to name its project. */
+  registryProjectMs: number;
   /** How often subscribers get the background processes. */
   processStreamMs: number;
   /** Pause between a SIGTERM and the extra look at background processes. */
@@ -44,6 +50,7 @@ export const DEFAULT_TIMINGS: DaemonTimings = {
   wakeMarginMs: WAKE_MARGIN_MS,
   usageIntervalMs: USAGE_INTERVAL_MS,
   namingTimeoutMs: NAMING_TIMEOUT_MS,
+  registryProjectMs: REGISTRY_PROJECT_TIMEOUT_MS,
   processStreamMs: PROCESS_STREAM_MS,
   processKillLookMs: PROCESS_KILL_LOOK_MS,
   processCacheMs: 1_000,

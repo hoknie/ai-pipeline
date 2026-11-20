@@ -55,6 +55,8 @@ export const settingsMethods = {
   webhook_remove: onShared('integration.write'),
   webhook_test: onShared('integration.write'),
   webhook_redeliver: onShared('integration.write'),
+  integration_links: onShared('integration.read'),
+  integration_link: onShared('integration.write'),
   integration_enable: onShared('integration.write'),
   integration_disable: onShared('integration.write'),
   integration_check: onShared('integration.write'),

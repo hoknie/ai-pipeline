@@ -126,3 +126,24 @@ export const WEBHOOKS_MIGRATION = `
   ALTER TABLE notification_subscriptions ADD COLUMN failure_streak INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE notification_subscriptions ADD COLUMN disabled_reason TEXT;
   `;
+
+/**
+ * The links of the projects of aip to the projects of a service registry: one row for a pair
+ * (project, connection), either a link or the reason there is none. The links of a connection go
+ * with it.
+ */
+export const SERVICE_REGISTRY_LINKS_MIGRATION = `
+  CREATE TABLE IF NOT EXISTS service_registry_links (
+    project_path TEXT NOT NULL,
+    connection_id TEXT NOT NULL REFERENCES integration_connections (id) ON DELETE CASCADE,
+    registry_path TEXT,
+    source TEXT CHECK (source IN ('auto', 'manual')),
+    status TEXT NOT NULL CHECK (status IN
+      ('linked', 'no_match', 'ambiguous', 'unreachable', 'unauthorized', 'truncated', 'disabled')),
+    candidates_json TEXT NOT NULL DEFAULT '[]',
+    matched_at INTEGER NOT NULL,
+    PRIMARY KEY (project_path, connection_id)
+  );
+  CREATE INDEX IF NOT EXISTS service_registry_links_by_connection
+    ON service_registry_links (connection_id);
+  `;

@@ -18,6 +18,7 @@ export const readingMethods: readonly Method[] = [
   'integration_types',
   'integration_list',
   'integration_skills',
+  'integration_links',
   'notify_list',
   'notify_log',
   'notify_channels',

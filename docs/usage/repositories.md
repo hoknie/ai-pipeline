@@ -37,6 +37,8 @@ Each repository of the list is a project with a few attributes of its own. They 
   - Disabling pauses its queue. Running runs go on, and you can still answer, pause, cancel and deliver them.
   - Enabling does not start the queue.
 
+A project can also be linked to its project in a [service registry](../configuration/integrations.md#linking-projects); the link follows the project when it moves.
+
 `aip repo move <project> <path>` gives a project a new path after its repository moved. Its runs, queue with its tasks, tags and observer settings follow, and the name, slug and color stay. The path may start with `~/`.
 It refuses while the project has unfinished runs, or when the new path is already in the list. No files are moved: worktrees of finished runs at the old place are left for `aip clean`.
 

@@ -7,6 +7,7 @@ import type { SubscriptionService } from '../../notifications/services/index.ts'
 import type { ObserverService } from '../../observers/services/index.ts';
 import type { QueueStore } from '../../queue/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
+import type { RegistryLinks } from '../../service-registry/services/index.ts';
 import type { RunStates } from '../../runs/services/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
 
@@ -21,6 +22,7 @@ export interface RepositoryMoveDependencies {
   observers: ObserverService;
   integrations: ConnectionService;
   notifications: SubscriptionService;
+  links: Pick<RegistryLinks, 'moveProject'>;
 }
 
 /** `repository_move`: a project, its runs, queue with its tasks, tags and observers move to another root. */
@@ -34,6 +36,7 @@ export class RepositoryMove {
   async move(reference: string, path: string): Promise<string> {
     const { database, registry, states, queues, tags, observers, integrations, notifications } =
       this.dependencies;
+    const { links } = this.dependencies;
     const from = await registry.resolve(reference);
     const to = await repositoryRoot(expandHome(path));
     if (to === from) throw rejected(`the project is already at ${to}`);
@@ -50,6 +53,8 @@ export class RepositoryMove {
       integrations.moveProject(from, to);
       // The subscriptions of the project follow it and go on receiving its events.
       notifications.moveProject(from, to);
+      // The links to the projects of the registries follow it with the connections.
+      links.moveProject(from, to);
     });
     const queue = queues.get(to);
     if (queue !== undefined) queues.save(queue);

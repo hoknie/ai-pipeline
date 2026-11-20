@@ -24,7 +24,15 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
   });
   ports.integrations.set(integrationOperations(services));
   // The channels follow the connections; the notifications follow the runs.
-  ports.integrationChanges.set(services.notifications.channels);
+  ports.integrationChanges.set({
+    connectionChanged: (id, change) => {
+      // A registry that was just enabled is matched with the projects it serves, in the background.
+      if (change === 'enabled') {
+        void services.serviceRegistry.links.autoLinkServed(id).catch(() => undefined);
+      }
+      services.notifications.channels.connectionChanged(id, change);
+    },
+  });
   ports.notify.set(services.notifications.dispatcher);
   ports.notifications.set(publications.notifications);
   ports.processes.set(publications.processes);
@@ -71,6 +79,9 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
     pin: (project, references) => services.serviceRegistry.skills.pin(project, references),
     materialize: (project, pinned, directory) =>
       services.serviceRegistry.skills.materialize(project, pinned, directory),
+  });
+  ports.registryProject.set({
+    projectFor: (project, servers) => services.serviceRegistry.links.projectFor(project, servers),
   });
   ports.queue.set(services.queue.advance);
   ports.observe.set(services.observers);

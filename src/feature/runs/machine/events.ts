@@ -1,6 +1,7 @@
 import type {
   Denial,
   PermissionsRefresh,
+  RegistryProjectRef,
   SpecialistsRefresh,
   Usage,
 } from '../../agents/types/index.ts';
@@ -87,6 +88,13 @@ export type Event =
   | { kind: 'split_proposed'; seq: number; groups: ProposedGroup[] }
   | { kind: 'attempt_exited'; group: string; seq: number; exit: AttemptExit }
   | { kind: 'attempt_usage'; updates: { group: string; seq: number; usage: Usage }[] }
+  /** The project of the service registry the run's project is linked to, found while the attempt prepares. */
+  | {
+      kind: 'registry_project_resolved';
+      group: string;
+      seq: number;
+      registryProject: RegistryProjectRef;
+    }
   | { kind: 'timed_out'; group: string; seq: number }
   | { kind: 'action_finished'; group: string; seq: number; outcome: ActionOutcome }
   | { kind: 'message'; group: string; seq: number; text: string }

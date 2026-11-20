@@ -1,6 +1,7 @@
 import { AppError, rejected } from '../../../platform/errors/index.ts';
 import {
   type PermissionsRefresh,
+  type RegistryProjectRef,
   type Usage,
   refreshPermissions,
 } from '../../agents/types/index.ts';
@@ -79,6 +80,23 @@ export function recordUsage(m: Ctx, updates: { group: string; seq: number; usage
     const attempt = group ? runningAttempt(group, update.seq) : undefined;
     if (attempt) attempt.usage = update.usage;
   }
+}
+
+/**
+ * Puts the project of the service registry into the input of an attempt that has not started yet
+ * and has none; for any other attempt the event is ignored.
+ */
+export function registryProjectResolved(
+  m: Ctx,
+  slug: string,
+  seq: number,
+  project: RegistryProjectRef,
+): void {
+  const group = findGroup(m.state, slug);
+  const attempt = group ? runningAttempt(group, seq) : undefined;
+  if (!attempt || attempt.input.registryProject !== undefined) return;
+  if (attempt.sessionId !== null || attempt.usage !== null || attempt.report !== null) return;
+  attempt.input.registryProject = { path: project.path, server: project.server };
 }
 
 export function reportAttempt(m: Ctx, slug: string, seq: number, report: Report): void {

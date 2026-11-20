@@ -4,6 +4,7 @@ import type {
   DeliveryView,
   IntegrationTypeView,
   RegistrySkillView,
+  ProjectLinkView,
   SubscriptionView,
 } from '../types.ts';
 import { call, enc, post } from '../http.ts';
@@ -29,6 +30,9 @@ export interface NewSubscription {
   events?: string[];
 }
 
+/** What is asked of the link of a project to a service registry: exactly one of the three. */
+export type LinkAction = { path: string } | { auto: true } | { clear: true };
+
 /** Connections, subscriptions and the journal. No secret travels through any of these calls. */
 export interface IntegrationsApi {
   integrations(): Promise<IntegrationsOverview>;
@@ -37,6 +41,10 @@ export interface IntegrationsApi {
     id: string,
     change: { set?: Record<string, string>; unset?: string[] },
   ): Promise<ConnectionView>;
+  /** The links of a project of a service registry (every project without a repository). */
+  integrationLinks(repository?: string): Promise<ProjectLinkView[]>;
+  /** Links a project to a registry project, matches it again or clears the link. */
+  integrationLink(id: string, repository: string, action: LinkAction): Promise<ProjectLinkView>;
   subscriptionAdd(subscription: NewSubscription): Promise<SubscriptionView>;
   subscriptionEvents(id: string, events: string[]): Promise<SubscriptionView>;
   subscriptionEnabled(id: string, enabled: boolean): Promise<SubscriptionView>;
@@ -55,6 +63,12 @@ export function integrationsApi(
       call(scoped(`/api/integrations/skills${query ? `?query=${enc(query)}` : ''}`)),
     integrations: () => call('/api/integrations'),
     integrationEdit: (id, change) => post('/api/integrations/edit', { id, ...change }),
+    integrationLinks: (repository) =>
+      call(
+        `/api/integrations/links${repository === undefined ? '' : `?repository=${encodeURIComponent(repository)}`}`,
+      ),
+    integrationLink: (id, repository, action) =>
+      post('/api/integrations/link', { id, repository, ...action }),
     subscriptionAdd: (subscription) =>
       post('/api/notifications', {
         connection: subscription.connection,
