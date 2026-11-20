@@ -11,6 +11,7 @@ import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/in
 import { useTags } from '../../shared/lib/catalog/tags.tsx';
 import type { QueueFields, PipelinesView } from '../../shared/api/types.ts';
 import { continueDraft, draftValid, fieldsOf, type QueueDraft } from './draft.ts';
+import { DuplicateNotice, useDuplicateRefusal } from './duplicate.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { withCurrent } from './form/LinkFields.tsx';
 import { SideFields } from './form/properties/SideFields.tsx';
@@ -84,6 +85,7 @@ function useSubmit(
   const [busy, setBusy] = useState(false);
   const [focusTick, setFocusTick] = useState(0);
   const catalog = useTags();
+  const duplicate = useDuplicateRefusal(effective);
   // after "add and continue" the cleared form takes the focus once it is drawn
   useEffect(() => {
     if (focusTick === 0) return;
@@ -95,12 +97,13 @@ function useSubmit(
     document.getElementById(`${idPrefix}-${field}`)?.focus();
     // only a new tick moves the focus
   }, [focusTick]);
-  const send = async (keep: boolean) => {
+  const send = async (keep: boolean, allowDuplicate = false) => {
     if (!draftValid(effective) || busy) return;
     setBusy(true);
     setError(null);
+    duplicate.clear();
     try {
-      const fields = fieldsOf(
+      const draftFields = fieldsOf(
         effective,
         (id) => {
           const tag = catalog.byId.get(id);
@@ -109,6 +112,7 @@ function useSubmit(
         idPrefix !== 'new',
         returned,
       );
+      const fields = allowDuplicate ? { ...draftFields, allowDuplicate: true } : draftFields;
       if (keep && onSubmitAndContinue) {
         await onSubmitAndContinue(fields);
         onDraft(continueDraft(effective));
@@ -117,7 +121,8 @@ function useSubmit(
         await onSubmit(fields);
       }
     } catch (failure) {
-      setError((failure as Error).message);
+      // a copy of a waiting task has its own notice, with the way to add it all the same
+      if (!duplicate.take(failure, keep)) setError((failure as Error).message);
     } finally {
       setBusy(false);
     }
@@ -127,6 +132,8 @@ function useSubmit(
     submitAndContinue: onSubmitAndContinue ? () => send(true) : undefined,
     busy,
     error,
+    duplicate: duplicate.refusal,
+    addAnyway: () => send(duplicate.refusal?.keep ?? false, true),
     // the daemon refuses an unknown or disabled provider by name: the field shows it
     providerError: error && /provider/i.test(error) ? error : undefined,
   };
@@ -173,6 +180,22 @@ interface QueueFormProps {
   fill?: boolean;
   /** The action row sticks to the bottom of the scrolling parent (the dialog). */
   stickyActions?: boolean;
+}
+
+/** Why the last submit failed: the refusal of the daemon, or the notice of a copy with its action. */
+function SubmitFailure({ sent }: { sent: ReturnType<typeof useSubmit> }) {
+  return (
+    <>
+      {sent.error && !sent.providerError ? <Alert variant="destructive">{sent.error}</Alert> : null}
+      {sent.duplicate ? (
+        <DuplicateNotice
+          refusal={sent.duplicate}
+          busy={sent.busy}
+          onAddAnyway={() => void sent.addAnyway()}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function SubmitButtons({
@@ -273,7 +296,7 @@ export function QueueForm({
           repositories={providerRepositories ?? (repository ? [repository] : [])}
         />
       </div>
-      {sent.error && !sent.providerError ? <Alert variant="destructive">{sent.error}</Alert> : null}
+      <SubmitFailure sent={sent} />
       <SubmitButtons
         {...{ valid, blocked, blockedHint, sent, submitLabel, onCancel }}
         sticky={stickyActions}

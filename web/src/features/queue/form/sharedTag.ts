@@ -70,6 +70,7 @@ export function projectsFields(
     ...(typeof fields.provider === 'string' ? { provider: fields.provider } : {}),
     ...(fields.title !== undefined ? { title: fields.title } : {}),
     ...(fields.postponed ? { postponed: true } : {}),
+    ...(fields.allowDuplicate ? { allowDuplicate: true } : {}),
     ...(fields.autoDeliver !== undefined ? { autoDeliver: fields.autoDeliver } : {}),
     ...(fields.deliveryMode !== undefined ? { deliveryMode: fields.deliveryMode } : {}),
     ...(fields.skip !== undefined && fields.skip.length > 0 ? { skip: fields.skip } : {}),
