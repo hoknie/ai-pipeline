@@ -166,7 +166,7 @@ export function formatQueue(
       item.provider === null
         ? ''
         : ` · provider: ${providerText(item.provider, item.providerName)}`;
-    const by = item.author === null ? '' : ` · by ${item.author.email}`;
+    const by = item.author ? ` · by ${item.author.email}` : '';
     const skipped = item.skip.length === 0 ? '' : ` · skip: ${item.skip.join(', ')}`;
     const mark =
       item.readiness === 'ready'

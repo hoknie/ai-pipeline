@@ -32,6 +32,18 @@ describe('the author in the text of the CLI', () => {
     expect(formatRun(view, 2000)).not.toContain('Author:');
   });
 
+  it('prints the queue of a daemon of an older build, which sends no author at all', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
+    const view = queueView(queue, () => undefined);
+    delete (view.items[0] as { author?: unknown }).author;
+    const line = formatQueue(view)
+      .split('\n')
+      .find((text) => text.includes('q1'));
+    expect(line).toBeDefined();
+    expect(line).not.toContain(' by ');
+  });
+
   it('keeps the author in the JSON of a run as the API has it', () => {
     const view = { ...runView(run(1), 2000), author: ALICE };
     expect(JSON.parse(JSON.stringify(view)).author).toEqual(ALICE);
