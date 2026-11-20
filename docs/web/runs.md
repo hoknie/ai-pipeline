@@ -16,6 +16,7 @@ Addresses can be shared: `#runs/<run-id>` opens a run, `#runs/<run-id>/<group>` 
 
 ## A run
 
+- On a [server](../configuration/delivery.md#server-mode) a sent run shows its remote branch in the delivery part of the statuses, as a link when the host is GitHub, GitLab or Bitbucket. When the push failed, the badge reads "Push failed" with the git reason in the tooltip, and "Deliver" becomes "Retry push".
 - The first row of the header summary, "Status", holds the state of the run, its delivery and the status of the open group or step.
 - The title is edited in place: Enter or leaving the field saves, Escape cancels.
 - The action row has "Deliver", "Return to the queue" and "Steps".

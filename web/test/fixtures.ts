@@ -173,6 +173,8 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     dirtyWarning: false,
     autoDeliver: false,
     deliveryMode: 'worktree',
+    remoteBranch: null,
+    baseCommit: 'abc',
     fromQueue: false,
     returnable: false,
     queueItem: null,

@@ -14,6 +14,10 @@ export function markServerMode(): void {
   serverMode = true;
 }
 
+export function isServerMode(): boolean {
+  return serverMode;
+}
+
 /** Called with the status of every answer; sends the browser to the login page on a 401. */
 export function handleUnauthorized(status: number): void {
   if (status === 401 && serverMode && typeof window !== 'undefined') {

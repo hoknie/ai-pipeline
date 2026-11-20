@@ -2,6 +2,7 @@ import { RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { DeliveryMode } from '../../../../../src/feature/swarm-config/types/index.ts';
+import { isServerMode } from '../../../shared/api/http.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import {
@@ -77,6 +78,10 @@ function AutoDeliver({ state, fallback }: { state: FormState; fallback: boolean 
 function ModeSelect({ state, fallback }: { state: FormState; fallback: DeliveryMode | null }) {
   const { t } = useTranslation();
   const { idPrefix, effective, change } = state;
+  // On the server only the mode `branch` exists: the others are refused there.
+  const server = isServerMode();
+  const modes = server ? DELIVERY_MODES.filter((mode) => mode === 'branch') : DELIVERY_MODES;
+  const value = server ? 'branch' : (effective.deliveryMode ?? fallback ?? 'worktree');
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -94,14 +99,14 @@ function ModeSelect({ state, fallback }: { state: FormState; fallback: DeliveryM
         ) : null}
       </div>
       <Select
-        value={effective.deliveryMode ?? fallback ?? 'worktree'}
+        value={value}
         onValueChange={(deliveryMode) => change({ deliveryMode: deliveryMode as DeliveryMode })}
       >
         <SelectTrigger id={`${idPrefix}-delivery-mode`} className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {DELIVERY_MODES.map((mode) => (
+          {modes.map((mode) => (
             <SelectItem key={mode} value={mode}>
               {t(`deliveryMode.${mode}`)}
             </SelectItem>

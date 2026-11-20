@@ -6,7 +6,7 @@ import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
 import { checkSkip } from '../../runs/types/index.ts';
-import type { ConfigService } from '../../swarm-config/services/index.ts';
+import { requireDeliveryMode, type ConfigService } from '../../swarm-config/services/index.ts';
 import {
   DEFAULT_VARIANT,
   checkVariant,
@@ -76,6 +76,7 @@ export class QueueItems {
     const { store, advance, registry, tags, links, runs, now } = this.dependencies;
     const repository = await registry.rootOf(params.repository);
     registry.requireEnabled(repository);
+    requireDeliveryMode(this.dependencies.config, params.deliveryMode);
     const queue = store.of(repository);
     const moment = now();
     await this.ensureItem(

@@ -152,6 +152,8 @@ export const runsRequests = [
     params: z.object({
       runId: z.string().min(1),
       groups: z.array(z.string().min(1)).optional(),
+      /** The result was applied by `aip run apply` on the machine of the caller in this mode; the journal says so. */
+      mode: z.enum(['worktree', 'commit']).optional(),
     }),
   }),
   z.object({

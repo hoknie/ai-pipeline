@@ -32,6 +32,8 @@ export const DELIVERY_MODES = ['worktree', 'commit', 'branch'] as const;
 
 export type DeliveryMode = (typeof DELIVERY_MODES)[number];
 
+export const DEFAULT_REMOTE = 'origin';
+
 export const DEFAULT_COMMIT_MESSAGE = '{title}\n\n{groups}';
 
 export const DEFAULT_MAX = 3;
@@ -65,6 +67,12 @@ export interface DeliverySettings {
   messageSpecialist: string | null;
   resolver: string | null;
   resolverRounds: number;
+  /** Send the branch `aip/<run>` of a delivery to `remote`. */
+  push: boolean;
+  /** The remote repository of a delivery. */
+  remote: string;
+  /** The main branch of `remote` a run starts from in the server mode; `undefined`: its `HEAD`. */
+  baseBranch?: string;
   /** Text appended to the task of the commit message author. */
   messagePrompt?: string;
   /** Text appended to the task of the resolver. */
@@ -149,7 +157,14 @@ export function defaultDelivery(): DeliverySettings {
     messageSpecialist: null,
     resolver: null,
     resolverRounds: 1,
+    push: false,
+    remote: DEFAULT_REMOTE,
   };
+}
+
+/** The delivery defaults of the server mode: only a branch, sent to the remote. */
+export function serverDelivery(): DeliverySettings {
+  return { ...defaultDelivery(), mode: 'branch', push: true };
 }
 
 function normalizedSplit(split: Split | null | undefined): Split | null {

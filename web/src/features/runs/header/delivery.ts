@@ -5,13 +5,18 @@ export function canDeliver(run: RunView): boolean {
   return run.delivery.merged > run.delivery.applied && !run.delivery.inProgress;
 }
 
+/** The branch of the delivery did not reach the remote repository: `apply` sends it again. */
+export function pushFailed(run: RunView): boolean {
+  return run.deliveryStage?.status === 'push_failed';
+}
+
 /** Whether the automatic delivery of the run is on and can still be cancelled. */
 export function autoDeliveryCancellable(run: RunView): boolean {
   return run.autoDeliver && !run.finished;
 }
 
 export type DeliveryBadge = {
-  status: 'running' | 'apply_failed' | 'pending' | 'applied';
+  status: 'running' | 'apply_failed' | 'push_failed' | 'pending' | 'applied';
   /** Which dictionary label to use; `null` takes the label of the status. */
   label: 'delivering' | 'deliveryFailed' | 'delivery' | 'deliveredManually' | null;
   /** Why the delivery failed. */
@@ -30,6 +35,9 @@ export function deliveryBadge(run: RunView): DeliveryBadge | null {
         run.deliveryStage?.status === 'apply_failed' ? (run.deliveryStage.reason ?? null) : null,
     };
   }
+  if (run.deliveryStage?.status === 'push_failed') {
+    return { status: 'push_failed', label: null, reason: run.deliveryStage.reason };
+  }
   if (delivery.merged > delivery.applied) {
     return { status: 'pending', label: 'delivery', reason: null };
   }
@@ -41,7 +49,7 @@ export function deliveryBadge(run: RunView): DeliveryBadge | null {
 }
 
 export interface UndeliveredMark {
-  status: 'apply_failed' | 'undelivered';
+  status: 'apply_failed' | 'push_failed' | 'undelivered';
   /** Why the delivery failed; `null` for `undelivered`. */
   reason: string | null;
   /** Merged groups already delivered. */
@@ -62,6 +70,10 @@ export function undeliveredMark(run: RunView): UndeliveredMark | null {
       run.deliveryStage?.status === 'apply_failed' ? (run.deliveryStage.reason ?? null) : null;
     return { status: 'apply_failed', reason, ...counts };
   }
+  if (pushFailed(run)) {
+    const reason = run.deliveryStage?.status === 'push_failed' ? run.deliveryStage.reason : null;
+    return { status: 'push_failed', reason, ...counts };
+  }
   if (!STOPPED.has(run.state)) return null;
   const waiting = run.groups.some(
     (group) => group.status === 'merged' && group.delivery === 'pending' && group.diff?.files !== 0,
@@ -76,7 +88,9 @@ export type ApplyOutcome =
 /** The outcome of a delivery from the answer of `apply`; `pending` while it still goes on. */
 export function applyOutcome(result: ApplyResult): ApplyOutcome {
   if (result.pending) return { kind: 'pending' };
-  const failed = result.groups.find((group) => group.delivery.state === 'apply_failed');
+  const failed = result.groups.find((group) =>
+    ['apply_failed', 'push_failed'].includes(group.delivery.state),
+  );
   if (failed) return { kind: 'failed', reason: failed.delivery.reason };
   if (result.groups.some((group) => group.delivery.state === 'applied')) {
     return { kind: 'applied' };
@@ -101,7 +115,7 @@ export function settledOutcome(run: RunView, watch: DeliveryWatch): SettledOutco
   if (run.delivery.inProgress) return null;
   if (run.delivery.finishedAt === watch.since) return watch.busy ? { kind: 'cancelled' } : null;
   if (run.deliveryStage?.status === 'applied') return { kind: 'applied' };
-  if (run.deliveryStage?.status === 'apply_failed') {
+  if (run.deliveryStage?.status === 'apply_failed' || run.deliveryStage?.status === 'push_failed') {
     return { kind: 'failed', reason: run.deliveryStage.reason ?? null };
   }
   return { kind: 'cancelled' };

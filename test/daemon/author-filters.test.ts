@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { addOrigin } from '../fixtures/origin.ts';
 import { IpcError, request } from '../../src/presentation/ipc/client/index.ts';
 import type {
   Method,
@@ -25,6 +26,7 @@ afterEach(async () => {
 async function start(server = true) {
   current = await harness();
   if (server) {
+    addOrigin(current.repo);
     const directory = join(String(current.environment.XDG_CONFIG_HOME), 'aip');
     mkdirSync(directory, { recursive: true });
     writeFileSync(

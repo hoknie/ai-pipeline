@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { addOrigin } from '../fixtures/origin.ts';
 import { IpcError, request } from '../../src/presentation/ipc/client/index.ts';
 import type {
   AccessActionsView,
@@ -34,6 +35,7 @@ const SERVER = (role = '') =>
 
 async function start(options: { role?: string; access?: string; local?: boolean } = {}) {
   current = await harness();
+  addOrigin(current.repo);
   const directory = join(String(current.environment.XDG_CONFIG_HOME), 'aip');
   mkdirSync(directory, { recursive: true });
   if (options.local !== true) {
@@ -323,6 +325,7 @@ rules:
     });
     const other = join(dirname(h.repo), 'other');
     copyTemplateRepo(other, CODE_ONLY_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    addOrigin(other);
     await as(h, undefined, 'repository_add', { path: h.repo });
     await as(h, undefined, 'repository_add', { path: other, slug: 'other' });
     const bob = await user(h, 'bob@corp.com', {});
@@ -360,7 +363,8 @@ rules:
     });
     const other = join(dirname(h.repo), 'other');
     copyTemplateRepo(other, CODE_ONLY_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
-    execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/acme/app.git'], {
+    addOrigin(other);
+    execFileSync('git', ['remote', 'set-url', 'origin', 'https://github.com/acme/app.git'], {
       cwd: h.repo,
     });
     await as(h, undefined, 'repository_add', { path: h.repo });
@@ -407,6 +411,7 @@ rules:
     const bob = await user(h, 'bob@corp.com', {});
     const other = join(dirname(h.repo), 'other');
     copyTemplateRepo(other, CODE_ONLY_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    addOrigin(other);
     await as(h, undefined, 'repository_add', { path: h.repo });
     await as(h, undefined, 'repository_add', { path: other, slug: 'other' });
     const created = await startRun(h, {

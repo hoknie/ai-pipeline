@@ -22,6 +22,16 @@ import {
 } from './constants.ts';
 import { type Group, actionOf, actionPointOf, isRepairGroup } from './group.ts';
 
+/** The branch of a delivery sent to a remote repository. */
+export interface RemoteBranch {
+  remote: string;
+  branch: string;
+  /** The page of the branch at a known host (GitHub, GitLab, Bitbucket); `null` at another one. */
+  url: string | null;
+  /** The address of the remote repository without scheme, user and `.git` (`host/owner/name`); a local path as it is. */
+  address: string;
+}
+
 /** A file attached to the task of a run; the bytes live in the attachment storage. */
 export interface RunAttachment {
   id: string;
@@ -51,6 +61,8 @@ export interface Run {
   dirtyWarning: boolean;
   nextMergeSeq: number;
   pendingDelivery: PendingDelivery | null;
+  /** The branch `aip/<run>` in the remote repository once it is sent there; `null` before. */
+  remoteBranch: RemoteBranch | null;
   /** Short title in the language of the task; null until known. */
   title: string | null;
   /** English kebab-case name, like the name of an OpenSpec change. */

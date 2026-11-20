@@ -52,4 +52,6 @@ export const LATER_MIGRATIONS: string[] = [
   SAML_MIGRATION,
   AUTHORSHIP_MIGRATION,
   STATS_AUTHOR_MIGRATION,
+  // the branch of a run in the remote repository once it is sent there (JSON); old rows have none
+  `ALTER TABLE runs ADD COLUMN remote_branch_json TEXT`,
 ];

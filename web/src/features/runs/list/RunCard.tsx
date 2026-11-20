@@ -43,7 +43,7 @@ function UndeliveredBadge({ run }: { run: RunView }) {
           : undefined
       }
       tip={
-        mark.status === 'apply_failed'
+        mark.status !== 'undelivered'
           ? (mark.reason ?? undefined)
           : t('runs.list.undeliveredTip', { applied: mark.delivered, merged: mark.merged })
       }

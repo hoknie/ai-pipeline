@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { addOrigin } from '../fixtures/origin.ts';
 import { StatsRecordRepository } from '../../src/feature/stats/repositories/index.ts';
 import { request } from '../../src/presentation/ipc/client/index.ts';
 import type {
@@ -38,6 +39,7 @@ function freePort(): Promise<number> {
 async function serverMode(box: Sandbox) {
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
+  addOrigin(box.repo);
   const directory = join(String(box.env.XDG_CONFIG_HOME), 'aip');
   mkdirSync(directory, { recursive: true });
   writeFileSync(

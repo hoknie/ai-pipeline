@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { addOrigin } from '../fixtures/origin.ts';
 import { IpcError, request } from '../../src/presentation/ipc/client/index.ts';
 import type {
   AuditView,
@@ -26,6 +27,7 @@ const SERVER =
 async function start(serverMode: boolean, extra = ''): Promise<Harness> {
   current = await harness();
   if (serverMode) {
+    addOrigin(current.repo);
     const directory = join(String(current.environment.XDG_CONFIG_HOME), 'aip');
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, 'settings.yaml'), SERVER + extra);

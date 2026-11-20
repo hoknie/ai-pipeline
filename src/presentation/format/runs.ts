@@ -123,6 +123,10 @@ export function formatRun(
   }
   const delivery = deliveryText(run);
   if (delivery) header.push(`${style.muted('Delivery:')} ${delivery}`);
+  if (run.remoteBranch) {
+    const { remote, branch, url } = run.remoteBranch;
+    header.push(`${style.muted('Remote branch:')} ${remote}/${branch}${url ? ` (${url})` : ''}`);
+  }
   if (run.diff) header.push(`${style.muted('Changes:')} ${formatDiff(run.diff, style)}`);
   if (run.resolver) {
     const { status, round, rounds, conflicts, reason } = run.resolver;
@@ -259,7 +263,7 @@ function systemLine(run: RunView, style: Style): string | null {
   const stage = run.deliveryStage;
   if (stage) {
     const detail =
-      stage.status === 'apply_failed' && stage.reason
+      (stage.status === 'apply_failed' || stage.status === 'push_failed') && stage.reason
         ? style.danger(stage.reason.split('\n')[0] ?? '')
         : '';
     parts.push(`delivery ${statusBadge(stage.status, style)}${detail ? ` (${detail})` : ''}`);

@@ -11,3 +11,4 @@ export * from './authorship.ts';
 export * from './changes.ts';
 export * from './workspace.ts';
 export * from './delivery.ts';
+export * from './remote.ts';

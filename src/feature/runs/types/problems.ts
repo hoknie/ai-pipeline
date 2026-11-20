@@ -1,5 +1,10 @@
-import { isRepairGroup } from './group.ts';
+import { type Group, isRepairGroup } from './group.ts';
 import { type RunState, actionClosed, allGroups, isRunFinished, stoppedActions } from './run.ts';
+
+/** The delivery of a merged group failed: git refused it, or its branch did not reach the remote. */
+function deliveryFailed(group: Group): boolean {
+  return group.delivery.state === 'apply_failed' || group.delivery.state === 'push_failed';
+}
 
 export type RunPhase = 'needs_human' | 'active' | 'finished' | 'cancelled' | 'failed';
 
@@ -22,16 +27,20 @@ export function runPhase(state: RunState): RunPhase {
   const failed =
     state.split?.status === 'failed' ||
     state.groups.some(
-      (group) =>
-        group.status === 'failed' ||
-        (group.status === 'merged' && group.delivery.state === 'apply_failed'),
+      (group) => group.status === 'failed' || (group.status === 'merged' && deliveryFailed(group)),
     ) ||
     stoppedActions(state, 'failed').length > 0;
   return failed ? 'failed' : 'finished';
 }
 
 export type ProblemReason =
-  'needs_human' | 'failed' | 'conflict' | 'cancelled' | 'apply_failed' | 'usage_limit';
+  | 'needs_human'
+  | 'failed'
+  | 'conflict'
+  | 'cancelled'
+  | 'apply_failed'
+  | 'push_failed'
+  | 'usage_limit';
 
 export interface Problem {
   key: string;
@@ -72,12 +81,13 @@ export function runProblems(state: RunState): Problem[] {
         reason,
       });
     }
-    if (group.status === 'merged' && group.delivery.state === 'apply_failed') {
+    if (group.status === 'merged' && deliveryFailed(group)) {
+      const reason = group.delivery.state === 'push_failed' ? 'push_failed' : 'apply_failed';
       problems.push({
-        key: `${id}/${group.slug}/apply_failed/${attempts}`,
+        key: `${id}/${group.slug}/${reason}/${attempts}`,
         run: id,
         group: group.slug,
-        reason: 'apply_failed',
+        reason,
       });
     }
   }

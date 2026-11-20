@@ -48,6 +48,8 @@ export interface RunBase {
   include: string[];
   /** Ref that keeps the snapshot commit, when one is made. */
   snapshotRef: string | null;
+  /** Start from this commit (the tip of a remote branch) instead of `HEAD`; nothing of the working tree joins. */
+  commit?: string | undefined;
 }
 
 const HEAD_BASE: RunBase = { workingTree: false, include: [], snapshotRef: null };
@@ -57,18 +59,17 @@ export async function prepareRunBranch(
   branch: string,
   base: RunBase = HEAD_BASE,
 ): Promise<PreparedRun> {
-  const head = await git(repository, 'rev-parse', '--verify', 'HEAD^{commit}');
+  const head = base.commit ?? (await git(repository, 'rev-parse', '--verify', 'HEAD^{commit}'));
   const dirty = (await git(repository, 'status', '--porcelain')) !== '';
   const baseCommit =
     base.workingTree || base.include.length > 0
       ? await snapshotCommit(repository, base.workingTree, base.include)
       : head;
-  if (baseCommit !== head && base.snapshotRef !== null) {
+  if (baseCommit !== head && base.snapshotRef !== null)
     await git(repository, 'update-ref', base.snapshotRef, baseCommit);
-  }
   if (isRef(branch)) await git(repository, 'update-ref', branch, baseCommit);
   else await git(repository, 'branch', branch, baseCommit);
-  return { baseCommit, dirty: dirty && !base.workingTree };
+  return { baseCommit, dirty: dirty && !base.workingTree && base.commit === undefined };
 }
 
 /** Paths of `include` that exist in the directory, relative to it. */

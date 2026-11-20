@@ -36,6 +36,7 @@ import {
   DEFAULT_MAX,
   DEFAULT_WORKSPACE_DIR,
   defaultDelivery,
+  serverDelivery,
   defaultNaming,
   defaultNetwork,
   defaultRuntimes,
@@ -218,10 +219,12 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     checkWorkspace(ctx, swarm.workspace, config.workspace, config.workspaceDir);
   if ('naming' in swarm) checkNaming(ctx, swarm.naming, config.naming);
   if ('web' in swarm) checkWeb(ctx, swarm.web, config.web);
+  let serverMode = false;
   if ('server' in swarm || config.web.auth === 'none') {
     const server = defaultServer();
     if ('server' in swarm) checkServer(ctx, swarm.server, server);
     checkServerWeb(ctx, server, config.web);
+    serverMode = server.enabled;
   }
   if ('runtimes' in swarm) checkRuntimes(ctx, swarm.runtimes, config.runtimes);
   if ('network' in swarm) checkNetwork(ctx, swarm.network, defaultNetwork());
@@ -242,9 +245,10 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
   if ('claude' in swarm) checkClaude(ctx, swarm.claude, config.claude);
   if ('opencode' in swarm) checkOpencode(ctx, swarm.opencode, config.opencode);
   if ('agy' in swarm) checkAgy(ctx, swarm.agy, config.agy);
+  if (serverMode) config.delivery = serverDelivery();
   if ('delivery' in swarm) {
     const known = isMapping(swarm.specialists) ? Object.keys(swarm.specialists) : [];
-    checkDelivery(ctx, swarm.delivery, config.delivery, known);
+    checkDelivery(ctx, swarm.delivery, config.delivery, known, serverMode);
   }
   if ('defaults' in swarm) checkDefaults(ctx, swarm.defaults, config.defaults);
   if ('mcp_servers' in swarm) config.mcpServers = checkMcpCatalog(ctx, swarm.mcp_servers);

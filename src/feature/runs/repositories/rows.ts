@@ -52,6 +52,7 @@ export function hydrateRun(database: Database, row: Row): RunState {
       dirtyWarning: Number(row.dirty_warning) === 1,
       nextMergeSeq: Number(row.next_merge_seq),
       pendingDelivery: nullable(row.pending_delivery_json ?? null),
+      remoteBranch: nullable(row.remote_branch_json ?? null),
       title: row.title === null || row.title === undefined ? null : String(row.title),
       name: row.name === null || row.name === undefined ? null : String(row.name),
       namingUsage: nullable(row.naming_usage_json ?? null),

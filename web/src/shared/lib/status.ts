@@ -57,6 +57,7 @@ export const STATUS: Record<string, StatusEntry> = {
   needs_human: { labelKey: 'needs_human', tone: 'warn', icon: MessageCircleQuestion, spin: false },
   conflict: { labelKey: 'conflict', tone: 'warn', icon: AlertTriangle, spin: false },
   apply_failed: { labelKey: 'apply_failed', tone: 'warn', icon: PackageX, spin: false },
+  push_failed: { labelKey: 'push_failed', tone: 'warn', icon: PackageX, spin: false },
   undelivered: { labelKey: 'undelivered', tone: 'warn', icon: PackageOpen, spin: false },
   rejected: { labelKey: 'rejected', tone: 'warn', icon: AlertTriangle, spin: false },
   failed: { labelKey: 'failed', tone: 'err', icon: XCircle, spin: false },

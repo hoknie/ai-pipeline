@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { addOrigin } from '../fixtures/origin.ts';
 import { request } from '../../src/presentation/ipc/client/index.ts';
 import { remoteRequest } from '../../src/presentation/ipc/client/remote.ts';
 import { startWebServer, type WebServer } from '../../src/presentation/web/index.ts';
@@ -56,6 +57,7 @@ async function start(extra = ''): Promise<Harness> {
       log: (message) => logs.push(message),
     },
   );
+  addOrigin(current.repo);
   const directory = join(String(current.environment.XDG_CONFIG_HOME), 'aip');
   mkdirSync(directory, { recursive: true });
   writeFileSync(

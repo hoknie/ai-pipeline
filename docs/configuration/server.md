@@ -79,7 +79,7 @@ In server mode the shared panel token and `AIP_WEB_TOKEN` do not work: a page wi
 - A task belongs to the person who added it, and its run to the same person. A task a specialist adds takes the author of its run.
 - Restarting, pausing or returning a run, and editing a task (also by someone else), leave the author as it is. Tasks added by the system, and everything from before server mode, have no author.
 - The panel, `aip queue`, `aip status` and `aip run show` show the author. `--json` and the API carry `author` as `{ id, email, name, disabled }`.
-- With `delivery.mode: commit` or `branch` the delivery commit is by the author of the run: `Author` is their name and email, `Committer` stays the git identity of the daemon's OS user. With `branch` the result is one commit on the base of the run.
+- The delivery commit of the branch `aip/<run-id>` is by the author of the run: `Author` is their name and email, `Committer` stays the git identity of the daemon's OS user. The result is one commit on the base of the run. A commit made by `aip run apply --mode commit` on a developer's machine has that developer's git identity.
 - A run without an author gets the git identity of the daemon for both. A local daemon changes nothing in its commits.
 - With `commit_trailer` the message ends with `Co-Authored-By: <value>` after an empty line, once.
 
@@ -118,5 +118,5 @@ A path on your machine is matched to a server project by the `git remote` of tha
 ## Limits
 
 - What a user may do is decided by the role and the rules of `access.yaml`: see [access.md](access.md). Without a role and without `default_role` a user can do nothing but manage their own tokens; the administrators have `role: admin`.
-- A user delivers a result only with `delivery.mode: branch`; with `worktree` or `commit` the server answers `access.denied`, because the working tree on the server is shared.
+- Delivery on the server is only a branch: `delivery.mode: worktree` or `commit` is a settings error there, see [delivery](delivery.md#server-mode).
 - `shutdown` and the daemon and panel controls are not available over the network without the `daemon.control` right.

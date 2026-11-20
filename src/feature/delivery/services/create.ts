@@ -10,6 +10,7 @@ import { CommitStamper } from './commit-stamp.ts';
 import { DeliverService } from './deliver.ts';
 import { DiffService } from './diffs.ts';
 import { PatchService } from './patches.ts';
+import { PushService } from './push.ts';
 
 export interface DeliveryServices {
   diffs: DiffService;
@@ -17,6 +18,8 @@ export interface DeliveryServices {
   deliver: DeliverService;
   /** Stamps the commits of the deliveries of the runs; set on the runs as their port. */
   commits: CommitStamper;
+  /** Sends the branch of a delivery to the remote repository; set on the runs as their port. */
+  push: PushService;
 }
 
 export function createDeliveryServices(dependencies: {
@@ -40,7 +43,8 @@ export function createDeliveryServices(dependencies: {
       now,
       stopping: () => runs.engine.stopping,
     }),
-    deliver: new DeliverService({ states: runs.states, engine: runs.engine }),
+    deliver: new DeliverService({ states: runs.states, engine: runs.engine, config }),
     commits: new CommitStamper({ config, authors }),
+    push: new PushService(),
   };
 }

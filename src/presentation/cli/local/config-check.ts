@@ -10,6 +10,7 @@ import {
   configPathsFromEnvironment,
   loadAccessPolicy,
   loadConfigSources,
+  loadServerSettings,
 } from '../../../feature/swarm-config/services/index.ts';
 import { actionNames, similarActions } from '../../../feature/access/types/index.ts';
 import { repositoryRoot } from '../../../platform/git/index.ts';
@@ -47,6 +48,9 @@ function presentDelivery(config: Config): unknown {
     mode: config.delivery.mode,
     auto: config.delivery.auto,
     keep: config.delivery.keep,
+    push: config.delivery.push,
+    remote: config.delivery.remote,
+    ...(config.delivery.baseBranch ? { base_branch: config.delivery.baseBranch } : {}),
     commit_message: config.delivery.commitMessage,
     ...(config.delivery.messageSpecialist
       ? { message_specialist: config.delivery.messageSpecialist }
@@ -199,7 +203,7 @@ export function presentConfig(
   };
 }
 
-export function configWarnings(config: ResolvedConfig): string[] {
+export function configWarnings(config: ResolvedConfig, serverMode = false): string[] {
   const warnings = config.specialists
     .filter((specialist) => specialist.permissions === 'full')
     .map(
@@ -219,6 +223,11 @@ export function configWarnings(config: ResolvedConfig): string[] {
       'claude.edit_mode: auto lets the Claude Code classifier decide on commands outside allow_commands; it does not keep them inside the worktree',
     );
   }
+  if (serverMode && config.workspace.base !== 'working_tree') {
+    warnings.push(
+      'workspace.base is ignored in the server mode: a run starts from the remote main branch (delivery.remote, delivery.base_branch)',
+    );
+  }
   return warnings;
 }
 
@@ -230,11 +239,13 @@ export async function checkConfig(
   let config: ResolvedConfig;
   let files: string[];
   let legacy: string[] = [];
+  let serverMode = false;
   try {
     const repository = await repositoryRoot(directory);
     const paths = configPathsFromEnvironment(repository, environment);
     ({ config, files, legacy = [] } = loadConfigSources(paths));
     // the access policies of the server mode: a file with a mistake is a failed check
+    serverMode = loadServerSettings(paths).enabled;
     loadAccessPolicy(paths, { names: actionNames(), similar: (name) => similarActions(name) });
   } catch (error) {
     io.stderr(`${error instanceof ConfigLoadError ? error.message : (error as Error).message}\n`);
@@ -282,7 +293,7 @@ export async function checkConfig(
       `Warning: runtime \`${name}\` is disabled and specialists on it fail; set runtimes.${name}.enabled: true in the shared settings.yaml\n`,
     );
   }
-  for (const warning of [...configWarnings(config), ...providerWarnings(config)]) {
+  for (const warning of [...configWarnings(config, serverMode), ...providerWarnings(config)]) {
     io.stdout(`Warning: ${warning}\n`);
   }
   return 0;

@@ -1317,3 +1317,28 @@ describe('the provider in text', () => {
     expect(text).not.toContain('instead of');
   });
 });
+
+describe('the remote branch of a run', () => {
+  it('is a line of `aip run show` with the page of the branch when the host is known', () => {
+    const state = run(1);
+    expect(formatRun(runView(state, 1000), 1000)).not.toContain('Remote branch:');
+    state.run.remoteBranch = {
+      remote: 'origin',
+      branch: 'aip/run000000001',
+      url: 'https://github.com/acme/app/tree/aip/run000000001',
+      address: 'github.com/acme/app',
+    };
+    expect(formatRun(runView(state, 1000), 1000)).toContain(
+      'Remote branch: origin/aip/run000000001 (https://github.com/acme/app/tree/aip/run000000001)',
+    );
+    state.run.remoteBranch = {
+      remote: 'origin',
+      branch: 'aip/run000000001',
+      url: null,
+      address: '/srv/app.git',
+    };
+    expect(formatRun(runView(state, 1000), 1000)).toContain(
+      'Remote branch: origin/aip/run000000001\n',
+    );
+  });
+});

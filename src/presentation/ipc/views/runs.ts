@@ -92,15 +92,17 @@ export function deliveryStage(state: RunState): DeliveryStage | null {
   const counts = deliveryCounts(state);
   if (state.run.pendingDelivery !== null) return { status: 'delivering' };
   if (counts.merged === 0) return null;
-  const failed = state.groups.filter(
-    (group) => group.status === 'merged' && group.delivery.state === 'apply_failed',
-  );
-  if (failed.length > 0) {
-    return {
-      status: 'apply_failed',
-      reason: failed[0]?.delivery.reason ?? null,
-      groups: failed.map((group) => group.slug),
-    };
+  for (const status of ['apply_failed', 'push_failed'] as const) {
+    const failed = state.groups.filter(
+      (group) => group.status === 'merged' && group.delivery.state === status,
+    );
+    if (failed.length > 0) {
+      return {
+        status,
+        reason: failed[0]?.delivery.reason ?? null,
+        groups: failed.map((group) => group.slug),
+      };
+    }
   }
   if (counts.applied !== counts.merged) return { status: 'pending' };
   return {
@@ -233,6 +235,8 @@ function runHead(state: RunState, observers: RepairPolicy) {
     dirtyWarning: state.run.dirtyWarning,
     autoDeliver: state.run.config.delivery.auto,
     deliveryMode: state.run.config.delivery.mode,
+    remoteBranch: state.run.remoteBranch,
+    baseCommit: state.run.baseCommit,
     fromQueue: state.run.fromQueue,
     returnable: false,
     // The queue is unknown here: the daemon fills it in with `withQueue`.

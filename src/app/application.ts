@@ -169,6 +169,7 @@ function createRuns(context: Context, lower: Lower) {
     diff: ports.diff.port,
     attachments: ports.attachments.port,
     commits: ports.commits.port,
+    push: ports.push.port,
     agentExit: processes,
   });
   return { runs, processes };

@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { addOrigin } from '../fixtures/origin.ts';
 import { request } from '../../src/presentation/ipc/client/index.ts';
 import type {
   Method,
@@ -27,6 +28,7 @@ const SERVER =
 async function start(serverMode: boolean): Promise<Harness> {
   current = await harness();
   if (serverMode) {
+    addOrigin(current.repo);
     const directory = join(String(current.environment.XDG_CONFIG_HOME), 'aip');
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, 'settings.yaml'), SERVER);
@@ -97,6 +99,7 @@ describe('the author of a task and of a run', () => {
     const alice = await signIn(h, 'alice@corp.com');
     const other = join(dirname(h.repo), 'other');
     copyTemplateRepo(other, CODE_ONLY_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    addOrigin(other);
     await h.call('repository_add', { path: h.repo });
     await h.call('repository_add', { path: other });
     const many = (await as(h, alice, 'queue_add_projects', {

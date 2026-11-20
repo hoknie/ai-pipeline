@@ -1,9 +1,18 @@
 import { randomInt } from 'node:crypto';
 
 import { rejected } from '../../../platform/errors/index.ts';
-import { excludeWorkspace, prepareRunBranch, workspaceRoot } from '../../../platform/git/index.ts';
+import {
+  excludeWorkspace,
+  prepareRunBranch,
+  resolveBase,
+  workspaceRoot,
+} from '../../../platform/git/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
-import type { ConfigService } from '../../swarm-config/services/index.ts';
+import {
+  requireDeliveryMode,
+  serverModeOn,
+  type ConfigService,
+} from '../../swarm-config/services/index.ts';
 import { findPipeline } from '../../swarm-config/types/index.ts';
 import type { Event } from '../machine/index.ts';
 import {
@@ -97,10 +106,17 @@ export class RunRequests {
     const skipError = checkSkip(config, params.pipeline, params.skip ?? []);
     if (skipError !== null) throw rejected(skipError);
     const id = runId(now(), randomInt(36 ** 4));
+    requireDeliveryMode(configs, params.deliveryMode);
+    // The server mode: the run starts from the main branch of the remote repository, fetched now.
+    const { remote, baseBranch } = config.delivery;
+    const remoteBase = serverModeOn(configs)
+      ? await resolveBase(repository, remote, baseBranch ?? null)
+      : null;
     const prepared = await prepareRunBranch(repository, `refs/aip/${id}/run`, {
-      workingTree: config.workspace.base === 'working_tree',
-      include: config.workspace.include,
+      workingTree: remoteBase === null && config.workspace.base === 'working_tree',
+      include: remoteBase === null ? config.workspace.include : [],
       snapshotRef: `refs/aip/${id}/base`,
+      commit: remoteBase?.commit,
     });
     await excludeWorkspace(repository, workspaceRoot(repository, config.workspaceDir));
     const state = createRun({

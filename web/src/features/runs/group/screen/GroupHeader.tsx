@@ -150,7 +150,9 @@ function DeliveryStage({ ctx }: { ctx: GroupCtx }) {
     >
       {stage.status === 'delivering' ? (
         <StatusBadge status="running" label={t('runs.system.delivering')} />
-      ) : stage.status === 'applied' || stage.status === 'apply_failed' ? (
+      ) : stage.status === 'applied' ||
+        stage.status === 'apply_failed' ||
+        stage.status === 'push_failed' ? (
         <>
           <StatusBadge status={stage.status} />
           {attemptAt !== null ? (

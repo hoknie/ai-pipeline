@@ -23,5 +23,10 @@ export { checkMcpCatalog } from './sections/mcp-servers.ts';
 export { validateQueueSection } from './sections/queue.ts';
 export { validateStatsSection } from './sections/stats.ts';
 export { validateAttachmentsSection } from './sections/attachments.ts';
-export { ConfigService, type DeliverySettings } from './settings.ts';
+export {
+  ConfigService,
+  requireDeliveryMode,
+  serverModeOn,
+  type DeliverySettings,
+} from './settings.ts';
 export { createSwarmConfigServices, type SwarmConfigServices } from './create.ts';

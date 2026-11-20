@@ -2,7 +2,7 @@ import { rejected } from '../../../platform/errors/index.ts';
 import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import { providerEvent, variantConfig, type RunsServices } from '../../runs/services/index.ts';
-import type { ConfigService } from '../../swarm-config/services/index.ts';
+import { requireDeliveryMode, type ConfigService } from '../../swarm-config/services/index.ts';
 import { checkSkip, stepStates, type RunState } from '../../runs/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
 import {
@@ -84,6 +84,7 @@ export class QueueEdit {
     if (existing?.run) this.checkReturned(params, skip);
     if (existing?.run && runVariant !== undefined) await this.variantInRun(existing, runVariant);
     if (existing?.run && runProvider !== undefined) await this.providerInRun(existing, runProvider);
+    requireDeliveryMode(this.dependencies.config, params.deliveryMode);
     await this.ensureFields(repository, existing, params, skip);
     const after = params.after === undefined ? undefined : items.resolveDependencies(params.after);
     const {

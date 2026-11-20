@@ -46,6 +46,7 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
   });
   // The server mode: a delivery commit is by the author of the run.
   ports.commits.set(services.delivery.commits);
+  ports.push.set(services.delivery.push);
   ports.authors.set({
     byId: (id) => {
       const user = services.identity.users.byId(id);

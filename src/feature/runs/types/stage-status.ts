@@ -79,7 +79,9 @@ export function deliveryStatus(state: RunState): StageStatus | null {
   const merged = mergedGroups(state);
   if (merged.length === 0) return null;
   if (merged.every((group) => group.delivery.state === 'applied')) return 'done';
-  return merged.some((group) => group.delivery.state === 'apply_failed') ? 'failed' : null;
+  return merged.some((group) => ['apply_failed', 'push_failed'].includes(group.delivery.state))
+    ? 'failed'
+    : null;
 }
 
 export function cleanupStatus(state: RunState): StageStatus | null {

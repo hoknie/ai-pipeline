@@ -15,6 +15,7 @@ export const STOPPING_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReaso
   'failed',
   'conflict',
   'apply_failed',
+  'push_failed',
 ]);
 
 /** Problems that `skipFailed` takes off the places: neither a cancel nor a usage limit. */
@@ -22,6 +23,7 @@ export const SKIPPED_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReason
   'failed',
   'conflict',
   'apply_failed',
+  'push_failed',
 ]);
 
 /** Problems that block the tasks depending on the run. */

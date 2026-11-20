@@ -123,7 +123,7 @@ export type DeliveryStage =
   | { status: 'pending' }
   | { status: 'delivering' }
   | { status: 'applied'; manual: boolean }
-  | { status: 'apply_failed'; reason: string | null; groups: string[] };
+  | { status: 'apply_failed' | 'push_failed'; reason: string | null; groups: string[] };
 
 /**
  * The state of a run in a view: its phase, `queued` for a finished run waiting as a return
@@ -197,6 +197,10 @@ export interface RunView {
   autoDeliver: boolean;
   /** How the merged result is delivered. */
   deliveryMode: DeliveryMode;
+  /** The branch of the delivery in the remote repository (`url`: its page at a known host); null before it is sent. */
+  remoteBranch: { remote: string; branch: string; url: string | null; address: string } | null;
+  /** The commit the run started from. */
+  baseCommit: string;
   /** Created by a task queue. */
   fromQueue: boolean;
   /** The run can go back to its queue: it has failed or cancelled groups and is not in the queue. */

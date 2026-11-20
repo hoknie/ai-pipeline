@@ -16,7 +16,11 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
   run_variant: { action: 'run.variant', info: runWith('variant') },
   run_provider: { action: 'run.provider', info: runWith('provider') },
   apply: { action: 'run.apply', info: runWith('groups', 'mode', 'force') },
-  run_mark_delivered: { action: 'run.mark_delivered', info: runWith('groups') },
+  run_mark_delivered: {
+    // `aip run apply` on the machine of a developer reports the delivery with its mode
+    action: (params) => (params.mode === undefined ? 'run.mark_delivered' : 'run.apply'),
+    info: runWith('groups', 'mode'),
+  },
   run_title: { action: 'run.title', info: runWith('title') },
   run_auto_deliver_cancel: { action: 'run.auto_deliver_cancel', info: runWith() },
   run_pause: { action: 'run.pause', info: runWith() },

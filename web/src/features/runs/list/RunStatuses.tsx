@@ -46,6 +46,28 @@ function mergeBadge(run: RunView, t: TFunction): ReactNode | null {
   return <StatusBadge status="merged" />;
 }
 
+/** The branch of the delivery in the remote repository: a link to its page at a known host. */
+function RemoteBranch({ run, t }: { run: RunView; t: TFunction }) {
+  const remote = run.remoteBranch;
+  if (!remote) return null;
+  const title = t('runs.header.remoteBranch', { branch: remote.branch, remote: remote.remote });
+  return remote.url ? (
+    <a
+      href={remote.url}
+      target="_blank"
+      rel="noreferrer"
+      title={t('runs.header.openRemoteBranch')}
+      className="font-mono text-xs text-primary underline-offset-2 hover:underline"
+    >
+      {remote.branch}
+    </a>
+  ) : (
+    <span title={title} className="font-mono text-xs text-muted-foreground">
+      {remote.branch}
+    </span>
+  );
+}
+
 function deliveryStatusPart(
   run: RunView,
   groupDelivery: string | null,
@@ -83,6 +105,7 @@ function deliveryStatusPart(
       />,
     );
   }
+  if (run.remoteBranch) deliveryBadges.push(<RemoteBranch key="remote" run={run} t={t} />);
   if (groupDelivery) deliveryBadges.push(<StatusBadge key="group" status={groupDelivery} />);
   return { key: 'delivery', label: t('runs.header.parts.delivery'), badges: deliveryBadges };
 }

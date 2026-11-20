@@ -1,5 +1,7 @@
 import { homedir } from 'node:os';
 
+import { rejected } from '../../../platform/errors/index.ts';
+
 import {
   ConfigLoadError,
   pipelineNameOf,
@@ -18,6 +20,7 @@ import {
 } from '../types/index.ts';
 
 import { configPaths } from './discover.ts';
+import { serverModeProblem } from './validate-settings.ts';
 import {
   loadAttachmentSettings,
   loadConfig,
@@ -156,4 +159,19 @@ export class ConfigService {
       return `invalid swarm.queue: ${error.message}`;
     }
   }
+}
+
+/** Whether the daemon works in the server mode; `false` when its settings do not load. */
+export function serverModeOn(config: Pick<ConfigService, 'serverSettings'>): boolean {
+  const settings = config.serverSettings();
+  return typeof settings !== 'string' && settings.enabled;
+}
+
+/** In the server mode a task or a delivery in `worktree` or `commit` is refused: only a branch is delivered. */
+export function requireDeliveryMode(
+  config: Pick<ConfigService, 'serverSettings'>,
+  mode: string | null | undefined,
+): void {
+  if (mode === null || mode === undefined || mode === 'branch' || !serverModeOn(config)) return;
+  throw rejected(serverModeProblem(mode));
 }

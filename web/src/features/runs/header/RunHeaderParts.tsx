@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '../../../shared/ui/overlays/dropdown-menu.tsx';
 import type { useRetryFailed, useRunDelivery, useRunHold, useRunObserver } from './useRunHeader.ts';
+import { pushFailed } from './delivery.ts';
 
 type Repair = ReturnType<typeof repairOf>;
 
@@ -105,7 +106,7 @@ export function RunButtons({
           title={delivery.deliverHint}
           onClick={() => void delivery.apply(false)}
         >
-          {t('runs.header.deliver')}
+          {t(pushFailed(run) ? 'runs.header.retryPush' : 'runs.header.deliver')}
         </Button>
       )}
     </>

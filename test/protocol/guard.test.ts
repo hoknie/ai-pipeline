@@ -133,12 +133,10 @@ describe('guard', () => {
     expect(() => guard(project, context(developer))).not.toThrow();
   });
 
-  it('delivers for a user only by a branch', () => {
+  it('lets a user apply a run of any delivery mode: the settings check refuses the modes', () => {
     const apply = parse('apply', { runId: 'r1' });
-    expect(() => guard(apply, context(developer, 'branch'))).not.toThrow();
-    for (const mode of ['worktree', 'commit']) {
-      expect(() => guard(apply, context(developer, mode))).toThrow(/by a branch/);
+    for (const mode of ['branch', 'worktree', 'commit']) {
+      expect(() => guard(apply, context(developer, mode))).not.toThrow();
     }
-    expect(() => guard(apply, context({ kind: 'system' }, 'worktree'))).not.toThrow();
   });
 });

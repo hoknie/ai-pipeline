@@ -10,6 +10,7 @@ import type {
   Incident,
   OnLimit,
   ProposedGroup,
+  RemoteBranch,
   Report,
   RunHold,
   RunState,
@@ -56,6 +57,8 @@ export type DeliveryEffect =
       message: string;
       auto: boolean;
     }
+  /** Send the branch of the delivery to the remote repository. */
+  | { kind: 'push'; run: string }
   | { kind: 'cleanup'; run: string }
   | { kind: 'prepare_resolve'; run: string; groups: string[]; round: number }
   | { kind: 'finish_resolve'; run: string; groups: string[]; message: string; conflicts: string[] };
@@ -109,6 +112,8 @@ export type Event =
   | { kind: 'deliver_requested'; groups: string[] | null; force: boolean; files: string[] }
   | { kind: 'delivered_marked'; groups: string[] | null }
   | { kind: 'delivery_finished'; result: DeliveryResult }
+  | { kind: 'delivery_pushed'; remoteBranch: RemoteBranch }
+  | { kind: 'delivery_push_failed'; reason: string }
   | { kind: 'resolve_prepared'; conflicts: string[] }
   | { kind: 'run_named'; title: string | null; name: string | null; usage: Usage | null }
   | { kind: 'tags_set'; tags: string[] }

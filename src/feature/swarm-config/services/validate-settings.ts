@@ -47,6 +47,9 @@ const DELIVERY_KEYS = [
   'resolver_rounds',
   'message_prompt',
   'resolver_prompt',
+  'push',
+  'remote',
+  'base_branch',
 ];
 
 const WORKSPACE_KEYS = ['base', 'include'];
@@ -87,18 +90,33 @@ function includeProblem(entry: string, workspaceDir: string): string | null {
   return null;
 }
 
+/** Why the server mode does not deliver in `mode`: the clone of the server has no working tree to write to. */
+export function serverModeProblem(mode: string): string {
+  return `\`${mode}\` is not allowed in the server mode: the result is delivered as a branch (\`branch\`); apply it on your machine with \`aip run apply\``;
+}
+
 export function checkDelivery(
   ctx: ValidateContext,
   value: unknown,
   delivery: DeliverySettings,
   known: string[],
+  serverMode = false,
 ): void {
   const mapping = readMapping(ctx, value, 'swarm.delivery');
   if (!mapping) return;
   for (const [key, field] of readEntries(ctx, mapping, 'swarm.delivery', DELIVERY_KEYS)) {
     const path = join('swarm.delivery', key);
     if (key === 'mode') {
-      delivery.mode = readChoice<DeliveryMode>(ctx, field, path, DELIVERY_MODES) ?? delivery.mode;
+      const mode = readChoice<DeliveryMode>(ctx, field, path, DELIVERY_MODES);
+      if (mode !== null && serverMode && mode !== 'branch') {
+        addError(ctx, path, serverModeProblem(mode));
+      } else delivery.mode = mode ?? delivery.mode;
+    }
+    if (key === 'push') delivery.push = readBoolean(ctx, field, path) ?? delivery.push;
+    if (key === 'remote') delivery.remote = readString(ctx, field, path) ?? delivery.remote;
+    if (key === 'base_branch') {
+      const branch = readString(ctx, field, path);
+      if (branch !== null) delivery.baseBranch = branch;
     }
     if (key === 'auto') delivery.auto = readBoolean(ctx, field, path) ?? delivery.auto;
     if (key === 'keep') delivery.keep = readBoolean(ctx, field, path) ?? delivery.keep;

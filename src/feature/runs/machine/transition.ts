@@ -16,6 +16,7 @@ import {
   requestDelivery,
   resolvePrepared,
 } from './delivery-flow.ts';
+import { pushed, pushFailed, retryPush } from './push/index.ts';
 import type { Ctx, Effect, Event } from './events.ts';
 import { attemptExited } from './exits.ts';
 import { repairAllowed, repairStart } from './repair.ts';
@@ -39,6 +40,11 @@ function updateFinished(state: RunState, now: number): void {
 type Handlers = { [K in Event['kind']]: (m: Ctx, event: Extract<Event, { kind: K }>) => void };
 
 function deliveryRequested(m: Ctx, event: Extract<Event, { kind: 'deliver_requested' }>): void {
+  const retry = retryPush(m.state, event.groups);
+  if (retry !== null) {
+    m.effects.push(...retry);
+    return;
+  }
   m.effects.push(
     ...requestDelivery(m.state, {
       groups: event.groups,
@@ -89,6 +95,8 @@ const HANDLERS: Handlers = {
   deliver_requested: deliveryRequested,
   delivered_marked: (m, e) => void m.effects.push(...markDelivered(m.state, e.groups, m.now)),
   delivery_finished: (m, e) => void m.effects.push(...finishDelivery(m.state, e.result, m.now)),
+  delivery_pushed: (m, e) => void m.effects.push(...pushed(m.state, e.remoteBranch)),
+  delivery_push_failed: (m, e) => pushFailed(m.state, e.reason),
   resolve_prepared: (m, e) => void m.effects.push(...resolvePrepared(m.state, e.conflicts)),
   run_named: runNamed,
   tags_set: (m, e) => void (m.state.run.tags = [...e.tags]),

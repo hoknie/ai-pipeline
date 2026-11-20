@@ -11,6 +11,7 @@ import type {
   QueueAdvancePort,
   RunAttachmentsPort,
   RunCommitsPort,
+  RunPushPort,
   RunsPublishPort,
 } from '../ports/index.ts';
 import {
@@ -47,6 +48,7 @@ export interface RunsDependencies {
   agentExit: AgentExitPort;
   attachments: RunAttachmentsPort;
   commits: RunCommitsPort;
+  push: RunPushPort;
 }
 
 export interface RunsServices {

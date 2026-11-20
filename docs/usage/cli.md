@@ -15,7 +15,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | `aip run variant <run-id> <variant> [--json]` | [Switches the variant](runs.md#changing-the-variant) of a run that is not finished; a running step whose definition changes starts again |
 | `aip run provider <run-id> [id] [--none] [--json]` | [Switches the provider](runs.md#changing-the-provider) of a run that is not finished; a running step on a tier whose item changes starts again |
 | `aip run skip <run-id> <step> [--off] [--json]` | [Skips a step](runs.md#skipping-a-step) for the whole run, or brings it back |
-| `aip run apply <run-id> [group...] [--force]` | [Delivers](../configuration/delivery.md#automatic-and-manual-delivery) ready groups |
+| `aip run apply <run-id> [group...] [--force]` | [Delivers](../configuration/delivery.md#automatic-and-manual-delivery) ready groups; with a server profile `[--mode worktree\|commit]` [applies the run's branch](../configuration/delivery.md#applying-on-your-machine) in your clone |
 | `aip provider list [--json]` | [Providers](../configuration/providers.md) with the status `available`, `unavailable` or `disabled` and the roles they cover |
 | `aip provider show <slug> [--json]` | One provider: routes, why a route is unavailable, the model of each role |
 | `aip run mark-delivered <run-id> [--group <slug...>]` | Marks merged groups as delivered after you merged them by hand; nothing is applied |

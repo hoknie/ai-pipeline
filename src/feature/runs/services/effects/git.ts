@@ -184,6 +184,17 @@ export class GitEffects {
     await this.dependencies.context.apply(state, { kind: 'delivery_finished', result });
   }
 
+  /** Sends the branch of the delivery to the remote repository and tells the machine how it went. */
+  async push(state: RunState): Promise<void> {
+    const outcome = await this.dependencies.push.push(state.run);
+    await this.dependencies.context.apply(
+      state,
+      outcome.ok
+        ? { kind: 'delivery_pushed', remoteBranch: outcome.remoteBranch }
+        : { kind: 'delivery_push_failed', reason: outcome.reason },
+    );
+  }
+
   async cleanup(state: RunState): Promise<void> {
     // The refs the patch is built from go away with the cleanup.
     await this.dependencies.diff.savePatch(state);

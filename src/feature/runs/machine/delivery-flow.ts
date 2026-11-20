@@ -17,6 +17,7 @@ import {
 } from '../types/index.ts';
 import { cleanupIfDelivered, selectGroups } from './delivery-checks.ts';
 import type { AttemptExit, DeliveryEffect, DeliveryRequest, DeliveryResult } from './events.ts';
+import { pushDue, pushEffect } from './push/index.ts';
 import { closeRepair, deliveryKeys, openRepairGroup, repairTask } from './repair.ts';
 import { messageTask, renderCommitMessage, resolveTask } from './texts.ts';
 
@@ -218,6 +219,7 @@ export function finishDelivery(
       refund: false,
     });
   }
+  if (outcome.kind === 'applied' && pushDue(state)) return [pushEffect(state)];
   return cleanupIfDelivered(state);
 }
 

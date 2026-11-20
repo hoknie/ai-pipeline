@@ -15,28 +15,6 @@ export function accessDenied(action: string, project: string | null): AppError {
   });
 }
 
-/** The delivery mode of the run in effect; `null` when the run is unknown. */
-function deliveryMode(request: Request, { services }: IpcContext): string | null {
-  const runId = (request.params as { runId?: string }).runId;
-  if (runId === undefined) return null;
-  const state = services.runs.states.lookup(runId);
-  return state ? state.run.config.delivery.mode : null;
-}
-
-/** The refusal of a delivery outside a branch: the working tree of the server is shared. */
-function checkDelivery(request: Request, context: IpcContext): void {
-  if (request.method !== 'apply') return;
-  const mode = deliveryMode(request, context);
-  // An unknown run (mode === null) passes on purpose: `apply` itself fails on an unknown run.
-  if (mode !== null && mode !== 'branch') {
-    throw new AppError(
-      'forbidden',
-      `delivery.mode is \`${mode}\`: the server working tree is shared, so a user delivers by a branch (delivery.mode: branch)`,
-      { code: 'ipc.guard', responseCode: ACCESS_DENIED },
-    );
-  }
-}
-
 function checkTarget(action: string, target: Target, context: IpcContext): void {
   const { access } = context.services;
   const { actor } = context;
@@ -67,8 +45,7 @@ function checkTarget(action: string, target: Target, context: IpcContext): void 
 
 /**
  * The rights of a request: in server mode a user is refused what the policies refuse, before the
- * method runs. The local and the system actor pass. The delivery of a user only by a branch
- * stays: it protects the shared working tree of the server, whatever the policies say.
+ * method runs. The local and the system actor pass.
  */
 export function guard(request: Request, context: IpcContext): void {
   const { actor } = context;
@@ -83,5 +60,4 @@ export function guard(request: Request, context: IpcContext): void {
       checkTarget(extra.action, extra.target(params, context), context);
     }
   }
-  checkDelivery(request, context);
 }

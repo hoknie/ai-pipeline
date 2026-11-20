@@ -6,6 +6,9 @@ Delivery brings the merged result of a run to you. By default it happens by itse
 delivery:
   mode: worktree            # worktree | commit | branch
   auto: true                # deliver right after the run finishes
+  push: false               # send the branch aip/<run-id> to the remote repository
+  remote: origin            # the remote repository of the delivery
+  base_branch: main         # server mode: the main branch runs start from
   keep: false               # keep worktrees and internal refs after delivery
   commit_message: |         # template for mode: commit
     {title}
@@ -24,7 +27,7 @@ delivery:
 - `commit` puts the changes in the working tree and makes one commit on the current branch, with the run's files only. Your other uncommitted edits are not touched. If anything is staged in the index, delivery refuses.
 - `branch` creates an `aip/<run-id>` branch with the result and leaves the working tree alone.
 
-In [server mode](server.md#authors-and-commits) the commit of `commit` and `branch` is by the person whose task it was.
+In [server mode](server.md#authors-and-commits) only `branch` is allowed, see [Server mode](#server-mode); its commit is by the person whose task it was.
 
 In `commit` mode with the `working_tree` [base](README.md#workspace), a run file that contained your uncommitted edits goes into the commit as a whole; the delivery answer lists such files.
 
@@ -112,6 +115,30 @@ delivery:
 ```
 
 `message_prompt` is appended to the task of `message_specialist`, and `resolver_prompt` to the task of the `resolver`.
+
+## Server mode
+
+On a [server](server.md) the clone of the project is not a workplace: its working tree belongs to nobody, so a run delivers a branch and you apply it on your machine.
+
+- `delivery.mode` is `branch`; `worktree` and `commit` are errors in the settings, in a task and in a delivery request. `aip config check` warns that `workspace.base` is ignored.
+- Before every run the daemon fetches `remote` and starts the run from `<remote>/<base_branch>`, so it sees what colleagues pushed. `base_branch` defaults to the branch the `HEAD` of `remote` points to. If the fetch fails, the run is not created and the task stays in the queue with the git error.
+- `push` (default `true` on a server, `false` locally) sends `aip/<run-id>` to `remote` after the branch is made, with the git credentials of the daemon's OS user. Nothing is forced and no other branch is touched.
+- If the branch name is taken by another history, or there is no access, the delivery is `push_failed` with the git reason. The local branch stays, and the run keeps its place in the queue as after `apply_failed`. Fix the cause and press «Retry push» in the panel; only the push is repeated.
+- Once sent, `aip run show` and the panel's delivery badge name the remote branch and, for GitHub, GitLab and Bitbucket, link to it.
+
+Give the daemon's OS user a deploy key or a bot account that may create `aip/*` branches, and nothing more: it writes to every project of the server. Protect the main branch on the host so that only a reviewed pull request changes it, and let the host delete merged `aip/*` branches.
+
+### Applying on your machine
+
+With a [server profile](server.md#from-your-machine), in a clone of the project that has a remote with the same address as the server's `remote`:
+
+```sh
+aip run apply <run-id>                 # the changes land in the working tree, uncommitted
+aip run apply <run-id> --mode commit   # or as one commit with your git identity
+aip run apply <run-id> --force         # with conflict markers, like a local delivery
+```
+
+The command fetches `aip/<run-id>` and delivers it with the same [safety](#safety) as a local delivery. Groups cannot be named, and a run whose branch is not in the remote repository (`push_failed`) is refused. Only after success the server is told, and the [journal](server.md#audit-journal) records `run.apply` by you; a refusal changes nothing there.
 
 ## Cleanup
 

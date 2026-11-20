@@ -4,7 +4,13 @@ import type { ApplyResult, QueueView, RunView } from '../../ipc/contract/index.t
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
 import { printQueue } from '../queue-print.ts';
+import { applyFromServer } from './server/apply.ts';
 import type { RunKit } from './run.ts';
+
+function parseApplyMode(mode: string | undefined): 'worktree' | 'commit' {
+  if (mode === undefined || mode === 'worktree' || mode === 'commit') return mode ?? 'worktree';
+  throw usage(`--mode must be worktree or commit, not \`${mode}\``);
+}
 
 export function addPause(kit: RunKit): void {
   const { print, output, examples, context, activeStyle, run } = kit;
@@ -33,9 +39,12 @@ export function addApply(kit: RunKit): void {
   const { print, output, examples, context, activeStyle, io, run } = kit;
   run
     .command('apply')
-    .description('Deliver merged groups of a run into your working tree (or as delivery.mode says)')
+    .description(
+      'Deliver merged groups of a run into your working tree (or as delivery.mode says); with a server profile, fetch the branch the server sent to the remote repository and deliver it into this clone',
+    )
     .argument('<run-id>', 'run id')
-    .argument('[groups...]', 'groups to deliver; all merged ones by default')
+    .argument('[groups...]', 'groups to deliver; all merged ones by default (not with a server)')
+    .option('--mode <mode>', 'with a server profile: worktree (default) or commit')
     .option('--force', 'apply even with conflicts, leaving conflict markers')
     .option('--json', 'print JSON')
     .addHelpText(
@@ -44,10 +53,26 @@ export function addApply(kit: RunKit): void {
         'aip run apply 0mh3k2ab1x9z',
         'aip run apply 0mh3k2ab1x9z login signup',
         'aip run apply 0mh3k2ab1x9z --force',
+        'aip run apply 0mh3k2ab1x9z --mode commit',
       ]),
     )
     .action(
-      async (runId: string, groups: string[], options: { force?: boolean; json?: boolean }) => {
+      async (
+        runId: string,
+        groups: string[],
+        options: { force?: boolean; json?: boolean; mode?: string },
+      ) => {
+        if (context().remote !== null) {
+          const { result, failed } = await applyFromServer(context(), runId, {
+            mode: parseApplyMode(options.mode),
+            force: options.force === true,
+            groups,
+          });
+          output(options.json, formatApply(result, activeStyle), result);
+          if (failed) io.setExitCode(1);
+          return;
+        }
+        if (options.mode !== undefined) throw usage('--mode works only with a server profile');
         const result = (await call(context(), 'apply', {
           runId,
           ...(groups.length > 0 ? { groups } : {}),

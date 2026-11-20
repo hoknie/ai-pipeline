@@ -1,6 +1,7 @@
 import { changedFiles } from '../../../platform/git/index.ts';
 import type { RunEngine, RunStates } from '../../runs/services/index.ts';
 import type { Group, RunState } from '../../runs/types/index.ts';
+import { requireDeliveryMode, type ConfigService } from '../../swarm-config/services/index.ts';
 import type { ApplyResult } from '../types/index.ts';
 
 /** The files the merged groups changed: the requested ones, or those not delivered yet. */
@@ -50,9 +51,9 @@ function appliedBefore(state: RunState): Set<string> {
 
 /** The requests of the user to deliver the result of a run or to count it as delivered. */
 export class DeliverService {
-  private readonly dependencies: { states: RunStates; engine: RunEngine };
+  private readonly dependencies: { states: RunStates; engine: RunEngine; config: ConfigService };
 
-  constructor(dependencies: { states: RunStates; engine: RunEngine }) {
+  constructor(dependencies: { states: RunStates; engine: RunEngine; config: ConfigService }) {
     this.dependencies = dependencies;
   }
 
@@ -61,6 +62,7 @@ export class DeliverService {
     const { states, engine } = this.dependencies;
     return engine.serial(async (): Promise<ApplyResult> => {
       const state = states.get(params.runId);
+      requireDeliveryMode(this.dependencies.config, state.run.config.delivery.mode);
       const requested = params.groups ?? null;
       const files = await mergedFiles(state, requested);
       const before = appliedBefore(state);
@@ -79,12 +81,24 @@ export class DeliverService {
   }
 
   /** `run_mark_delivered`: the user delivered the groups by hand. */
-  markDelivered(params: { runId: string; groups?: string[] | undefined }) {
+  markDelivered(params: {
+    runId: string;
+    groups?: string[] | undefined;
+    mode?: 'worktree' | 'commit' | undefined;
+  }) {
     const { states, engine } = this.dependencies;
     return engine.serial(async (): Promise<ApplyResult> => {
       const state = states.get(params.runId);
       const requested = params.groups ?? null;
       const before = appliedBefore(state);
+      // `aip run apply` of a developer reports the result it applied: a branch the server delivered
+      // already is not an error.
+      const waiting = state.groups.some(
+        (group) => group.status === 'merged' && group.delivery.state !== 'applied',
+      );
+      if (params.mode !== undefined && !waiting) {
+        return { runId: state.run.id, pending: false, groups: delivered(state, requested, before) };
+      }
       await engine.apply(state, { kind: 'delivered_marked', groups: requested });
       return { runId: state.run.id, pending: false, groups: delivered(state, requested, before) };
     });

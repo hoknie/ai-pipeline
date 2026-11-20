@@ -82,7 +82,7 @@ export const INCIDENT_KINDS = ['question', 'failed', 'conflict', 'delivery'] as 
 
 export type IncidentKind = (typeof INCIDENT_KINDS)[number];
 
-export const DELIVERY_STATES = ['pending', 'applied', 'apply_failed'] as const;
+export const DELIVERY_STATES = ['pending', 'applied', 'apply_failed', 'push_failed'] as const;
 
 export type DeliveryState = (typeof DELIVERY_STATES)[number];
 

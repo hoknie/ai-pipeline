@@ -12,6 +12,7 @@ import type {
   QueueAdvancePort,
   RunAttachmentsPort,
   RunCommitsPort,
+  RunPushPort,
   RunsPublishPort,
 } from '../feature/runs/ports/index.ts';
 import type { ConfigChangedPort } from '../feature/swarm-edit/ports/index.ts';
@@ -75,6 +76,7 @@ export function declarePorts() {
     delivery: wiring.port<DeliveryPublishPort>('delivery.publish'),
     authors: wiring.port<DeliveryAuthorsPort>('delivery.authors'),
     commits: wiring.port<RunCommitsPort>('runs.commits'),
+    push: wiring.port<RunPushPort>('runs.push'),
     artifacts: wiring.port<ArtifactsPublishPort>('artifacts.publish'),
     queuePublish: wiring.port<QueuePublishPort>('queue.publish'),
     repair: wiring.port<RepairPolicyPort>('queue.repair'),

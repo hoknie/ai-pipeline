@@ -7,6 +7,7 @@ import type {
   DiffPort,
   QueueAdvancePort,
   RunCommitsPort,
+  RunPushPort,
   RunAttachmentsPort,
   RunsPublishPort,
 } from '../../ports/index.ts';
@@ -56,6 +57,7 @@ export interface EffectDependencies {
   queue: QueueAdvancePort;
   attachments: RunAttachmentsPort;
   commits: RunCommitsPort;
+  push: RunPushPort;
   publish: Pick<RunsPublishPort, 'logGrew'>;
 }
 

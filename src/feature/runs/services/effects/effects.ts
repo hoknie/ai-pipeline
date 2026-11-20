@@ -91,6 +91,8 @@ export class RunEffects implements EffectRunner {
         return this.git.merge(state, effect.group, effect.updateOnConflict);
       case 'deliver':
         return this.git.deliver(state, effect.groups, effect.force, effect.message);
+      case 'push':
+        return this.git.push(state);
       case 'cleanup':
         return this.git.cleanup(state);
       case 'prepare_resolve':

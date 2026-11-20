@@ -9,7 +9,11 @@ import {
 import type { DeliveryEffect } from './events.ts';
 
 function deliverable(group: Group): boolean {
-  return group.status === 'merged' && group.delivery.state !== 'applied';
+  return (
+    group.status === 'merged' &&
+    group.delivery.state !== 'applied' &&
+    group.delivery.state !== 'push_failed'
+  );
 }
 
 export function selectGroups(state: RunState, requested: string[] | null): Group[] {
@@ -50,7 +54,9 @@ export function markDelivered(
   }
   let groups: Group[];
   if (requested === null || requested.length === 0) {
-    groups = state.groups.filter(deliverable);
+    groups = state.groups.filter(
+      (group) => group.status === 'merged' && group.delivery.state !== 'applied',
+    );
     if (groups.length === 0)
       throw rejected('nothing to mark: no merged groups are waiting for delivery');
   } else {
