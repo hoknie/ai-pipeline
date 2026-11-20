@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import IntegrationsPage from '../src/features/integrations/IntegrationsPage.tsx';
+import { IntegrationsGroup } from '../src/features/integrations/index.ts';
 
 import {
   fakeApi,
@@ -18,7 +18,14 @@ const registry = [repositoryView('/work/app', { color: 'blue' })];
 
 async function open(overrides: Parameters<typeof fakeApi>[0] = {}) {
   const api = fakeApi({ webhooks: vi.fn(async () => [webhookView()]), ...overrides });
-  render(<IntegrationsPage api={api} registry={registry} />);
+  render(
+    <IntegrationsGroup
+      api={api}
+      registry={registry}
+      tab="webhooks"
+      leave={() => async () => undefined}
+    />,
+  );
   await screen.findByTestId('webhook-w1');
   return api;
 }
@@ -70,9 +77,17 @@ describe('the webhooks of the page of integrations', () => {
       directions: ['outbound'],
       operations: [],
     });
-    await open({ integrations: vi.fn(async () => overview) });
+    const api = fakeApi({ integrations: vi.fn(async () => overview) });
+    render(
+      <IntegrationsGroup
+        api={api}
+        registry={registry}
+        tab="connections"
+        leave={() => async () => undefined}
+      />,
+    );
+    await screen.findByTestId('connection-c1');
     expect(screen.queryByTestId('connection-w1')).toBeNull();
-    expect(screen.getByTestId('connection-c1')).toBeTruthy();
   });
 
   it('creates a webhook for all projects with the events chosen', async () => {

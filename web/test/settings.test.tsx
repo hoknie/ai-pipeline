@@ -457,6 +457,7 @@ const GLOBAL_GROUPS = [
   'Runtimes',
   'Swarm',
   'Observers',
+  'Integrations',
   'Projects',
   'System',
 ];

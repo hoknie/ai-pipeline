@@ -25,7 +25,7 @@ aip integration secret remove <id> <slot>
 - A secret is read from stdin only (up to 16 KiB); there is no `--value`, so it never lands in the shell history or in `ps`. Errors never repeat the input.
 - Removing a secret of an enabled connection disables it first. `remove` deletes the connection and its secrets; repeat it if it was cut short.
 - A project that has a connection cannot be removed from the daemon; moving a project keeps its connections.
-- Secret commands exist only in the CLI: they are not MCP tools and not in the web panel. The panel lists connections and edits their non-secret parameters; it does not create, enable or remove them.
+- Secret commands exist only in the CLI: they are not MCP tools and not in the web panel. The panel (settings → "Shared" → "Integrations") makes, enables, disables, checks and removes connections and edits their non-secret parameters; for a missing secret the card shows the command above with a button to copy it.
 
 ## Service registry
 
@@ -42,6 +42,8 @@ aip integration secret set <id> token --stdin < token.txt
 aip integration enable <id>
 aip integration check <id>        # ok, 14 tools
 ```
+
+The tab "Service registry" of the same group covers it in the panel: it makes the connection (kind fixed, `url` as a field), shows the state of the token, checks the connection ("ok, 14 tools" or the code, with the time) and lists the projects with their links to the registry. The token is set with the command above; a link is edited in the settings of the project.
 
 Give the specialists the registry as a server of the [catalog](specialists.md#mcp-servers) that goes through the connection:
 

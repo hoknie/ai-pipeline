@@ -3,10 +3,15 @@ import { useTranslation } from 'react-i18next';
 
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
-import { agentTabOf, observerTabOf } from '../../../shared/lib/nav/settingsGroups.ts';
+import {
+  agentTabOf,
+  integrationTabOf,
+  observerTabOf,
+} from '../../../shared/lib/nav/settingsGroups.ts';
 import { settingsRouteOfSwarmTarget } from '../../swarm/index.ts';
 import { Skeleton } from '../../../shared/ui/feedback/skeleton.tsx';
 import { SettingsForm } from '../../../shared/ui/forms/settings/SettingsForm.tsx';
+import { IntegrationsGroup } from '../../integrations/index.ts';
 import { ObserversGroup } from '../ObserversGroup.tsx';
 import { QueueModes } from '../QueueModes.tsx';
 import { SystemGroup } from '../SystemGroup.tsx';
@@ -169,6 +174,16 @@ export function GroupBody({ props, settings }: BodyProps) {
         streamed={props.streamedObservers}
         repositories={props.repositories}
         onDirty={settings.setDirty}
+      />
+    );
+  }
+  if (group === 'integrations') {
+    return (
+      <IntegrationsGroup
+        api={api}
+        registry={props.registry}
+        tab={integrationTabOf(props.agentTab)}
+        leave={settings.leave}
       />
     );
   }

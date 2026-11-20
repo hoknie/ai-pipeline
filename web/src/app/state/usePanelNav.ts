@@ -18,6 +18,7 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
     onNavigate: (view: View) => {
       setRoute(tabRoute(view, route, panel.lastRun.current));
     },
+    onRoute: setRoute,
     // the section «Swarm» opens the tab it was left on; inside it a click keeps the open place
     hrefSwarm: formatRoute(swarmRoute(route)),
     onOpenSwarm: () => setRoute(swarmRoute(route)),

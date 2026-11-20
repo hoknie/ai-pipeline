@@ -113,7 +113,48 @@ export const en = {
     disabled: 'disabled',
     connections: {
       title: 'Connections',
-      empty: 'No connections yet. Create one with the CLI:',
+      empty: 'No connections yet. Create one with the form above.',
+      add: {
+        title: 'New connection',
+        kind: 'Kind',
+        name: 'Name',
+        scope: 'Where',
+        create: 'Create connection',
+        secretNote:
+          'The secret is not entered in the panel: after the connection is created, its card shows the CLI command that sets it.',
+      },
+    },
+    actions: {
+      enable: 'Enable',
+      disable: 'Disable',
+      remove: 'Remove',
+      removeTitle: 'Remove the connection {{name}}?',
+      removeDescription:
+        'Its secrets are removed too, and the subscriptions that use it stop working.',
+      cancel: 'Cancel',
+      copy: 'Copy command',
+      copied: 'Copied',
+    },
+    check: {
+      run: 'Check',
+      running: 'Checking…',
+      never: 'Not checked yet',
+      ok: 'ok, {{count}} tools',
+      failed: 'failed: {{code}}',
+    },
+    registry: {
+      title: 'Service registry',
+      empty:
+        'No service registry connections yet. Create one with the form above, then set its token with the CLI.',
+      links: {
+        title: 'Projects',
+        empty: 'No projects are linked yet.',
+        project: 'Project',
+        connection: 'Connection',
+        path: 'Registry project',
+        source: 'Link',
+        status: 'Status',
+      },
     },
     scope: {
       global: 'All projects',
@@ -1892,6 +1933,13 @@ export const en = {
       invalid: 'Not a valid variable name.',
       taken: 'This variable already exists.',
     },
+    integrationTabs: {
+      label: 'Integrations tabs',
+      connections: 'Connections',
+      registry: 'Service registry',
+      notifications: 'Notifications',
+      webhooks: 'Webhooks',
+    },
     agentTabs: {
       label: 'Agents tabs',
       general: 'Main',
@@ -1944,6 +1992,7 @@ export const en = {
     },
     swarmNoteProject: 'The level is chosen when saving: project or shared.',
     group: {
+      integrations: 'Integrations',
       swarm: 'Swarm',
       projects: 'Projects',
       general: 'General',
@@ -1959,6 +2008,8 @@ export const en = {
       tags: 'Tags',
     },
     about: {
+      integrations:
+        'Connections to chats and other services, the service registry, notifications and webhooks. A secret is never entered here: set it with the CLI.',
       swarm: 'Providers, roles, chains, specialists and pipelines in one window, by tabs.',
       projects:
         'Every project of the daemon: its name, slug, color, whether it is enabled, and its path. Disabled projects are listed here too.',

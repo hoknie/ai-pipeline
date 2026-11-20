@@ -104,6 +104,8 @@ export interface CatalogEntry {
   secrets: readonly SecretSpec[];
   directions: readonly Direction[];
   operations: readonly string[];
+  /** The command that makes connections of this kind; present when the generic add is refused. */
+  createdBy?: string;
 }
 
 export const NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;

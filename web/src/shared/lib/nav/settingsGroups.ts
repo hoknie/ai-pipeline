@@ -14,6 +14,7 @@ export const SETTINGS_GROUPS_BY_SCOPE = {
     'runtimes',
     'swarm',
     'observers',
+    'integrations',
     'projects',
     'system',
   ],
@@ -45,6 +46,7 @@ export const LEGACY_SETTINGS_GROUPS: Record<
   queue: { scope: 'project', group: 'queue' },
   tags: { scope: 'project', group: 'tags' },
   system: { scope: 'global', group: 'system' },
+  integrations: { scope: 'global', group: 'integrations' },
 };
 
 /** The tabs of the window «Swarm», in the order of the entities: a provider is used by a chain, and so on. */
@@ -85,6 +87,15 @@ export function agentTabOf(part: string | null): AgentTab {
   return AGENT_TABS.find((tab) => tab === part) ?? 'general';
 }
 
+/** The tabs of the group «Integrations»; the third part of its address. */
+export const INTEGRATION_TABS = ['connections', 'registry', 'notifications', 'webhooks'] as const;
+export type IntegrationTab = (typeof INTEGRATION_TABS)[number];
+
+/** The tab of the group «Integrations» for the part of an address; an unknown one is the first. */
+export function integrationTabOf(part: string | null): IntegrationTab {
+  return INTEGRATION_TABS.find((tab) => tab === part) ?? 'connections';
+}
+
 const isScope = (key: string | null): key is SettingsScope =>
   SETTINGS_SCOPES.some((scope) => scope === key);
 
@@ -100,6 +111,10 @@ export function settingsLocationOf(
   if (scope === 'global' && group === 'tags') return { scope: 'project', group: 'tags' };
   // the groups of the swarm parts of the shared tab became tabs of the window «Swarm»
   if (swarmLegacyTab(scope, group) !== null) return { scope: 'global', group: 'swarm' };
+  // the group has no project tab: an address of that tab leads to the shared one
+  if (scope === 'project' && group === 'integrations') {
+    return { scope: 'global', group: 'integrations' };
+  }
   if (isScope(scope)) {
     const groups: readonly string[] = SETTINGS_GROUPS_BY_SCOPE[scope];
     const found = groups.find((candidate) => candidate === group);

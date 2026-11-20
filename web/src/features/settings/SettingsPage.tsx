@@ -28,7 +28,11 @@ function targetOf(
   // the swarm of the shared tab saves into the shared directory; the project one by level
   if (group === 'swarm') return scope === 'global' && config ? config.directories.global : null;
   const isForm =
-    group !== 'tags' && group !== 'queue' && group !== 'observers' && group !== 'projects';
+    group !== 'tags' &&
+    group !== 'queue' &&
+    group !== 'observers' &&
+    group !== 'projects' &&
+    group !== 'integrations';
   return isForm ? (config?.settingsFiles[scope].file ?? null) : null;
 }
 

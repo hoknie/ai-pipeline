@@ -50,6 +50,20 @@ describe('panel hotkeys', () => {
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
   });
 
+  it('ctrl+i opens the group of the integrations in the settings', async () => {
+    mount();
+    press('i', 'KeyI', { ctrlKey: true });
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/integrations'));
+    expect(await screen.findByRole('heading', { name: 'Integrations' })).toBeTruthy();
+    expect(screen.getByRole('tablist', { name: 'Integrations tabs' })).toBeTruthy();
+  });
+
+  it('opens the old #integrations address as that group', async () => {
+    window.location.hash = '#integrations';
+    mount();
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/integrations'));
+  });
+
   it('ctrl+b goes to the pipelines and ctrl+t to the stats', async () => {
     mount();
     press('b', 'KeyB', { ctrlKey: true });

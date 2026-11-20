@@ -1,5 +1,6 @@
 import {
   agentTabOf,
+  integrationTabOf,
   observerTabOf,
   settingsLocationOf,
   swarmLegacyTab,
@@ -7,14 +8,7 @@ import {
 } from './settingsGroups.ts';
 
 export type View =
-  | 'runs'
-  | 'queue'
-  | 'specialists'
-  | 'pipelines'
-  | 'providers'
-  | 'stats'
-  | 'integrations'
-  | 'settings';
+  'runs' | 'queue' | 'specialists' | 'pipelines' | 'providers' | 'stats' | 'settings';
 
 export interface Route {
   view: View;
@@ -94,7 +88,9 @@ function settingsRoute(
         ? observerTabOf(third)
         : group === 'agents' && third !== null
           ? agentTabOf(third)
-          : null;
+          : scope === 'global' && group === 'integrations' && third !== null
+            ? integrationTabOf(third)
+            : null;
   return { view: 'settings', run: group, group: scope, step, tab: null };
 }
 
@@ -111,9 +107,6 @@ export type StatsPeriodId = (typeof STATS_PERIODS)[number];
 
 export const statsPeriodOf = (value: string | null): StatsPeriodId =>
   STATS_PERIODS.find((period) => period === value) ?? '30d';
-
-/** The route of a page without parts. */
-const plainRoute = (view: View): Route => ({ view, run: null, group: null, step: null, tab: null });
 
 const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : null);
 
@@ -160,7 +153,8 @@ function parseBase(hash: string): Route {
       tab: first === 'new' ? params.get('preset') || null : null,
     };
   }
-  if (head === 'integrations') return plainRoute('integrations');
+  // the former section of the navigation: a group of the shared settings now
+  if (head === 'integrations') return settingsRoute('global', 'integrations', null);
   if (head === 'stats')
     return {
       view: 'stats',
@@ -263,7 +257,6 @@ function formatBase(route: Route): string {
     const preset = route.run === 'new' && route.tab ? `?preset=${enc(route.tab)}` : '';
     return `#providers/${enc(route.run)}${preset}`;
   }
-  if (route.view === 'integrations') return '#integrations';
   if (route.view === 'stats') {
     const project = route.run ? `&project=${enc(route.run)}` : '';
     return `#stats?period=${statsPeriodOf(route.group)}${project}`;
@@ -286,7 +279,9 @@ function formatBase(route: Route): string {
           ? observerTabOf(route.step)
           : group === 'agents' && agentTabOf(route.step) !== 'general'
             ? agentTabOf(route.step)
-            : null;
+            : group === 'integrations' && integrationTabOf(route.step) !== 'connections'
+              ? integrationTabOf(route.step)
+              : null;
     return `#settings/${scope}/${group}${slug === null ? '' : `/${enc(slug)}`}`;
   }
   if (route.view === 'pipelines') {

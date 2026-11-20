@@ -23,6 +23,15 @@ export interface DeliveryQuery {
   limit?: number;
 }
 
+/** A new connection: its kind, name, scope and non-secret parameters. */
+export interface NewConnection {
+  kind: string;
+  name: string;
+  /** Root of one project; without it the connection is global. */
+  repository?: string;
+  params?: Record<string, string>;
+}
+
 export interface NewSubscription {
   connection: string;
   /** Root of one project; without it the subscription is for all projects. */
@@ -41,6 +50,12 @@ export interface IntegrationsApi {
     id: string,
     change: { set?: Record<string, string>; unset?: string[] },
   ): Promise<ConnectionView>;
+  /** Makes a connection; it stays off until its secrets are set (with the CLI). */
+  integrationAdd(connection: NewConnection): Promise<ConnectionView>;
+  integrationEnabled(id: string, enabled: boolean): Promise<ConnectionView>;
+  integrationRemove(id: string): Promise<void>;
+  /** Checks the connection; the outcome is kept in its `lastCheck`. */
+  integrationCheck(id: string): Promise<ConnectionView>;
   /** The links of a project of a service registry (every project without a repository). */
   integrationLinks(repository?: string): Promise<ProjectLinkView[]>;
   /** Links a project to a registry project, matches it again or clears the link. */
@@ -62,6 +77,19 @@ export function integrationsApi(
     registrySkills: (query) =>
       call(scoped(`/api/integrations/skills${query ? `?query=${enc(query)}` : ''}`)),
     integrations: () => call('/api/integrations'),
+    integrationAdd: ({ kind, name, repository, params }) =>
+      post('/api/integrations', {
+        kind,
+        name,
+        ...(repository === undefined ? { global: true } : { repository }),
+        ...(params === undefined ? {} : { params }),
+      }),
+    integrationEnabled: (id, enabled) =>
+      post(`/api/integrations/${enabled ? 'enable' : 'disable'}`, { id }),
+    integrationRemove: async (id) => {
+      await post('/api/integrations/remove', { id });
+    },
+    integrationCheck: (id) => post('/api/integrations/check', { id }),
     integrationEdit: (id, change) => post('/api/integrations/edit', { id, ...change }),
     integrationLinks: (repository) =>
       call(

@@ -25,6 +25,16 @@ describe('catalog', () => {
     });
   });
 
+  it('names the command of a kind that has one of its own, and only for such a kind', () => {
+    const own = { ...EXAMPLE, kind: 'own', createdBy: 'aip webhook add' };
+    const types = fixture({
+      adapters: [exampleAdapter(), exampleAdapter({ descriptor: own })],
+    }).services.connections.types();
+    expect(types.find((entry) => entry.kind === 'own')?.createdBy).toBe('aip webhook add');
+    const plain = types.find((entry) => entry.kind === 'example')!;
+    expect('createdBy' in plain).toBe(false);
+  });
+
   it('refuses a kind registered twice', () => {
     expect(() => fixture({ adapters: [exampleAdapter(), exampleAdapter()] })).toThrow(/twice/);
   });

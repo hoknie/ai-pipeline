@@ -114,7 +114,48 @@ export const ru: Dictionary = {
     disabled: 'выключено',
     connections: {
       title: 'Подключения',
-      empty: 'Подключений пока нет. Создайте через CLI:',
+      empty: 'Подключений пока нет. Создайте через форму выше.',
+      add: {
+        title: 'Новое подключение',
+        kind: 'Вид',
+        name: 'Имя',
+        scope: 'Где',
+        create: 'Создать подключение',
+        secretNote:
+          'Секрет в панели не вводится: после создания на карточке подключения появится команда CLI, которая его задаёт.',
+      },
+    },
+    actions: {
+      enable: 'Включить',
+      disable: 'Выключить',
+      remove: 'Удалить',
+      removeTitle: 'Удалить подключение {{name}}?',
+      removeDescription:
+        'Его секреты тоже удалятся, а подписки, которые его используют, перестанут работать.',
+      cancel: 'Отмена',
+      copy: 'Копировать команду',
+      copied: 'Скопировано',
+    },
+    check: {
+      run: 'Проверить',
+      running: 'Проверка…',
+      never: 'Не проверялось',
+      ok: 'ok, инструментов: {{count}}',
+      failed: 'ошибка: {{code}}',
+    },
+    registry: {
+      title: 'Service registry',
+      empty:
+        'Подключений к service registry пока нет. Создайте через форму выше, затем задайте токен командой CLI.',
+      links: {
+        title: 'Проекты',
+        empty: 'Проектов с привязкой пока нет.',
+        project: 'Проект',
+        connection: 'Подключение',
+        path: 'Проект в registry',
+        source: 'Привязка',
+        status: 'Статус',
+      },
     },
     scope: {
       global: 'Все проекты',
@@ -1921,6 +1962,13 @@ export const ru: Dictionary = {
       invalid: 'Недопустимое имя переменной.',
       taken: 'Такая переменная уже есть.',
     },
+    integrationTabs: {
+      label: 'Вкладки группы «Интеграции»',
+      connections: 'Подключения',
+      registry: 'Service registry',
+      notifications: 'Уведомления',
+      webhooks: 'Вебхуки',
+    },
     agentTabs: {
       label: 'Вкладки группы «Агенты»',
       general: 'Основное',
@@ -1975,6 +2023,7 @@ export const ru: Dictionary = {
     },
     swarmNoteProject: 'Уровень сохранения выбирается при записи: проект или общий.',
     group: {
+      integrations: 'Интеграции',
       swarm: 'Рой',
       projects: 'Проекты',
       general: 'Основное',
@@ -1990,6 +2039,8 @@ export const ru: Dictionary = {
       tags: 'Теги',
     },
     about: {
+      integrations:
+        'Подключения к чатам и другим сервисам, service registry, уведомления и вебхуки. Секреты здесь не вводятся: задайте их командой CLI.',
       swarm: 'Провайдеры, роли, цепочки, специалисты и pipeline в одном окне по вкладкам.',
       projects:
         'Все проекты демона: название, slug, цвет, включён ли проект и его путь. Выключенные проекты тоже здесь.',

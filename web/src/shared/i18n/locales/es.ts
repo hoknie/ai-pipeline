@@ -115,7 +115,48 @@ export const es: Dictionary = {
     disabled: 'desactivada',
     connections: {
       title: 'Conexiones',
-      empty: 'Aún no hay conexiones. Cree una con la CLI:',
+      empty: 'Aún no hay conexiones. Cree una con el formulario de arriba.',
+      add: {
+        title: 'Nueva conexión',
+        kind: 'Tipo',
+        name: 'Nombre',
+        scope: 'Dónde',
+        create: 'Crear conexión',
+        secretNote:
+          'El secreto no se introduce en el panel: al crear la conexión, su tarjeta muestra el comando de la CLI que lo establece.',
+      },
+    },
+    actions: {
+      enable: 'Activar',
+      disable: 'Desactivar',
+      remove: 'Eliminar',
+      removeTitle: '¿Eliminar la conexión {{name}}?',
+      removeDescription:
+        'También se eliminan sus secretos y las suscripciones que la usan dejan de funcionar.',
+      cancel: 'Cancelar',
+      copy: 'Copiar comando',
+      copied: 'Copiado',
+    },
+    check: {
+      run: 'Comprobar',
+      running: 'Comprobando…',
+      never: 'Aún sin comprobar',
+      ok: 'ok, {{count}} herramientas',
+      failed: 'error: {{code}}',
+    },
+    registry: {
+      title: 'Service registry',
+      empty:
+        'Aún no hay conexiones al service registry. Cree una con el formulario de arriba y luego establezca su token con la CLI.',
+      links: {
+        title: 'Proyectos',
+        empty: 'Aún no hay proyectos vinculados.',
+        project: 'Proyecto',
+        connection: 'Conexión',
+        path: 'Proyecto del registry',
+        source: 'Vínculo',
+        status: 'Estado',
+      },
     },
     scope: {
       global: 'Todos los proyectos',
@@ -1929,6 +1970,13 @@ export const es: Dictionary = {
       invalid: 'Nombre de variable no válido.',
       taken: 'Esta variable ya existe.',
     },
+    integrationTabs: {
+      label: 'Pestañas de Integraciones',
+      connections: 'Conexiones',
+      registry: 'Service registry',
+      notifications: 'Notificaciones',
+      webhooks: 'Webhooks',
+    },
     agentTabs: {
       label: 'Pestañas de Agentes',
       general: 'Principal',
@@ -1982,6 +2030,7 @@ export const es: Dictionary = {
     },
     swarmNoteProject: 'El nivel se elige al guardar: proyecto o compartido.',
     group: {
+      integrations: 'Integraciones',
       swarm: 'Enjambre',
       projects: 'Proyectos',
       general: 'General',
@@ -1997,6 +2046,8 @@ export const es: Dictionary = {
       tags: 'Etiquetas',
     },
     about: {
+      integrations:
+        'Conexiones a chats y otros servicios, el service registry, notificaciones y webhooks. Aquí nunca se introduce un secreto: establézcalo con la CLI.',
       swarm: 'Proveedores, roles, cadenas, especialistas y pipelines en una ventana, por pestañas.',
       projects:
         'Todos los proyectos del daemon: nombre, slug, color, si está activado y su ruta. Los proyectos desactivados también aparecen aquí.',

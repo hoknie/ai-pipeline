@@ -1,23 +1,15 @@
-import {
-  Activity,
-  BarChart3,
-  Boxes,
-  ListOrdered,
-  Plug,
-  Settings,
-  type LucideIcon,
-} from 'lucide-react';
+import { Activity, BarChart3, Boxes, ListOrdered, Settings, type LucideIcon } from 'lucide-react';
 
 import type { TFunction } from 'i18next';
 
-import type { View } from '../shared/lib/nav/route.ts';
+import type { Route, View } from '../shared/lib/nav/route.ts';
 
 export interface Section {
   /** The view a click on the section opens (the section «Swarm» opens its last tab). */
   view: View;
   /** Every view the section shows; the section is highlighted for any of them. */
   views: View[];
-  labelKey: 'runs' | 'queue' | 'swarm' | 'stats' | 'integrations' | 'settings';
+  labelKey: 'runs' | 'queue' | 'swarm' | 'stats' | 'settings';
   icon: LucideIcon;
 }
 
@@ -30,7 +22,6 @@ export const SECTIONS: Section[] = [
   { view: 'queue', views: ['queue'], labelKey: 'queue', icon: ListOrdered },
   { view: 'specialists', views: SWARM_VIEWS, labelKey: 'swarm', icon: Boxes },
   { view: 'stats', views: ['stats'], labelKey: 'stats', icon: BarChart3 },
-  { view: 'integrations', views: ['integrations'], labelKey: 'integrations', icon: Plug },
   { view: 'settings', views: ['settings'], labelKey: 'settings', icon: Settings },
 ];
 
@@ -41,6 +32,8 @@ export const showsView = (section: Section, view: View): boolean => section.view
 export interface SectionShortcut {
   key: 'r' | 'q' | 's' | 'b' | 'o' | 't' | 'i' | 'c';
   view: View;
+  /** Where the shortcut goes when that is not the plain page of `view` (a group of the settings). */
+  route?: Route;
   /** The label in `nav.*`. */
   labelKey:
     | 'runs'
@@ -61,7 +54,13 @@ export const SECTION_SHORTCUTS: SectionShortcut[] = [
   { key: 'b', view: 'pipelines', labelKey: 'pipelines' },
   { key: 'o', view: 'providers', labelKey: 'providers' },
   { key: 't', view: 'stats', labelKey: 'stats' },
-  { key: 'i', view: 'integrations', labelKey: 'integrations' },
+  // the integrations are a group of the shared settings, not a section of the navigation
+  {
+    key: 'i',
+    view: 'settings',
+    route: { view: 'settings', run: 'integrations', group: 'global', step: null, tab: null },
+    labelKey: 'integrations',
+  },
   { key: 'c', view: 'settings', labelKey: 'settings' },
 ];
 

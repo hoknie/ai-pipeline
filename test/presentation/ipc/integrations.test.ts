@@ -151,17 +151,15 @@ describe('where the methods are not offered', () => {
     });
   }
 
-  it('has no MCP tool and no panel route that creates connections or touches secrets', () => {
+  it('has no MCP tool, and no panel route that touches secrets', () => {
     const root = join(import.meta.dirname, '..', '..', '..', 'src', 'presentation');
     const own = join('web', 'routes', 'integrations', 'integrations.ts');
     for (const place of ['mcp', 'web']) {
       for (const file of sources(join(root, place))) {
         const text = readFileSync(file, 'utf8');
         if (file.endsWith(own)) {
-          // the panel reads connections and edits their non-secret parameters, nothing more
-          expect(text, file).not.toMatch(
-            /integration_(add|remove|enable|disable|secret_set|secret_remove)/,
-          );
+          // the panel manages connections and their non-secret parameters; secrets stay with the CLI
+          expect(text, file).not.toMatch(/integration_secret_(set|remove)/);
         } else {
           expect(text, file).not.toMatch(/integration_/);
         }

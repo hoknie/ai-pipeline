@@ -115,15 +115,74 @@ describe('the panel API of integrations', () => {
     expect(JSON.stringify(after)).not.toContain(SENTINEL);
   });
 
-  it('has no route that creates, enables or removes a connection or carries a secret', async () => {
+  it('makes, enables, disables and removes a connection, and refuses a secret in the body', async () => {
+    const { post, get } = await setup();
+    const made = await post('/api/integrations', {
+      kind: 'telegram',
+      name: 'second',
+      global: true,
+      params: { allowed_users: '222' },
+    });
+    expect(made.status).toBe(200);
+    const view = (await made.json()) as ConnectionView;
+    expect(view).toMatchObject({ kind: 'telegram', name: 'second', enabled: false });
+
+    const early = await post('/api/integrations/enable', { id: view.id });
+    expect(early.status).toBeGreaterThanOrEqual(400);
+
+    await h!.call('integration_secret_set', {
+      id: view.id,
+      slot: 'bot_token',
+      value: fake!.token,
+    });
+    await h!.call('integration_edit', { id: view.id, set: { chat_id: '-1001' } });
+    const on = await post('/api/integrations/enable', { id: view.id });
+    expect(((await on.json()) as ConnectionView).enabled).toBe(true);
+    const off = await post('/api/integrations/disable', { id: view.id });
+    expect(((await off.json()) as ConnectionView).enabled).toBe(false);
+
+    const removed = await post('/api/integrations/remove', { id: view.id });
+    expect(removed.status).toBe(200);
+    const left = (await (await get('/api/integrations')).json()) as {
+      connections: ConnectionView[];
+    };
+    expect(left.connections.map((one) => one.name)).toEqual(['main']);
+
+    for (const body of [
+      { kind: 'telegram', name: 'third', global: true, bot_token: SENTINEL },
+      { kind: 'telegram', name: 'third', global: true, secrets: { bot_token: SENTINEL } },
+      { kind: 'telegram', name: 'third', global: true, value: SENTINEL },
+    ]) {
+      const refused = await post('/api/integrations', body);
+      expect(refused.status).toBeGreaterThanOrEqual(400);
+      expect(await refused.text()).not.toContain(SENTINEL);
+    }
+    const refusedAction = await post('/api/integrations/enable', { id: view.id, value: SENTINEL });
+    expect(refusedAction.status).toBeGreaterThanOrEqual(400);
+    expect(await refusedAction.text()).not.toContain(SENTINEL);
+  });
+
+  it('checks a connection through the API and keeps the routes closed without a login', async () => {
+    const { post, base, id } = await setup();
+    const checked = await post('/api/integrations/check', { id });
+    expect(checked.status).toBeLessThan(500);
+    expect(await checked.text()).not.toContain(SENTINEL);
+    for (const path of ['', '/enable', '/disable', '/remove', '/check']) {
+      const response = await fetch(`${base}/api/integrations${path}`, {
+        method: 'POST',
+        headers: JSON_TYPE,
+        body: JSON.stringify({ id }),
+      });
+      expect(response.status).toBe(401);
+    }
+  });
+
+  it('has no route that carries a secret', async () => {
     const { post, id } = await setup();
     for (const path of [
-      '/api/integrations',
       '/api/integrations/secret',
       '/api/integrations/secret/set',
-      '/api/integrations/enable',
-      '/api/integrations/add',
-      '/api/integrations/remove',
+      '/api/integrations/secret/remove',
     ]) {
       const response = await post(path, { id, slot: 'bot_token', value: SENTINEL });
       expect([404, 405]).toContain(response.status);

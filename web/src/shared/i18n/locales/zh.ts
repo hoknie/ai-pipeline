@@ -103,7 +103,45 @@ export const zh: Dictionary = {
     disabled: '已停用',
     connections: {
       title: '连接',
-      empty: '还没有连接。请用 CLI 创建：',
+      empty: '还没有连接。请使用上面的表单创建。',
+      add: {
+        title: '新建连接',
+        kind: '类型',
+        name: '名称',
+        scope: '范围',
+        create: '创建连接',
+        secretNote: '面板不接收密钥：创建连接后，其卡片会显示设置密钥的 CLI 命令。',
+      },
+    },
+    actions: {
+      enable: '启用',
+      disable: '停用',
+      remove: '删除',
+      removeTitle: '删除连接 {{name}}？',
+      removeDescription: '其密钥也会被删除，使用它的订阅将停止工作。',
+      cancel: '取消',
+      copy: '复制命令',
+      copied: '已复制',
+    },
+    check: {
+      run: '检查',
+      running: '正在检查…',
+      never: '尚未检查',
+      ok: 'ok，{{count}} 个工具',
+      failed: '失败：{{code}}',
+    },
+    registry: {
+      title: 'Service registry',
+      empty: '还没有 service registry 连接。请用上面的表单创建，然后用 CLI 设置令牌。',
+      links: {
+        title: '项目',
+        empty: '还没有关联的项目。',
+        project: '项目',
+        connection: '连接',
+        path: 'registry 中的项目',
+        source: '关联',
+        status: '状态',
+      },
     },
     scope: {
       global: '所有项目',
@@ -1846,6 +1884,13 @@ export const zh: Dictionary = {
       invalid: '变量名无效。',
       taken: '该变量已存在。',
     },
+    integrationTabs: {
+      label: '集成标签页',
+      connections: '连接',
+      registry: 'Service registry',
+      notifications: '通知',
+      webhooks: 'Webhook',
+    },
     agentTabs: {
       label: '代理标签页',
       general: '主要',
@@ -1896,6 +1941,7 @@ export const zh: Dictionary = {
     },
     swarmNoteProject: '层级在保存时选择：项目或共享。',
     group: {
+      integrations: '集成',
       swarm: '集群',
       projects: '项目',
       general: '常规',
@@ -1911,6 +1957,8 @@ export const zh: Dictionary = {
       tags: '标签',
     },
     about: {
+      integrations:
+        '与聊天和其他服务的连接、service registry、通知和 webhook。此处不会输入密钥：请用 CLI 设置。',
       swarm: '提供商、角色、链、专家和 pipeline 按标签页集中在一个窗口。',
       projects: '守护进程的所有项目：名称、slug、颜色、是否启用以及路径。已停用的项目也列在这里。',
       observers: '观察者：在出现问题（提问、失败、冲突、交付被拒）后接手任务并尝试修复的智能体。',

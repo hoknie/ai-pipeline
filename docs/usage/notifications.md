@@ -113,7 +113,9 @@ aip notify log                        # the newest 20 lines
 aip notify log --state failed --limit 5
 ```
 
-The same journal, the state of every channel and the parameters of the connections are on the **Integrations** page of the [web panel](../web/README.md). For a missing secret the page shows the command that sets it.
+The same journal, the state of every channel and the parameters of the connections are in the group **Integrations** of the shared settings in the [web panel](../web/README.md): the tabs "Connections" and "Notifications".
+A connection is made, switched on and off and removed there.
+For a missing secret the card shows the command that sets it, with a button to copy it; the secret itself is never typed in the panel.
 
 ## Network
 

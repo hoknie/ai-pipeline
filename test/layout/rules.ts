@@ -225,7 +225,7 @@ export const webGraph: Record<string, readonly string[]> = {
   runs: ['pipelines', 'tags', 'repositories', 'providers'],
   queue: ['runs', 'tags', 'repositories', 'providers'],
   swarm: ['providers', 'specialists', 'pipelines', 'repositories'],
-  settings: ['swarm', 'specialists', 'repositories'],
+  settings: ['swarm', 'specialists', 'repositories', 'integrations'],
 };
 
 /**

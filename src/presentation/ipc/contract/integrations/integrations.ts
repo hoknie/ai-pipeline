@@ -42,9 +42,10 @@ const slot = z.string().regex(SLOT_PATTERN);
 const parameters = z.record(z.string().min(1).max(64), z.string().max(1000));
 
 /**
- * The methods that manage connections and their secrets. Only the local CLI uses them: no MCP
- * tool and no HTTP route of the panel carries them, so no specialist and no browser can read or
- * change a secret through the daemon.
+ * The methods that manage connections and their secrets. The panel carries all of them except
+ * `integration_secret_set` and `integration_secret_remove`, which only the local CLI uses: no MCP
+ * tool and no HTTP route carries them, so no specialist and no browser can read or change a
+ * secret through the daemon.
  */
 export const integrationsRequests = [
   z.object({ method: z.literal('integration_types'), params: z.object({}).default({}) }),

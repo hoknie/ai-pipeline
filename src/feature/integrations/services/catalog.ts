@@ -24,6 +24,7 @@ export class AdapterCatalog {
       secrets: descriptor.secrets,
       directions: descriptor.directions,
       operations: descriptor.operations,
+      ...(descriptor.createdBy === undefined ? {} : { createdBy: descriptor.createdBy }),
     }));
   }
 

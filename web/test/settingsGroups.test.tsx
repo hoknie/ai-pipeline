@@ -6,6 +6,7 @@ import {
   errorGroupOf,
   errorsByGroup,
   groupOf,
+  integrationTabOf,
   settingsLocationOf,
 } from '../src/shared/lib/nav/settingsGroups.ts';
 import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
@@ -20,6 +21,7 @@ describe('groups of settings', () => {
       'runtimes',
       'swarm',
       'observers',
+      'integrations',
       'projects',
       'system',
     ]);
@@ -31,6 +33,22 @@ describe('groups of settings', () => {
       'swarm',
       'tags',
     ]);
+  });
+
+  it('keeps the integrations on the shared tab, and the old addresses lead there', () => {
+    expect(SETTINGS_GROUPS_BY_SCOPE.project).not.toContain('integrations');
+    expect(LEGACY_SETTINGS_GROUPS.integrations).toEqual({ scope: 'global', group: 'integrations' });
+    expect(settingsLocationOf('integrations', null)).toEqual({
+      scope: 'global',
+      group: 'integrations',
+    });
+    expect(settingsLocationOf('project', 'integrations')).toEqual({
+      scope: 'global',
+      group: 'integrations',
+    });
+    expect(integrationTabOf('registry')).toBe('registry');
+    expect(integrationTabOf('x')).toBe('connections');
+    expect(integrationTabOf(null)).toBe('connections');
   });
 
   it('puts every field to the enlarged group of its section', () => {

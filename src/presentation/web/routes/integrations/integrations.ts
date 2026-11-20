@@ -9,6 +9,21 @@ const names = z.array(z.string().min(1).max(40)).max(20);
 /** Strict: a field that is not listed (a secret, say) is refused by name, never stored or echoed. */
 const strict = <T extends z.ZodRawShape>(shape: T) => z.object(shape).strict();
 
+const addConnection = strict({
+  kind: z.string().min(1).max(40),
+  name: z.string().min(1).max(80),
+  repository: z.string().min(1).max(4096).optional(),
+  global: z.boolean().optional(),
+  params: z.record(z.string().min(1).max(64), z.string().max(1000)).optional(),
+});
+const connectionId = strict({ id });
+const connectionActions = [
+  ['enable', 'integration_enable'],
+  ['disable', 'integration_disable'],
+  ['remove', 'integration_remove'],
+  ['check', 'integration_check'],
+] as const;
+
 const editConnection = strict({
   id,
   set: z.record(z.string().min(1).max(64), z.string().max(1000)).optional(),
@@ -41,10 +56,26 @@ const subscriptionActions = [
   ['test', 'notify_test'],
 ] as const;
 
+/** Makes a connection and switches, checks or removes one: none of these carries a secret. */
+function connectionRoutes(call: RouteKit['call']): Route[] {
+  return [
+    {
+      method: 'POST',
+      pattern: /^\/api\/integrations$/,
+      handle: async (_match, body) => call('integration_add', parseBody(addConnection, body)),
+    },
+    ...connectionActions.map(([verb, method]): Route => ({
+      method: 'POST',
+      pattern: new RegExp(`^/api/integrations/${verb}$`),
+      handle: async (_match, body) => call(method, parseBody(connectionId, body)),
+    })),
+  ];
+}
+
 /**
- * The pages of integrations: connections (read, and their non-secret parameters), subscriptions,
- * the journal and the state of the channels. No route takes or returns a secret, and none creates,
- * removes, enables or disables a connection: that stays with the local CLI. The link of a project
+ * The pages of integrations: connections (make, enable, disable, check, remove and edit their
+ * non-secret parameters), subscriptions, the journal and the state of the channels. No route takes
+ * or returns a secret: setting and removing one stays with the local CLI. The link of a project
  * to its project in a service registry is a setting of the project and goes through here.
  */
 export function integrationsRoutes({ call }: RouteKit): Route[] {
@@ -69,6 +100,7 @@ export function integrationsRoutes({ call }: RouteKit): Route[] {
           ...(query.get('query') ? { query: query.get('query')!.slice(0, 200) } : {}),
         }),
     },
+    ...connectionRoutes(call),
     {
       method: 'POST',
       pattern: /^\/api\/integrations\/edit$/,

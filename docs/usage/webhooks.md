@@ -90,4 +90,4 @@ The receiver should accept both secrets for a while: set the new one with `aip i
 
 With `network.proxy` set (see [network](../configuration/network.md)), every address except loopback goes through the proxy with `CONNECT`; the proxy sees the host and port, not the path or query. Loopback addresses (`127.0.0.1`, `localhost`) are called directly.
 
-The panel (page «Integrations», section «Webhooks») creates, switches, tests and edits webhooks and shows the journal with a button to send a delivery again; it shows the command for the secret instead of asking for it.
+The panel (settings → "Shared" → "Integrations", tab "Webhooks") creates, switches, tests and edits webhooks and shows the journal with a button to send a delivery again; it shows the command for the secret instead of asking for it.

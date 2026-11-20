@@ -26,7 +26,7 @@ export interface SettingsPageProps {
   runs: RunView[];
   /** Opens a group of a run (from the topology of a pipeline). */
   onOpenGroup: (target: { runId: string; slug: string }, step: string | null) => void;
-  /** The open tab of the group «Agents» (`general` or `mcp`); null for the first. */
+  /** The open tab of the group «Agents» (`general` or `mcp`) or «Integrations»; null for the first. */
   agentTab: string | null;
   /** The open tab of the group «Observers»; null for the first. */
   observerTab: string | null;

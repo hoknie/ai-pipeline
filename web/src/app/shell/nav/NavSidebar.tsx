@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { modLabel } from '../../../shared/lib/browser/hotkeys.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
-import type { View } from '../../../shared/lib/nav/route.ts';
+import type { Route, View } from '../../../shared/lib/nav/route.ts';
 import { SECTIONS, showsView, type Section } from '../../sections.ts';
 import type { NotificationCenterState } from '../../notifications.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
@@ -21,6 +21,8 @@ export interface NavProps {
   view: View;
   hrefFor: (view: View) => string;
   onNavigate: (view: View) => void;
+  /** Opens an address that is not the page of a section; absent: the shortcut opens its view. */
+  onRoute?: (route: Route) => void;
   /** The address of the section «Swarm»: its last tab. */
   hrefSwarm: string;
   /** Opens the section «Swarm» on its last tab. */

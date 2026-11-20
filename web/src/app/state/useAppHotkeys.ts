@@ -21,7 +21,8 @@ export function useAppHotkeys(nav: NavProps): void {
       // with selected text ctrl+c keeps copying instead of going to the settings
       if (section.key === 'c' && hasSelection()) return;
       event.preventDefault();
-      nav.onNavigate(section.view);
+      if (section.route !== undefined && nav.onRoute !== undefined) nav.onRoute(section.route);
+      else nav.onNavigate(section.view);
     });
   }
 }
