@@ -11,6 +11,8 @@ export interface Scope {
   since?: number;
   until?: number;
   repository?: string;
+  /** Only the records of this author (a user id). */
+  author?: string;
   /** Roots of the projects left out of every read. */
   exclude: readonly string[];
   /** Only these projects are read; absent: every project. */
@@ -34,6 +36,10 @@ function where(scope: Scope): { sql: string; values: (string | number)[] } {
     clauses.push('repository = ?');
     values.push(scope.repository);
   }
+  if (scope.author !== undefined) {
+    clauses.push('author = ?');
+    values.push(scope.author);
+  }
   if (scope.exclude.length > 0) {
     clauses.push(`repository NOT IN (${scope.exclude.map(() => '?').join(', ')})`);
     values.push(...scope.exclude);
@@ -48,7 +54,7 @@ function where(scope: Scope): { sql: string; values: (string | number)[] } {
 }
 
 const ATTEMPT_COLUMNS = `run_id, group_slug, seq, kind, repository, pipeline, step_id, specialist, runtime,
-  model, status, reason, started_at, finished_at, duration_ms, input_tokens, output_tokens`;
+  model, status, reason, started_at, finished_at, duration_ms, input_tokens, output_tokens, author`;
 
 function attemptOf(row: Row): AttemptRecord {
   return {
@@ -69,6 +75,7 @@ function attemptOf(row: Row): AttemptRecord {
     durationMs: Number(row.duration_ms),
     inputTokens: Number(row.input_tokens),
     outputTokens: Number(row.output_tokens),
+    author: row.author === null ? null : String(row.author),
   };
 }
 
@@ -81,6 +88,7 @@ function taskOf(row: Row): TaskRecord {
     finishedAt: Number(row.finished_at),
     wallMs: Number(row.wall_ms),
     outcome: String(row.outcome) as TaskOutcome,
+    author: row.author === null ? null : String(row.author),
   };
 }
 
@@ -108,7 +116,7 @@ export class StatsReportRepository {
     const { sql, values } = where(scope);
     return this.database
       .prepare(
-        `SELECT run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome
+        `SELECT run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome, author
          FROM stats_runs${sql} ORDER BY finished_at, run_id`,
       )
       .all(...values)

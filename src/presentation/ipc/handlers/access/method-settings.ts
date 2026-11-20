@@ -95,6 +95,7 @@ export const settingsMethods = {
   tokens_revoke: open,
   login_link_create: onShared('users.manage'),
   users_list: onShared('users.manage'),
+  users_directory: onShared('users.read'),
   users_set: onShared('users.manage'),
   users_disable: onShared('users.manage'),
   users_enable: onShared('users.manage'),

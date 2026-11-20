@@ -33,6 +33,8 @@ export function useStatsReport(
   period: StatsPeriodId,
   repository: string | null,
   runs: readonly RunView[],
+  /** A user id or `me`; null: every author. */
+  author: string | null = null,
 ): StatsState {
   const [report, setReport] = useState<StatsReportView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export function useStatsReport(
           bucket: 'auto',
           since: periodSince(period, Date.now()),
           ...(repository === null ? {} : { repository }),
+          ...(author === null ? {} : { author }),
         })
         .then((next) => {
           if (id !== latest.current) return;
@@ -64,7 +67,7 @@ export function useStatsReport(
           setLoading(false);
         });
     },
-    [api, period, repository],
+    [api, period, repository, author],
   );
 
   useEffect(() => {

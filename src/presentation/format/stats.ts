@@ -22,10 +22,15 @@ function period(report: StatsReportView): string {
   return `${from}${to} · ${scope}`;
 }
 
-function breakdown(title: string, rows: Breakdown[], style: Style): string[] {
+function breakdown(
+  title: string,
+  rows: Breakdown[],
+  style: Style,
+  label: (row: Breakdown) => string = (row) => row.key,
+): string[] {
   if (rows.length === 0) return [];
   const body = rows.map((row) => [
-    row.key,
+    label(row),
     String(row.attempts),
     formatTokens(row.tokens),
     formatSpan(row.agentMs),
@@ -33,6 +38,12 @@ function breakdown(title: string, rows: Breakdown[], style: Style): string[] {
   ]);
   const header = [title, 'attempts', 'tokens', 'agent time', 'tokens/attempt'];
   return ['', table([header, ...body], style)];
+}
+
+/** The email of a user, `no author` for the records without one, the key of a user that is gone. */
+function authorLabel(row: Breakdown): string {
+  if (row.key === 'none') return 'no author';
+  return row.email ?? row.name ?? row.key;
 }
 
 function projects(report: StatsReportView, style: Style): string[] {
@@ -76,6 +87,7 @@ export function formatStats(report: StatsReportView, style: Style = plainStyle):
     ...breakdown('model', report.byModel, style),
     ...breakdown('pipeline', report.byPipeline, style),
     ...breakdown('runtime', report.byRuntime, style),
+    ...breakdown('author', report.byAuthor ?? [], style, authorLabel),
   );
   return lines.join('\n');
 }

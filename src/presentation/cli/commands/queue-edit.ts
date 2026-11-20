@@ -1,8 +1,7 @@
-import { Option, type Command } from 'commander';
+import { Option } from 'commander';
 
 import { repositoryArgument } from '../../ipc/client/index.ts';
-import { formatQueues } from '../../format/index.ts';
-import type { GlobalQueueView, QueueView, RepositoryView } from '../../ipc/contract/index.ts';
+import type { QueueView } from '../../ipc/contract/index.ts';
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
 import { linkInputsOf } from '../links.ts';
@@ -276,35 +275,4 @@ export function addSettings(kit: QueueKit): void {
         );
       },
     );
-}
-
-/** `aip queue list`: the queue of a repository, or with `--all` of every enabled project. */
-export function addList(kit: QueueKit): void {
-  const { examples, context, showQueue, queue, common, output, activeStyle } = kit;
-  common(queue.command('list').description('Show the queue of the repository'))
-    .option('--all', 'show the queues of all enabled projects')
-    .addHelpText(
-      'after',
-      examples(['aip queue list', 'aip queue list --json', 'aip queue list --all']),
-    )
-    .action(async (options: { repo: string; json?: boolean; all?: boolean }, command: Command) => {
-      if (options.all) {
-        if (command.getOptionValueSource('repo') !== 'default') {
-          throw usage('--all cannot be combined with --repo');
-        }
-        const views = (await call(context(), 'queues', {})) as QueueView[];
-        const registry =
-          views.length === 0 || options.json
-            ? []
-            : ((await call(context(), 'repositories', {})) as RepositoryView[]);
-        output(options.json, formatQueues(views, registry, activeStyle), views);
-        return;
-      }
-      await showQueue(
-        options.json,
-        (await call(context(), 'queue', {
-          repository: repositoryArgument(options.repo),
-        })) as QueueView | GlobalQueueView,
-      );
-    });
 }

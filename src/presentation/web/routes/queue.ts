@@ -72,7 +72,8 @@ export function queueRoutes(kit: RouteKit): Route[] {
     {
       method: 'GET',
       pattern: /^\/api\/queue$/,
-      handle: (_match, _body, repository) => call('queue', { repository }),
+      handle: (_match, body, repository) =>
+        call('queue', { ...(body as { author?: string }), repository }),
     },
     {
       method: 'POST',

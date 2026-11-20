@@ -42,6 +42,7 @@ export function recordsOf(state: RunState): RunRecords {
         durationMs: Math.max(0, attempt.finishedAt - attempt.startedAt),
         inputTokens: attempt.usage?.inputTokens ?? 0,
         outputTokens: attempt.usage?.outputTokens ?? 0,
+        author: run.author,
       });
     }
   }
@@ -69,6 +70,7 @@ function namingRecord(state: RunState): NamingRecord {
     durationMs: 0,
     inputTokens: usage?.inputTokens ?? 0,
     outputTokens: usage?.outputTokens ?? 0,
+    author: run.author,
   };
 }
 
@@ -85,5 +87,6 @@ function taskOf(state: RunState): TaskRecord | null {
     finishedAt: run.finishedAt,
     wallMs: Math.max(0, run.finishedAt - run.createdAt),
     outcome: phase,
+    author: run.author,
   };
 }

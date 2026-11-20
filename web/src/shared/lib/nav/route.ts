@@ -34,6 +34,8 @@ export interface Route {
   preset?: string | null;
   /** Slug of the project of an entry of the specialists or pipelines tab (`?project=`); null: a shared one. */
   project?: string | null;
+  /** The author filter of the runs, the queue and the statistics (`?author=`): a user id or `me`; absent: everybody. */
+  author?: string | null;
 }
 
 /** Groups of the shared tab whose third address part opens an entry (a slug, an id or `new`). */
@@ -107,12 +109,21 @@ const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : 
 
 /** `#runs/<run>/<group>/<step>`, the older `#topology/<pipeline>` opens the topology section; the older `#<run>/<group>` still works. */
 export function parseRoute(hash: string): Route {
-  const route = parseBase(hash);
+  const route = withAuthor(parseBase(hash), hash);
   if (route.view !== 'specialists' && route.view !== 'pipelines' && route.view !== 'providers') {
     return route;
   }
   const project = new URLSearchParams(hash.split('?', 2)[1] ?? '').get('project') || null;
   return project === null ? route : { ...route, project };
+}
+
+const AUTHOR_VIEWS: ReadonlySet<View> = new Set<View>(['runs', 'queue', 'stats']);
+
+/** The `author` of the address on the views that filter by it. */
+function withAuthor(route: Route, hash: string): Route {
+  if (!AUTHOR_VIEWS.has(route.view)) return route;
+  const author = new URLSearchParams(hash.split('?', 2)[1] ?? '').get('author') || null;
+  return author === null ? route : { ...route, author };
 }
 
 function parseBase(hash: string): Route {
@@ -201,11 +212,17 @@ function parseBase(hash: string): Route {
 }
 
 export function formatRoute(route: Route): string {
-  const base = formatBase(route);
+  const base = withAuthorQuery(formatBase(route), route);
   const withProject =
     route.view === 'specialists' || route.view === 'pipelines' || route.view === 'providers';
   if (!route.project || !withProject) return base;
   return `${base}${base.includes('?') ? '&' : '?'}project=${encodeURIComponent(route.project)}`;
+}
+
+/** The author filter appended to the address of a view that has it. */
+function withAuthorQuery(base: string, route: Route): string {
+  if (!route.author || !AUTHOR_VIEWS.has(route.view)) return base;
+  return `${base}${base.includes('?') ? '&' : '?'}author=${encodeURIComponent(route.author)}`;
 }
 
 /** `#settings/<tab>/swarm/<window tab>[/<entry>|/<section>/<id>]`. */

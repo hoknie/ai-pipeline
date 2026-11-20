@@ -21,6 +21,8 @@ export interface AttemptRecord {
   durationMs: number;
   inputTokens: number;
   outputTokens: number;
+  /** Id of the user who created the run; null: none. */
+  author: string | null;
 }
 
 export type NamingRecord = AttemptRecord & { kind: 'naming' };
@@ -34,6 +36,8 @@ export interface TaskRecord {
   finishedAt: number;
   wallMs: number;
   outcome: TaskOutcome;
+  /** Id of the user who created the run; null: none. */
+  author: string | null;
 }
 
 /** Key of an attempt record inside a run. */

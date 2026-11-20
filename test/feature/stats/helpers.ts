@@ -74,6 +74,7 @@ export function attemptRecord(overrides: Partial<AttemptRecord> = {}): AttemptRe
     durationMs: 1000,
     inputTokens: 100,
     outputTokens: 50,
+    author: null,
     ...overrides,
   };
 }
@@ -88,6 +89,7 @@ export function taskRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
     finishedAt: 5000,
     wallMs: 4000,
     outcome: 'finished',
+    author: null,
     ...overrides,
   };
 }

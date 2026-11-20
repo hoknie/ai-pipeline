@@ -126,7 +126,13 @@ const queueParallel = z.number().int().min(1).max(20);
 
 export const queueRequests = [
   z.object({ method: z.literal('queues'), params: z.object({}) }),
-  z.object({ method: z.literal('queue'), params: z.object({ repository: queueRepository }) }),
+  z.object({
+    method: z.literal('queue'),
+    params: z.object({
+      repository: queueRepository,
+      author: z.string().min(1).max(128).optional(),
+    }),
+  }),
   z.object({ method: z.literal('queue_add'), params: queueAddParams }),
   z.object({ method: z.literal('queue_add_projects'), params: queueAddProjectsParams }),
   z.object({ method: z.literal('queue_edit'), params: queueEditParams }),

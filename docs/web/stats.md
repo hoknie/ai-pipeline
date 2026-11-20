@@ -6,6 +6,7 @@ The "Statistics" section shows what the agents used: tokens and time. The number
 
 - **Period:** "7 days", "30 days" (default), "90 days" or "All time". Days count from local midnight, so the tiles and the chart cover the same days.
 - **Project:** "All projects" or one project of the list. A click on a project name in the table of projects picks it.
+- **Author** (server mode only): "All authors", "Mine" or one user. The choice is in the address as `author=<id|me>`; opening the section from the navigation resets it.
 
 Changing a filter reads the report again without reloading the page. While the section is open, it is read again after a run changes, at most once in 5 seconds.
 
@@ -30,6 +31,8 @@ Every chart has a name and a table with the same data for a screen reader.
 
 - "Projects": all projects of the period; the first row is the total. Headers sort the table, ascending first, then descending; the total stays first. Columns: tasks, tokens, agent work, full time, and the mean and median of tokens and agent work per task.
 - Breakdowns: tabs "Specialists", "Models", "Pipeline" and "Runtimes" with attempts, input and output tokens, agent work and tokens per attempt.
+
+- "By authors" (server mode only): author (name, the email in the tip), attempts, tokens, agent work and tokens per attempt; records without an author are "No author". A click on a name picks that author in the filter.
 
 ## Clear a project's statistics
 

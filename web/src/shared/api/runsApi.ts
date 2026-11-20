@@ -20,6 +20,7 @@ export interface RunsApi {
   finishedRuns(
     before?: string,
     repository?: string,
+    author?: string,
   ): Promise<{ runs: RunView[]; next: string | null }>;
   /** One run by id, also one the list no longer carries; 404 when the daemon does not know it. */
   run(runId: string): Promise<RunView>;
@@ -41,11 +42,11 @@ export interface RunsApi {
 export function runsApi(): RunsApi {
   const api: RunsApi = {
     runs: () => call('/api/runs'),
-    finishedRuns: (before, repository) =>
+    finishedRuns: (before, repository, author) =>
       call(
         `/api/finished-runs?limit=${FINISHED_PAGE}${before ? `&before=${enc(before)}` : ''}${
           repository ? `&repository=${enc(repository)}` : ''
-        }`,
+        }${author ? `&author=${enc(author)}` : ''}`,
       ),
     run: (runId) => call(`/api/runs/${enc(runId)}`),
     group: (runId, group) => call(`/api/runs/${enc(runId)}/groups/${enc(group)}?tail=200`),

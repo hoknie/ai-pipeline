@@ -40,6 +40,7 @@ export const readingMethods: readonly Method[] = [
   'web_status',
   'whoami',
   'users_list',
+  'users_directory',
   'tokens_list',
   'audit_list',
   'auth_resolve',

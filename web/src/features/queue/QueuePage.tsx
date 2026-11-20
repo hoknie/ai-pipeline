@@ -6,7 +6,8 @@ import type { Api } from '../../shared/api/api.ts';
 import { clock } from '../../shared/lib/format.ts';
 import { takeFocusRequest } from '../../shared/lib/browser/hotkeys.ts';
 import { formatRoute } from '../../shared/lib/nav/route.ts';
-import type { QueueView, RunView, PipelinesView } from '../../shared/api/types.ts';
+import type { PipelinesView, QueueView, RunView } from '../../shared/api/types.ts';
+import { useQueueAuthor } from './filter/useQueueAuthor.tsx';
 
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
@@ -40,6 +41,21 @@ export function usePipelines(api: Api): PipelinesView | null {
   return pipelines;
 }
 
+interface QueueBodyProps {
+  api: Api;
+  queue: QueueView | null;
+  now: number;
+  drafts: Record<string, QueueDraft>;
+  onDraft: (key: string, draft: QueueDraft | null) => void;
+  onQueue: (queue: QueueView) => void;
+  onError: (message: string) => void;
+  onNewTask: () => void;
+  runs?: RunView[];
+  /** The author filter of the address: a user id, `me` or null for everybody. */
+  author?: string | null;
+  onAuthor?: (author: string | null) => void;
+}
+
 function QueueBody({
   api,
   queue,
@@ -50,19 +66,12 @@ function QueueBody({
   onError,
   onNewTask,
   runs = [],
-}: {
-  api: Api;
-  queue: QueueView | null;
-  now: number;
-  drafts: Record<string, QueueDraft>;
-  onDraft: (key: string, draft: QueueDraft | null) => void;
-  onQueue: (queue: QueueView) => void;
-  onError: (message: string) => void;
-  onNewTask: () => void;
-  runs?: RunView[];
-}) {
+  author = null,
+  onAuthor,
+}: QueueBodyProps) {
   const { t } = useTranslation();
   const pipelines = usePipelines(api);
+  const { bar, itemVisible, runVisible } = useQueueAuthor(api, runs, author, onAuthor);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [parallel, setParallel] = useState<string | null>(null);
 
@@ -93,6 +102,7 @@ function QueueBody({
           onNewTask={onNewTask}
         />
         <div className="flex min-w-0 flex-col gap-4">
+          {bar}
           <StopReason queue={queue} />
           <QueueRuns
             queue={queue}
@@ -101,6 +111,7 @@ function QueueBody({
             onQueue={onQueue}
             onError={onError}
             highlight={linked}
+            visible={runVisible}
           />
           <section aria-label={t('queue.waitingLabel')}>
             <h3 className="mb-2 font-semibold">{t('queue.waiting')}</h3>
@@ -115,6 +126,7 @@ function QueueBody({
               onQueue={onQueue}
               highlight={linked}
               onHighlight={setHighlight}
+              visible={itemVisible}
             />
           </section>
         </div>

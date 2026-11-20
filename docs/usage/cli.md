@@ -7,7 +7,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | Command | What it does |
 |---|---|
 | `aip run start <pipeline>` | [Queues a task](runs.md#starting-a-task) and starts a stopped queue; `--attach <path>` (repeatable) adds [attachments](queue.md#attachments) |
-| `aip run list [run-id] [--tag <name>]` | Active and recent runs; with a run id, the table of that run's groups |
+| `aip run list [run-id] [--tag <name>] [--mine\|--author <email>]` | Active and recent runs; with a run id, the table of that run's groups |
 | `aip run show <run-id>` | The groups of one run and the `System:` line |
 | `aip run watch [run-id]` | Redraws the state of a run in place until it finishes |
 | `aip run cancel <run-id>` | Stops a whole run |
@@ -35,7 +35,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 
 | Command | What it does |
 |---|---|
-| `aip queue list` | Order, state and the reason for stopping |
+| `aip queue list [--mine\|--author <email>]` | Order, state and the reason for stopping |
 | `aip queue add <pipeline>` | [Adds a task](queue.md#adding-and-ordering-tasks) without starting the queue; `--attach <path>` (repeatable) adds [attachments](queue.md#attachments) |
 | `aip queue edit <item>`, `aip queue remove <item>` | Changes or removes a waiting task; `--attach <path>` and `--detach <name>` change its attachments |
 | `aip queue move <item> <position>` | Moves a waiting task; 1 is the first |

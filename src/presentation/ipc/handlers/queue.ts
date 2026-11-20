@@ -1,6 +1,7 @@
 import { authorOf, createdBySystemOf } from '../../../feature/identity/types/index.ts';
 import { directoryName } from '../../../feature/repos/types/index.ts';
 import { visible } from './access/visible.ts';
+import { authorParam } from './access/author.ts';
 import type { HandlerTable, IpcContext } from './types.ts';
 
 /** Runs `work` in the queue of the daemon, as every request of the queue does. */
@@ -29,6 +30,24 @@ function queueAnswer(
   };
 }
 
+/** Only the tasks and the runs of the author: the order of the others is not touched. */
+function byAuthor<T extends QueueViews>(context: IpcContext, answer: T, author: string): T {
+  const { runs } = context.services;
+  const own = (run: { id: string }) => runs.states.lookup(run.id)?.run.author === author;
+  return {
+    ...answer,
+    items: answer.items.filter((item) => item.author?.id === author),
+    runs: answer.runs.filter(own),
+    skipped: answer.skipped.filter(own),
+  };
+}
+
+type QueueViews = {
+  items: { author: { id: string } | null }[];
+  runs: { id: string }[];
+  skipped: { id: string }[];
+};
+
 /** The links of a task; an item that became a run shares them with its run. */
 function viewsOfTask(context: IpcContext, id: string) {
   const { queue } = context.services;
@@ -48,9 +67,14 @@ export const queueHandlers = {
       return { ...queued, queue: queueAnswer(context, queued.queue) };
     }),
   queue: (params, context) =>
-    serial(context, async () =>
-      queueAnswer(context, await context.services.queue.control.queueOf(params.repository)),
-    ),
+    serial(context, async () => {
+      const answer = queueAnswer(
+        context,
+        await context.services.queue.control.queueOf(params.repository),
+      );
+      const author = authorParam(context, params.author);
+      return author === undefined ? answer : byAuthor(context, answer, author);
+    }),
   queues: (_params, context) =>
     serial(context, async () => {
       const { registry, queue } = context.services;

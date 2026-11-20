@@ -94,6 +94,15 @@ export const en = {
     waiting: 'waiting for an answer: {{count}}',
     queued: 'in the queue: {{count}}',
   },
+  author: {
+    filter: {
+      label: 'Author',
+      all: 'All authors',
+      mine: 'Mine',
+      empty: 'No runs or tasks by this author',
+    },
+    table: { title: 'By authors', name: 'Author', none: 'No author' },
+  },
   stats: {
     loading: 'Loading statistics',
     error: 'Could not load the statistics: {{message}}',

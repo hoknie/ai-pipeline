@@ -9,8 +9,8 @@ import type { CliIo } from '../io.ts';
 import { addTaskLinks } from '../links.ts';
 import { collect } from '../options.ts';
 import { addAdd } from '../queue-add.ts';
-import { printQueue, watchRepo } from '../queue-print.ts';
-import { addEdit, addList, addSettings } from './queue-edit.ts';
+import { addList, printQueue, watchRepo } from '../queue-print.ts';
+import { addEdit, addSettings } from './queue-edit.ts';
 
 function queueKit(program: Command, io: CliIo, style: Style) {
   const { print, output, examples, context, activeStyle } = bind(io, style);

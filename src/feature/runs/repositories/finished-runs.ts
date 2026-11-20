@@ -41,12 +41,17 @@ export class FinishedRunRepository {
     limit: number,
     before?: { createdAt: number; id: string },
     repository?: string,
+    author?: string,
   ): { runs: RunState[]; more: boolean } {
     const conditions = ['finished_at IS NOT NULL'];
     const params: (string | number)[] = [];
     if (repository !== undefined) {
       conditions.push('repository = ?');
       params.push(repository);
+    }
+    if (author !== undefined) {
+      conditions.push('author_id = ?');
+      params.push(author);
     }
     if (before) {
       conditions.push('(created_at < ? OR (created_at = ? AND id < ?))');

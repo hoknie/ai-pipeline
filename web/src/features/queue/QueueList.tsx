@@ -3,7 +3,12 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
-import type { PipelinesView, QueueView, RunView } from '../../shared/api/types.ts';
+import type {
+  PipelinesView,
+  QueueItemView as QueueItem,
+  QueueView,
+  RunView,
+} from '../../shared/api/types.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Empty } from '../../shared/ui/feedback/empty.tsx';
 import type { QueueDraft } from './QueueForm.tsx';
@@ -33,6 +38,7 @@ export function QueueList({
   highlight = null,
   onHighlight = () => undefined,
   scope,
+  visible,
 }: {
   api: Api;
   queue: QueueView;
@@ -49,6 +55,8 @@ export function QueueList({
   onHighlight?: (id: string | null) => void;
   /** What a task is handled through; without it every task belongs to `queue`'s project. */
   scope?: ItemScope;
+  /** Hides the tasks that do not pass (the author filter); the others keep their order. */
+  visible?: (item: QueueItem) => boolean;
 }) {
   const { t } = useTranslation();
   const own = useMemo(
@@ -65,7 +73,7 @@ export function QueueList({
     }
   };
   const notice = { message, setMessage, refresh };
-  const { shown, move } = useQueueOrder(itemScope, queue, onQueue, notice);
+  const { shown, move } = useQueueOrder(itemScope, queue, onQueue, notice, visible);
   const actions = useQueueActions(itemScope, onQueue, onDraft, notice);
   const drag = useQueueDrag(shown, move);
   const alert = <Notice message={message} onClose={() => setMessage(null)} />;

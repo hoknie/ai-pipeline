@@ -81,6 +81,8 @@ export function useRuns(
   onError: (message: string) => void = () => undefined,
   /** Older runs come per selected repository (true) or of all repositories (false). */
   historyByRepository = false,
+  /** Older runs of this author only (a user id or `me`); null: of every author. */
+  historyAuthor: string | null = null,
 ): RunsResult {
   const { state, set, refs } = useRunsStore(opened, wanted);
   useEffect(() => connectRuns(api, openStream, set, refs), [api, openStream]);
@@ -91,6 +93,7 @@ export function useRuns(
     api,
     set.setHistory,
     historyByRepository ? (selection.selected ?? undefined) : null,
+    historyAuthor,
   );
   const { runs, extra, history: pages } = state;
   const sorted = useMemo(() => {

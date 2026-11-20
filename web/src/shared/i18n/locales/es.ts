@@ -96,6 +96,15 @@ export const es: Dictionary = {
     waiting: 'esperan respuesta: {{count}}',
     queued: 'en la cola: {{count}}',
   },
+  author: {
+    filter: {
+      label: 'Autor',
+      all: 'Todos los autores',
+      mine: 'Míos',
+      empty: 'No hay ejecuciones ni tareas de este autor',
+    },
+    table: { title: 'Por autores', name: 'Autor', none: 'Sin autor' },
+  },
   stats: {
     loading: 'Cargando las estadísticas',
     error: 'No se pudieron cargar las estadísticas: {{message}}',

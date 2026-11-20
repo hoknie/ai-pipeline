@@ -23,10 +23,12 @@ export function useHistoryPages(
   api: Api,
   setHistory: (update: (current: Map<string, RunView>) => Map<string, RunView>) => void,
   repository: string | null | undefined,
+  /** Only the runs of this author (a user id or `me`); null: every author. */
+  author: string | null = null,
 ): HistoryState {
   const [lists, setLists] = useState<ReadonlyMap<string, ListState>>(new Map());
   const listsRef = useRef(lists);
-  const key = repository ?? '';
+  const key = `${repository ?? ''}|${author ?? ''}`;
   const patch = useCallback((id: string, change: Partial<ListState>) => {
     const next = new Map(listsRef.current);
     next.set(id, { ...(next.get(id) ?? FRESH), ...change });
@@ -38,8 +40,11 @@ export function useHistoryPages(
     const list = listsRef.current.get(key) ?? FRESH;
     if (list.loading || list.cursor === null) return;
     patch(key, { loading: true, error: null });
-    api
-      .finishedRuns(list.cursor, repository ?? undefined)
+    const request =
+      author === null
+        ? api.finishedRuns(list.cursor, repository ?? undefined)
+        : api.finishedRuns(list.cursor, repository ?? undefined, author);
+    request
       .then((page) => {
         setHistory((current) => page.runs.reduce((map, run) => putRun(map, run), current));
         patch(key, { cursor: page.next, loading: false });
@@ -50,7 +55,7 @@ export function useHistoryPages(
           error: error instanceof Error ? error.message : String(error),
         });
       });
-  }, [api, setHistory, repository, key, patch]);
+  }, [api, setHistory, repository, author, key, patch]);
   const current = lists.get(key) ?? FRESH;
   return useMemo(
     () => ({

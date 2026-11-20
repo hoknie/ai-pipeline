@@ -861,6 +861,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     repositories: vi.fn(async () => []),
     addRepository: vi.fn(async () => []),
     updateRepository: vi.fn(async () => []),
+    usersDirectory: vi.fn(async () => []),
     accessMe: vi.fn(async (repository: string | null) => ({
       actor: 'local' as const,
       userId: null,

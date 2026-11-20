@@ -121,6 +121,8 @@ export function QueueRoute(props: {
         onError={props.onError}
         onNewTask={props.onNewTask}
         runs={common.runs}
+        author={common.route.author ?? null}
+        onAuthor={(author) => common.onRoute({ ...common.route, author })}
         others={otherQueues(page.queues, page.repositories, props.queue?.repository ?? null)}
         onOpenProject={props.onOpenProject}
       />
@@ -139,8 +141,26 @@ export function StatsRoute({ common, registry }: { common: Common; registry: Rep
         runs={common.runs}
         period={statsPeriodOf(route.group)}
         project={route.run}
+        author={route.author ?? null}
         onFilter={(period, project) =>
-          onRoute({ view: 'stats', run: project, group: period, step: null, tab: null })
+          onRoute({
+            view: 'stats',
+            run: project,
+            group: period,
+            step: null,
+            tab: null,
+            ...(route.author ? { author: route.author } : {}),
+          })
+        }
+        onAuthor={(author) =>
+          onRoute({
+            view: 'stats',
+            run: route.run,
+            group: statsPeriodOf(route.group),
+            step: null,
+            tab: null,
+            ...(author === null ? {} : { author }),
+          })
         }
       />
     </Suspense>

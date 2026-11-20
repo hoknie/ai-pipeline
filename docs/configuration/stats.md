@@ -48,6 +48,15 @@ Agent time is the time of attempts of every runtime but `command`; command actio
 
 A task that started while collection was off and finished with it on has records of part of its attempts only, so its per-task figures are lower.
 
+## Authors
+
+In [server mode](server.md) every record carries the id of the user who created the run (empty for runs without an author). The first start with this feature fills the author of the records already in the journal from their runs, once; with collection off it waits like the history move. The report then has:
+
+- a table by author: attempts, tokens, agent time and tokens per attempt. The name is the email and name of the user as of now; records without an author are the row `none`. In local mode there is no such table;
+- the filter `author` (a user id, or `me` for the user who asks): totals, tables and the series then count only that user's runs. `me` from `local` or `system`, and any `author` in local mode, are refused.
+
+`aip stats --author <email|me>` applies the filter and prints the table by author; an unknown email is an error.
+
 ## Clearing
 
 `aip stats clear --project <path>` deletes every record of the project and prints how many. Runs and their attempts are not touched, and the history is not moved again.

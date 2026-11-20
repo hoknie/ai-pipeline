@@ -46,16 +46,7 @@ function FreeSlots({ count }: { count: number }) {
   ));
 }
 
-export function QueueRuns({
-  queue,
-  now,
-  api,
-  onQueue,
-  onError,
-  highlight = null,
-  repositoryOf = () => queue.repository,
-  projectOf,
-}: {
+interface QueueRunsProps {
   queue: QueueView;
   now: number;
   api: Api;
@@ -67,14 +58,32 @@ export function QueueRuns({
   repositoryOf?: (run: QueueRunView) => string;
   /** The path to label a run with; without it no label. */
   projectOf?: (run: QueueRunView) => string | undefined;
-}) {
+  /** Hides the runs that do not pass (the author filter), the skipped ones too. */
+  visible?: (run: QueueRunView) => boolean;
+}
+
+export function QueueRuns({
+  queue,
+  now,
+  api,
+  onQueue,
+  onError,
+  highlight = null,
+  repositoryOf = () => queue.repository,
+  projectOf,
+  visible,
+}: QueueRunsProps) {
   const { t } = useTranslation();
   const running = queue.status === 'running';
   const { pausing, pause } = usePause(repositoryOf, api, onQueue, onError);
+  const shown =
+    visible === undefined
+      ? queue
+      : { ...queue, runs: queue.runs.filter(visible), skipped: queue.skipped.filter(visible) };
   const skipped =
-    queue.skipped.length > 0 ? (
+    shown.skipped.length > 0 ? (
       <SkippedRuns
-        queue={queue}
+        queue={shown}
         now={now}
         api={api}
         onQueue={onQueue}
@@ -83,8 +92,10 @@ export function QueueRuns({
         {...(projectOf ? { projectOf } : {})}
       />
     ) : null;
-  if (queue.runs.length === 0 && !running) return skipped;
-  const free = running ? Math.max(0, queue.parallel - queue.runs.length) : 0;
+  if (shown.runs.length === 0 && !running) return skipped;
+  // a filtered list has no free places to show: the hidden runs hold some of them
+  const free =
+    running && visible === undefined ? Math.max(0, queue.parallel - queue.runs.length) : 0;
   return (
     <>
       <section aria-label={t('queue.runningLabel')}>
@@ -96,7 +107,7 @@ export function QueueRuns({
           <p className="mb-2 text-sm text-muted-foreground">{t('queue.runsOverflow')}</p>
         ) : null}
         <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
-          {queue.runs.map((run) => (
+          {shown.runs.map((run) => (
             <li key={run.id} className="flex min-w-0 flex-col gap-1">
               {projectOf?.(run) !== undefined ? (
                 <ProjectLabel repository={projectOf(run) as string} />

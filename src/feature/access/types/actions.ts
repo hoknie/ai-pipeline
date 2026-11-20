@@ -91,6 +91,11 @@ export const ACTIONS: readonly ActionInfo[] = [
   { name: 'daemon.control', description: 'stop the daemon or the panel', resource: 'global' },
   { name: 'audit.read', description: 'read the audit journal', resource: 'global' },
   {
+    name: 'users.read',
+    description: 'see the list of users (id, email, name) to filter by author',
+    resource: 'global',
+  },
+  {
     name: 'users.manage',
     description: 'manage users, their attributes and login links',
     resource: 'global',

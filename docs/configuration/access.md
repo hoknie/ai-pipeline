@@ -114,6 +114,7 @@ rules:
 | `config.read`, `config.write`, `config.global.write` | read the configuration, write a project's, write the shared one and the observers |
 | `stats.read`, `stats.clear` | read or clear the statistics |
 | `observers.read`, `integration.read`, `integration.write`, `process.read`, `process.kill`, `daemon.control` | observers, integrations, background processes, stopping the daemon or the panel |
+| `users.read` | the list of users (id, email, name) behind the author filters |
 | `audit.read`, `users.manage` | the [audit journal](server.md#audit-journal), users and login links |
 
 ## What a user sees

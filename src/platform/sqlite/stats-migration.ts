@@ -39,3 +39,12 @@ export const STATS_MIGRATION = `
   );
   INSERT OR IGNORE INTO stats_meta (id, backfilled_at) VALUES (1, NULL);
   `;
+
+/** The author of the run in the usage journal: copied at record time, empty for runs without one. */
+export const STATS_AUTHOR_MIGRATION = `
+  ALTER TABLE stats_attempts ADD COLUMN author TEXT;
+  ALTER TABLE stats_runs ADD COLUMN author TEXT;
+  ALTER TABLE stats_meta ADD COLUMN author_backfilled_at INTEGER;
+  CREATE INDEX IF NOT EXISTS stats_attempts_by_author ON stats_attempts (author, finished_at);
+  CREATE INDEX IF NOT EXISTS stats_runs_by_author ON stats_runs (author, finished_at);
+  `;

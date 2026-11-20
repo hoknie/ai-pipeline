@@ -8,6 +8,8 @@ import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Empty } from '../../shared/ui/feedback/empty.tsx';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
+import { useAuthorChoices } from '../../shared/lib/catalog/authors.ts';
+import { AuthorsTable } from './AuthorsTable.tsx';
 import { BreakdownTabs } from './BreakdownTabs.tsx';
 import { DailyChart } from './DailyChart.tsx';
 import { KpiTiles } from './KpiTiles.tsx';
@@ -21,11 +23,13 @@ function Content({
   api,
   report,
   onProject,
+  onAuthor,
   onCleared,
 }: {
   api: Api;
   report: StatsReportView;
   onProject: (repository: string) => void;
+  onAuthor: (author: string) => void;
   onCleared: () => void;
 }) {
   const { t } = useTranslation();
@@ -43,6 +47,7 @@ function Content({
       <ProjectShares report={report} />
       <ProjectsTable api={api} report={report} onSelect={onProject} onCleared={onCleared} />
       <BreakdownTabs report={report} />
+      <AuthorsTable report={report} onSelect={onAuthor} />
     </>
   );
 }
@@ -54,7 +59,9 @@ export default function StatsPage({
   runs,
   period,
   project,
+  author = null,
   onFilter,
+  onAuthor = () => undefined,
 }: {
   api: Api;
   registry: readonly RepositoryView[];
@@ -62,12 +69,31 @@ export default function StatsPage({
   period: StatsPeriodId;
   project: string | null;
   onFilter: (period: StatsPeriodId, project: string | null) => void;
+  /** The author of the address: a user id, `me` or null for everybody. */
+  author?: string | null;
+  onAuthor?: (author: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const { report, error, loading, reload } = useStatsReport(api, period, project, runs);
+  const authors = useAuthorChoices(api);
+  // the local mode has no authors: a stale `author` of the address is not sent
+  const { report, error, loading, reload } = useStatsReport(
+    api,
+    period,
+    project,
+    runs,
+    authors.enabled ? author : null,
+  );
   return (
     <div className="flex min-w-0 flex-col gap-4 p-4" data-testid="stats-page">
-      <StatsFilters period={period} project={project} registry={registry} onChange={onFilter} />
+      <StatsFilters
+        period={period}
+        project={project}
+        registry={registry}
+        onChange={onFilter}
+        author={author}
+        authors={authors}
+        onAuthor={onAuthor}
+      />
       {report !== null && !report.settings.enabled ? (
         <Alert variant="warn" className="flex flex-wrap items-center gap-2">
           <span>{t('stats.disabled.title')}</span>
@@ -95,6 +121,7 @@ export default function StatsPage({
           api={api}
           report={report}
           onProject={(repository) => onFilter(period, repository)}
+          onAuthor={onAuthor}
           onCleared={reload}
         />
       )}

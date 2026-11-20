@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RUN_TITLE_LIMIT } from '../../../feature/agents/types/index.ts';
+import type { ParamsOf } from '../../ipc/contract/index.ts';
 import { parseBody } from '../http.ts';
 import { segment, type Route, type RouteKit } from './types.ts';
 
@@ -42,12 +43,15 @@ export function runsRoutes(kit: RouteKit): Route[] {
     runBody(kit, 'variant', 'run_variant', variantBody),
     runBody(kit, 'provider', 'run_provider', providerBody),
     runBody(kit, 'title', 'run_title', runTitleBody),
-    { method: 'GET', pattern: /^\/api\/runs$/, handle: () => call('status', {}) },
+    {
+      method: 'GET',
+      pattern: /^\/api\/runs$/,
+      handle: (_match, body) => call('status', body as ParamsOf<'status'>),
+    },
     {
       method: 'GET',
       pattern: /^\/api\/finished-runs$/,
-      handle: (_match, body) =>
-        call('finished_runs', body as { limit: number; before?: string; repository?: string }),
+      handle: (_match, body) => call('finished_runs', body as ParamsOf<'finished_runs'>),
     },
     {
       method: 'GET',

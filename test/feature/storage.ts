@@ -83,7 +83,14 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
 
 /** Takes away the columns of the newest migrations (the variants and the take filter), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
-  // The newest migration adds the author of a task and of a run, and the audit journal.
+  // The newest migration adds the author to the usage journal.
+  database.exec(
+    'DROP INDEX IF EXISTS stats_attempts_by_author; DROP INDEX IF EXISTS stats_runs_by_author',
+  );
+  dropColumn(database, 'stats_attempts', 'author');
+  dropColumn(database, 'stats_runs', 'author');
+  dropColumn(database, 'stats_meta', 'author_backfilled_at');
+  // The one before adds the author of a task and of a run, and the audit journal.
   database.exec('DROP TABLE IF EXISTS audit_events');
   dropColumn(database, 'queue_items', 'created_by_system');
   dropColumn(database, 'runs', 'created_by_system');

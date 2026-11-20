@@ -5,6 +5,7 @@ import type { SocketFactory } from '../../shared/api/stream.ts';
 import { useRuns } from '../../shared/api/runs/useRuns.ts';
 import { notifyError } from '../../shared/lib/browser/notify.ts';
 import { usePreference } from '../../shared/lib/browser/preferences.ts';
+import { useAuthorChoices } from '../../shared/lib/catalog/authors.ts';
 import { displayPaths, waitingByRepository } from '../../shared/lib/catalog/repositories.ts';
 import { useNotificationCenter } from '../notifications.ts';
 import { useChrome } from './useChrome.ts';
@@ -17,6 +18,8 @@ export function usePanelData(api: Api, openStream: SocketFactory) {
   const [allChosen, setAllChosen] = usePreference('projects.all', false);
   const [onlyReplies, setOnlyReplies] = usePreference('onlyReplies', false);
   const { route, setRoute, lastRun } = useRouteState();
+  // the local mode has no authors: a stale `author` of the address is not sent
+  const authorMode = useAuthorChoices(api).enabled;
   const state = useRuns(
     api,
     openStream,
@@ -24,6 +27,7 @@ export function usePanelData(api: Api, openStream: SocketFactory) {
     route.view === 'runs' ? route.run : null,
     notifyError,
     !allChosen,
+    route.view === 'runs' && authorMode ? (route.author ?? null) : null,
   );
   const { runs, selected, registry } = state;
   const chrome = useChrome(route.view);

@@ -21,6 +21,8 @@ const perTask = z.object({ tokens: stat, agentMs: stat, wallMs: stat });
 const breakdown = z.object({
   key: z.string(),
   name: z.string().nullable(),
+  /** Only in `byAuthor`: the email of the user. */
+  email: z.string().nullable().optional(),
   attempts: number,
   inputTokens: number,
   outputTokens: number,
@@ -62,6 +64,7 @@ export const statsReportSchema = z.object({
   byModel: z.array(breakdown),
   byPipeline: z.array(breakdown),
   byRuntime: z.array(breakdown),
+  byAuthor: z.array(breakdown).optional(),
   series: z.array(
     z.object({
       day: z.string(),

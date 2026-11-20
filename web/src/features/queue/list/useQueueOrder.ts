@@ -17,6 +17,8 @@ export function useQueueOrder(
   queue: QueueView,
   onQueue: (queue: QueueView) => void,
   notice: QueueNotice,
+  /** Hides the items that do not pass; the hidden ones keep their places when the others move. */
+  visible?: (item: QueueItemView) => boolean,
 ) {
   const { t } = useTranslation();
   const [order, setOrder] = useState<string[] | null>(null);
@@ -31,16 +33,30 @@ export function useQueueOrder(
     .map((id) => byId.get(id))
     .filter((item): item is QueueItemView => item !== undefined);
   for (const item of queue.items) if (!shown.includes(item)) shown.push(item);
+  const listed = visible === undefined ? shown : shown.filter(visible);
 
+  /** `position` counts the listed items; the request counts all of them, hidden ones included. */
   const move = async (id: string, position: number) => {
     const ids = shown.map((item) => item.id);
-    const from = ids.indexOf(id);
-    if (from === -1 || position < 1 || position > ids.length || position - 1 === from) return;
-    setOrder(moveId(ids, from, position));
+    const shownIds = listed.map((item) => item.id);
+    const listedFrom = shownIds.indexOf(id);
+    if (
+      listedFrom === -1 ||
+      position < 1 ||
+      position > shownIds.length ||
+      position - 1 === listedFrom
+    ) {
+      return;
+    }
+    // the item takes the place of the listed neighbour it is dropped on; the hidden ones stay
+    const absolute = ids.indexOf(shownIds[position - 1] as string) + 1;
+    setOrder(moveId(ids, ids.indexOf(id), absolute));
     notice.setMessage(null);
     inFlight.current = true;
     try {
-      onQueue(await scope.apiOf(byId.get(id) as QueueItemView).queueEdit(id, { position }));
+      onQueue(
+        await scope.apiOf(byId.get(id) as QueueItemView).queueEdit(id, { position: absolute }),
+      );
     } catch (failure) {
       notice.setMessage(t('queue.list.moveFailed', { error: (failure as Error).message }));
       void notice.refresh();
@@ -49,5 +65,5 @@ export function useQueueOrder(
       setOrder(null);
     }
   };
-  return { shown, move };
+  return { shown: listed, move };
 }

@@ -6,6 +6,11 @@ import { parse as parseYaml } from 'yaml';
 import { DELIVERY_MODES, type DeliveryMode } from '../../feature/swarm-config/types/index.ts';
 import { proposedGroupSchema } from '../ipc/contract/index.ts';
 
+import type { Command } from 'commander';
+
+import type { UserDirectoryEntry } from '../ipc/contract/index.ts';
+
+import { call, type Context } from './context.ts';
 import { usage } from './io.ts';
 
 export function readGroups(file: string) {
@@ -70,4 +75,38 @@ export function parseSwitch(flag: string, value: string | undefined): boolean | 
   if (value === 'on') return true;
   if (value === 'off') return false;
   throw usage(`${flag} must be on or off`);
+}
+
+/** `--mine` and `--author`: the lists of runs and of the queue show only the runs and tasks of one author. */
+export function addAuthorOptions(command: Command): Command {
+  return command
+    .option('--mine', 'only what you created (server mode)')
+    .option('--author <email>', 'only what this user created (server mode)');
+}
+
+export interface AuthorOptions {
+  mine?: boolean;
+  author?: string;
+}
+
+/**
+ * The `author` parameter of a request: `me` for `--mine` (or `--author me` where `allowMe` is set),
+ * the id of the user for an email, nothing when no flag is given.
+ */
+export async function authorParameter(
+  ctx: Context,
+  options: AuthorOptions,
+  allowMe = false,
+): Promise<{ author?: string }> {
+  if (options.mine === true && options.author !== undefined) {
+    throw usage('--mine and --author cannot be combined');
+  }
+  if (options.mine === true) return { author: 'me' };
+  if (options.author === undefined) return {};
+  if (allowMe && options.author === 'me') return { author: 'me' };
+  const { users } = (await call(ctx, 'users_directory', {})) as { users: UserDirectoryEntry[] };
+  const email = options.author.trim().toLowerCase();
+  const found = users.find((user) => user.email.toLowerCase() === email);
+  if (found === undefined) throw usage(`unknown user "${options.author}"`);
+  return { author: found.id };
 }

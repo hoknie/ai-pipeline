@@ -30,12 +30,14 @@ A run starts from a snapshot of your working tree, so specialists also see your 
 
 ```sh
 aip run list                    # active and recent runs
+aip run list --mine             # server mode: only your runs; or --author bob@corp.com
 aip run watch [run-id]          # redraw until it finishes
 aip run show <run-id>           # the groups of one run
 aip group show <run-id> <group> # attempts, verdicts, remarks, tokens, changed files, the tail of the log
 ```
 
 - A run that has a variant other than `default` shows `<pipeline>:<variant>` in the `PIPELINE` column; in `--json` every run has `variant` and `variantName` (`default` for runs made before variants).
+- `--mine` (the owner of the profile or token) and `--author <email>` are for server mode and exclude each other; in local mode, with a profile without an account, or with an unknown email they fail with a non-zero code. They also work on `aip queue list`.
 - `aip run list` shows each run with its task number (`#` column), the first line of its task and a summary of changes (`2 files +367 −0`). With a run id, it prints the table of that run's groups.
 - A pipeline with a `name` is printed as `<name> (<id>)`; without a `name`, as the id.
 - `aip run show` prints a `System:` line with the system stages in the order split, commit message, resolver, observer and delivery, for example `System: split done · message running · delivery pending`. A failed delivery shows its first reason there, even when no resolver ran.

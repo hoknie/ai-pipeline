@@ -70,6 +70,16 @@ describe('GET and DELETE /api/stats', () => {
     });
   });
 
+  it('passes the author of a report as it is, `me` too', async () => {
+    const { base, headers } = await panel();
+    expect((await fetch(`${base}/api/stats?author=me`, { headers })).status).toBe(200);
+    expect(received).toEqual({ method: 'stats_report', params: { author: 'me' } });
+    await fetch(`${base}/api/stats?author=u1&since=5`, { headers });
+    expect(received?.params).toEqual({ author: 'u1', since: 5 });
+    await fetch(`${base}/api/stats?author=`, { headers });
+    expect(received).toEqual({ method: 'stats_report', params: {} });
+  });
+
   it.each([
     'since=abc',
     'since=-5',

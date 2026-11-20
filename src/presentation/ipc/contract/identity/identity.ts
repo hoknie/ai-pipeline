@@ -56,6 +56,7 @@ export const identityRequests = [
   }),
   z.object({ method: z.literal('whoami'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('users_list'), params: z.object({}).default({}) }),
+  z.object({ method: z.literal('users_directory'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('users_set'), params: z.object({ email, attributes }) }),
   z.object({ method: z.literal('users_disable'), params: z.object({ email }) }),
   z.object({ method: z.literal('users_enable'), params: z.object({ email }) }),
@@ -129,6 +130,13 @@ export interface UserView {
   admin: boolean;
   createdAt: number;
   lastLoginAt: number | null;
+}
+
+/** A user as the filters of the lists need it: no attributes, no state of the account. */
+export interface UserDirectoryEntry {
+  id: string;
+  email: string;
+  name: string;
 }
 
 export interface TokenView {

@@ -19,8 +19,8 @@ export class StatsRecordRepository {
     const statement = this.database.prepare(
       `INSERT OR IGNORE INTO stats_attempts (run_id, group_slug, seq, kind, repository, pipeline, step_id,
          specialist, runtime, model, status, reason, started_at, finished_at, duration_ms,
-         input_tokens, output_tokens)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         input_tokens, output_tokens, author)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     let added = 0;
     for (const record of records) {
@@ -42,6 +42,7 @@ export class StatsRecordRepository {
         record.durationMs,
         record.inputTokens,
         record.outputTokens,
+        record.author,
       );
       added += Number(result.changes);
     }
@@ -52,11 +53,12 @@ export class StatsRecordRepository {
   upsertTask(task: TaskRecord): void {
     this.database
       .prepare(
-        `INSERT INTO stats_runs (run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO stats_runs (run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome, author)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (run_id) DO UPDATE SET repository = excluded.repository,
            pipeline = excluded.pipeline, created_at = excluded.created_at,
-           finished_at = excluded.finished_at, wall_ms = excluded.wall_ms, outcome = excluded.outcome`,
+           finished_at = excluded.finished_at, wall_ms = excluded.wall_ms, outcome = excluded.outcome,
+           author = excluded.author`,
       )
       .run(
         task.runId,
@@ -66,7 +68,21 @@ export class StatsRecordRepository {
         task.finishedAt,
         task.wallMs,
         task.outcome,
+        task.author,
       );
+  }
+
+  /**
+   * Fills the author of the records written before the journal had one, from the author of their
+   * run. The one place the journal reads the table of the runs; used once.
+   */
+  fillAuthors(): void {
+    for (const table of ['stats_attempts', 'stats_runs']) {
+      this.database.exec(
+        `UPDATE ${table} SET author = (SELECT runs.author_id FROM runs WHERE runs.id = ${table}.run_id)
+         WHERE author IS NULL`,
+      );
+    }
   }
 
   /** Removes every record of the project; returns the number of rows removed. */

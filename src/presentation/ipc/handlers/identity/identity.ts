@@ -133,6 +133,14 @@ export const identityHandlers = {
     serverOnly(context);
     return { users: context.services.identity.users.list().map(userView) };
   },
+  users_directory: async (_params, context) => {
+    serverOnly(context);
+    return {
+      users: context.services.identity.users
+        .list()
+        .map((user) => ({ id: user.id, email: user.email, name: user.name })),
+    };
+  },
   users_set: async (params, context) => {
     serverOnly(context);
     return userView(context.services.identity.users.setAttributes(params.email, params.attributes));

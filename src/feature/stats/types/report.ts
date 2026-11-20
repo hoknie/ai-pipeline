@@ -12,6 +12,10 @@ export interface StatsQuery {
   bucket?: StatsBucketRequest;
   /** Roots of the projects the report may cover; absent: all. */
   only?: readonly string[];
+  /** Only the records of this author (a user id). */
+  author?: string;
+  /** Adds the breakdown by author (server mode). */
+  byAuthor?: boolean;
 }
 
 export interface Totals {
@@ -49,6 +53,8 @@ export interface BreakdownRow {
   key: string;
   /** Display name from the configuration of the projects; null when there is none. */
   name: string | null;
+  /** Only in `byAuthor`, set by the presentation: the email of the user. */
+  email?: string | null;
   attempts: number;
   inputTokens: number;
   outputTokens: number;
@@ -64,6 +70,9 @@ export interface SeriesProject {
   agentMs: number;
   tasks: number;
 }
+
+/** The key of the records without an author in `byAuthor`. */
+export const NO_AUTHOR = 'none';
 
 /** The name of the model of attempts that carry none. */
 export const UNKNOWN_MODEL = 'unknown';
@@ -103,6 +112,8 @@ export interface StatsReport {
   byModel: BreakdownRow[];
   byPipeline: BreakdownRow[];
   byRuntime: BreakdownRow[];
+  /** By user id, `none` for runs without author; present only when the query asks for it. */
+  byAuthor?: BreakdownRow[];
   series: SeriesDay[];
 }
 

@@ -4,7 +4,13 @@ import {
   type ObserversResult,
   type ObserversView,
 } from './observerTypes.ts';
-import type { AccessMe, BackgroundProcessesView, RepositoryView, SystemView } from './types.ts';
+import type {
+  AccessMe,
+  BackgroundProcessesView,
+  RepositoryView,
+  SystemView,
+  UserDirectoryEntry,
+} from './types.ts';
 import { ApiError, call, enc, json, post, withRepository } from './http.ts';
 
 /** The view in an answer; an answer that is not one is a failure. */
@@ -78,6 +84,8 @@ export interface SystemApi {
   killProcess(pid: number): Promise<unknown>;
   /** What the user may do in a project (`null`: the shared level). */
   accessMe(repository: string | null): Promise<AccessMe>;
+  /** The users for the author filters: id, email and name (server mode). */
+  usersDirectory(): Promise<UserDirectoryEntry[]>;
   /** State of the daemon and of the panel itself. */
   system(): Promise<SystemView>;
   /** Restarts the panel; the answer comes before it goes down. */
@@ -114,6 +122,13 @@ export function systemApi(): SystemApi {
     killProcess: (pid) => post(`/api/processes/${pid}/kill`),
     accessMe: (repository) =>
       call(repository === null ? '/api/access/me' : `/api/access/me?repository=${enc(repository)}`),
+    usersDirectory: async () =>
+      (
+        await post<{ users: UserDirectoryEntry[] }>('/api/ipc', {
+          method: 'users_directory',
+          params: {},
+        })
+      ).users,
     system: () => call('/api/system'),
     restartWeb: async () => void (await post('/api/system/web/restart')),
     restartDaemon: async (force) =>

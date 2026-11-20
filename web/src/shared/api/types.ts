@@ -69,6 +69,7 @@ export type {
   RuntimeCatalog,
   StatsClearView,
   StatsReportView,
+  UserDirectoryEntry,
   StepGroup,
   StepState,
   StepTopology,

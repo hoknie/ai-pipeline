@@ -95,6 +95,15 @@ export const ru: Dictionary = {
     waiting: 'ждут ответа: {{count}}',
     queued: 'в очереди: {{count}}',
   },
+  author: {
+    filter: {
+      label: 'Автор',
+      all: 'Все авторы',
+      mine: 'Мои',
+      empty: 'Нет запусков и задач этого автора',
+    },
+    table: { title: 'По авторам', name: 'Автор', none: 'Без автора' },
+  },
   stats: {
     loading: 'Загрузка статистики',
     error: 'Не удалось загрузить статистику: {{message}}',

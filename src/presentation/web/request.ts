@@ -70,19 +70,31 @@ function auditQuery(search: URLSearchParams): object {
   };
 }
 
-/** `since`, `until`, `repository` and `bucket` of `/api/stats`; the moments are whole milliseconds. */
+/** The `author` of a list or a report: a user id or `me`; the daemon refuses it in the local mode. */
+function authorQuery(search: URLSearchParams): { author?: string } {
+  const author = search.get('author');
+  if (author === null || author === '') return {};
+  if (author.length > 128) throw panel('invalid', 'author is too long');
+  return { author };
+}
+
+/** `since`, `until`, `repository`, `bucket` and `author` of `/api/stats`; the moments are whole milliseconds. */
 function statsQuery(search: URLSearchParams): {
   since?: number;
   until?: number;
   repository?: string;
   bucket?: 'auto' | '6h' | 'day' | 'week';
+  author?: string;
 } {
   const result: {
     since?: number;
     until?: number;
     repository?: string;
     bucket?: 'auto' | '6h' | 'day' | 'week';
-  } = {};
+    author?: string;
+  } = {
+    ...authorQuery(search),
+  };
   for (const key of ['since', 'until'] as const) {
     const value = search.get(key);
     if (value === null) continue;
@@ -139,8 +151,14 @@ export async function requestBody(incoming: IncomingMessage, url: URL): Promise<
     const repository = searchParams.get('repository');
     if (repository && !isAbsolute(repository))
       throw panel('invalid', 'repository must be an absolute path');
-    return { limit, ...(before ? { before } : {}), ...(repository ? { repository } : {}) };
+    return {
+      limit,
+      ...(before ? { before } : {}),
+      ...(repository ? { repository } : {}),
+      ...authorQuery(searchParams),
+    };
   }
+  if (pathname === '/api/runs' || pathname === '/api/queue') return authorQuery(searchParams);
   if (pathname === '/api/audit') return auditQuery(searchParams);
   if (pathname === '/api/observers/history') return historyQuery(searchParams);
   if (pathname.endsWith('/transcript')) return transcriptQuery(searchParams);

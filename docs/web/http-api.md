@@ -43,7 +43,7 @@ A reverse proxy in front of the panel must pass WebSocket upgrades. `aip events 
 | Request | What it does |
 |---|---|
 | `GET /api/runs` | Active and recent runs |
-| `GET /api/finished-runs?limit=<n>&before=<cursor>&repository=<path>` | A page of finished runs |
+| `GET /api/finished-runs?limit=<n>&before=<cursor>&repository=<path>&author=<id\|me>` | A page of finished runs |
 | `GET /api/runs/<id>` | One run |
 | `POST /api/runs/<id>/title` | Changes the title |
 | `POST /api/runs/<id>/tags` | Changes the tags |
@@ -55,6 +55,7 @@ A reverse proxy in front of the panel must pass WebSocket upgrades. `aip events 
 | `GET /api/runs/<id>/patch` | Downloads the patch of the run |
 
 - `GET /api/finished-runs` returns `{runs, next}`, newest created first.
+- `GET /api/runs`, `GET /api/finished-runs`, `GET /api/queue` and `GET /api/stats` take `author` (a user id, or `me` for the signed-in user) in server mode and return only that author's records. In local mode the parameter is answered with 400.
   - `limit` is an integer from 1 to 100 (15 by default). `before` is the `next` of the previous page; leave it out for the first page. `next` is `null` on the last page.
   - A `limit` out of range, a `before` that is not a cursor or a `repository` that is not an absolute path is answered with 400.
 - `POST /api/runs/<id>/title` takes `{"title": "<new title>"}` (trimmed, 1 to 60 characters) and returns the run. The short `name` stays, and a later answer of the naming model does not replace the title. An empty or too long title comes back with code 400, an unknown run with code 404.

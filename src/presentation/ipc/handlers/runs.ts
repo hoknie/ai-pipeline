@@ -5,6 +5,7 @@ import {
 } from '../../../feature/runs/services/index.ts';
 
 import { visible } from './access/visible.ts';
+import { authorParam } from './access/author.ts';
 import type { HandlerTable, IpcContext } from './types.ts';
 
 /** Applies an event to the run and answers with its view. */
@@ -22,12 +23,15 @@ export const runHandlers = {
     const { services, snapshots } = context;
     const now = services.now();
     if (params.runId) return snapshots.run(services.runs.states.get(params.runId), now);
-    return visible(context, snapshots.recentRuns(now), (run) => run.repository);
+    const author = authorParam(context, params.author);
+    const runs = visible(context, snapshots.recentRuns(now), (run) => run.repository);
+    return author === undefined ? runs : runs.filter((run) => run.author?.id === author);
   },
   finished_runs: async (params, context) => {
     const { services, snapshots } = context;
     const now = services.now();
-    const page = services.runs.states.page(params.limit, params.before, params.repository);
+    const author = authorParam(context, params.author);
+    const page = services.runs.states.page(params.limit, params.before, params.repository, author);
     const runs = visible(context, page.runs, (state) => state.run.repository);
     return { runs: runs.map((state) => snapshots.run(state, now)), next: page.next };
   },

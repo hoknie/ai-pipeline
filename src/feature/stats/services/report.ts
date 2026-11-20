@@ -20,6 +20,7 @@ import {
   projectRows,
   resolveBucket,
   totalsOf,
+  NO_AUTHOR,
   UNKNOWN_MODEL,
 } from '../types/index.ts';
 
@@ -59,6 +60,7 @@ export class StatsReportService {
       ...(repository === undefined ? {} : { repository }),
       exclude,
       ...(query.only === undefined ? {} : { only: query.only }),
+      ...(query.author === undefined ? {} : { author: query.author }),
     };
     const attempts = reads.attempts(scope);
     const tasks = reads.tasks(scope);
@@ -101,6 +103,9 @@ export class StatsReportService {
       byModel: breakdownRows(attempts, (record) => record.model ?? UNKNOWN_MODEL),
       byPipeline: breakdownRows(attempts, pipelineKey, pipelineNames),
       byRuntime: breakdownRows(attempts, (record) => record.runtime),
+      ...(query.byAuthor === true
+        ? { byAuthor: breakdownRows(attempts, (record) => record.author ?? NO_AUTHOR) }
+        : {}),
       series: start === null ? [] : bucketSeries(attempts, tasks, start, end, bucket),
     };
     return report;

@@ -14,7 +14,15 @@ import type { RunQueued, RunView } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
 import { linkInputsOf } from '../links.ts';
-import { attachmentSources, collect, parseDeliveryMode, readGroups } from '../options.ts';
+import {
+  addAuthorOptions,
+  attachmentSources,
+  authorParameter,
+  collect,
+  parseDeliveryMode,
+  readGroups,
+  type AuthorOptions,
+} from '../options.ts';
 import { watch } from '../watch.ts';
 import {
   addApply,
@@ -159,17 +167,24 @@ function addStart(kit: RunKit): void {
 
 function addList(kit: RunKit): void {
   const { print, output, examples, context, activeStyle, run } = kit;
-  run
+  const list = run
     .command('list')
     .description('Show active and recent runs')
     .option('--tag <name>', 'only runs with this tag; repeat for any of several', collect)
-    .option('--json', 'print JSON')
+    .option('--json', 'print JSON');
+  addAuthorOptions(list)
     .addHelpText(
       'after',
-      examples(['aip run list', 'aip run list --json', 'aip run list --tag auth --tag v2']),
+      examples([
+        'aip run list',
+        'aip run list --json',
+        'aip run list --tag auth --tag v2',
+        'aip run list --mine',
+      ]),
     )
-    .action(async (options: { json?: boolean; tag?: string[] }) => {
-      const all = (await call(context(), 'status', {})) as RunView[];
+    .action(async (options: { json?: boolean; tag?: string[] } & AuthorOptions) => {
+      const filter = await authorParameter(context(), options);
+      const all = (await call(context(), 'status', filter)) as RunView[];
       const runs = options.tag === undefined ? all : filterByTags(all, options.tag);
       const empty = options.tag !== undefined && runs.length === 0;
       output(

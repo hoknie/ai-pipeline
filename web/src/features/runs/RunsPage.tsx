@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import type { RunView } from '../../shared/api/types.ts';
 import { useMediaQuery } from '../../shared/lib/browser/media.ts';
 import { defaultEntry, orderEntries } from '../../shared/lib/order.ts';
 import { activeFilters, filterRuns } from './list/runFilter.ts';
@@ -10,8 +11,15 @@ import { RunDetail } from './page/RunDetail.tsx';
 import { RunListPane } from './page/RunListPane.tsx';
 import type { RunsPageProps } from './page/types.ts';
 import { useRunFilters } from './page/useRunFilters.ts';
+import { useAuthorBar } from './page/useAuthorBar.tsx';
 import { useRunNavigation } from './page/useRunNavigation.ts';
 import { LIST_WIDTH, LIST_WIDTH_COLLAPSED } from './page/widths.ts';
+
+/** The group of the run the address names, else the default one; null without a run. */
+function groupOf(run: RunView | null, slug: string | null) {
+  if (run === null) return null;
+  return orderEntries(run).find((candidate) => candidate.slug === slug) ?? defaultEntry(run);
+}
 
 /** The runs section: filters, the list of runs and the open run with its group; filters sit in a column from 1280 px and behind a button below. */
 export function RunsPage(props: RunsPageProps) {
@@ -21,7 +29,8 @@ export function RunsPage(props: RunsPageProps) {
   const [query, setQuery] = useState('');
   const { filters, setStored, collapsed, setCollapsed, byId } = useRunFilters(repository);
   const run = runs.find((candidate) => candidate.id === route.run) ?? null;
-  const shown = filterRuns(runs, query, filters, scope, repository, byId);
+  const { authored, bar: authorBar } = useAuthorBar(props);
+  const shown = filterRuns(authored, query, filters, scope, repository, byId);
   const { screen, setScreen, select } = useRunNavigation({
     route,
     onRoute: props.onRoute,
@@ -30,7 +39,7 @@ export function RunsPage(props: RunsPageProps) {
     run,
   });
   const filterProps = {
-    runs,
+    runs: authored,
     query,
     onQuery: setQuery,
     filters,
@@ -41,23 +50,24 @@ export function RunsPage(props: RunsPageProps) {
   };
   const count = activeFilters(query, filters, scope);
   if (loaded && runs.length === 0) return <NoRuns onRoute={props.onRoute} />;
-  const group = run
-    ? (orderEntries(run).find((candidate) => candidate.slug === route.group) ?? defaultEntry(run))
-    : null;
+  const group = groupOf(run, route.group);
   const detail = <RunDetail {...props} run={run} onSelect={select} />;
   const control = loaded ? (
     <RunFiltersButton filterProps={filterProps} count={count} wide={wide} />
   ) : null;
-  const list = (
-    <RunListPane
-      {...filterProps}
-      loaded={loaded}
-      run={run}
-      group={group?.slug ?? null}
-      now={props.now}
-      onSelect={select}
-      history={props.history}
-    />
+  const listing = (
+    <>
+      {authorBar}
+      <RunListPane
+        {...filterProps}
+        loaded={loaded}
+        run={run}
+        group={group?.slug ?? null}
+        now={props.now}
+        onSelect={select}
+        history={props.history}
+      />
+    </>
   );
   if (!wide) {
     const open = run || openedState === 'loading' || openedState === 'missing';
@@ -66,7 +76,7 @@ export function RunsPage(props: RunsPageProps) {
     ) : (
       <div className="flex flex-col gap-2 p-3">
         {control}
-        {list}
+        {listing}
       </div>
     );
   }
@@ -86,7 +96,7 @@ export function RunsPage(props: RunsPageProps) {
         className="flex shrink-0 flex-col gap-2 overflow-y-auto border-r p-3"
       >
         {columns ? null : control}
-        {list}
+        {listing}
       </aside>
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">{detail}</main>
     </div>

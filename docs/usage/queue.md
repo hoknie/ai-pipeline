@@ -11,6 +11,7 @@ aip queue add feature --task "Add a login form"       # to the end of the queue
 aip queue add feature --groups groups.yaml --title "Forms"
 aip queue list                                       # order, state, reason for stopping
 aip queue list --all                                 # the queues of all enabled projects
+aip queue list --mine                                # server mode: only your tasks; or --author bob@corp.com
 aip queue move <item> 1                              # make the task first
 aip queue edit <item> --task "New text"              # or: remove <item>
 aip queue add feature --task "Later" --postpone      # postponed: a running queue does not take it

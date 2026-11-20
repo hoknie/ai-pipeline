@@ -72,7 +72,9 @@ export class StatsLedger {
    */
   async backfill(): Promise<void> {
     try {
-      await this.backfillNow(await this.settings());
+      const settings = await this.settings();
+      this.backfillNow(settings);
+      this.backfillAuthors(settings);
     } catch (error) {
       this.dependencies.warn(`cannot move the history: ${String(error)}`);
     }
@@ -90,6 +92,7 @@ export class StatsLedger {
       if (!settings.enabled) return;
       this.backfillNow(settings);
     }
+    if (settings.enabled) this.backfillAuthors(settings);
     const from = this.capturedFrom ?? 0;
     const fresh = attempts.filter(
       (record) =>
@@ -134,8 +137,19 @@ export class StatsLedger {
       records.insertAttempts(attempts);
       for (const task of tasks) records.upsertTask(task);
       meta.markBackfilled(at);
+      meta.markAuthorBackfilled(at);
     });
     this.capturedFrom = at;
+  }
+
+  /** Fills the author of the records from before the author, once; waits while collection is off. */
+  private backfillAuthors(settings: LedgerSettings): void {
+    const { records, meta, now } = this.dependencies;
+    if (!settings.enabled || meta.authorBackfilledAt() !== null) return;
+    records.transaction(() => {
+      records.fillAuthors();
+      meta.markAuthorBackfilled(now());
+    });
   }
 
   /** The settings now; a read stays valid for a couple of seconds. */

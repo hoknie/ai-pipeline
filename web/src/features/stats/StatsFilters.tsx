@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { RepositoryView } from '../../shared/api/types.ts';
 import { directoryLabel } from '../../shared/lib/catalog/repositories.ts';
 import { STATS_PERIODS, type StatsPeriodId } from '../../shared/lib/nav/route.ts';
+import type { AuthorChoices } from '../../shared/lib/catalog/authors.ts';
+import { AuthorFilter } from '../../shared/ui/forms/filters/AuthorFilter.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
 
 const PERIOD_ORDER: StatsPeriodId[] = ['7d', '30d', '90d', 'all'];
@@ -13,11 +15,19 @@ export function StatsFilters({
   project,
   registry,
   onChange,
+  author = null,
+  authors,
+  onAuthor,
 }: {
   period: StatsPeriodId;
   project: string | null;
   registry: readonly RepositoryView[];
   onChange: (period: StatsPeriodId, project: string | null) => void;
+  /** The author of the address: a user id, `me` or null for everybody. */
+  author?: string | null;
+  /** Who can be chosen; the filter is shown in the server mode only. */
+  authors?: AuthorChoices;
+  onAuthor?: (author: string | null) => void;
 }) {
   const { t } = useTranslation();
   const known = registry.some((entry) => entry.path === project);
@@ -58,6 +68,9 @@ export function StatsFilters({
           ))}
         </select>
       </label>
+      {authors?.enabled && onAuthor ? (
+        <AuthorFilter value={author} users={authors.users} onChange={onAuthor} />
+      ) : null}
     </div>
   );
 }

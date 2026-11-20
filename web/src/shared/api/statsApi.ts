@@ -10,6 +10,8 @@ export interface StatsQuery {
   until?: number;
   repository?: string;
   bucket?: StatsBucketRequest;
+  /** A user id or `me`; server mode only. */
+  author?: string;
 }
 
 export interface StatsApi {
@@ -27,6 +29,7 @@ export function statsApi(): StatsApi {
       if (query.until !== undefined) params.set('until', String(query.until));
       if (query.repository) params.set('repository', query.repository);
       if (query.bucket) params.set('bucket', query.bucket);
+      if (query.author) params.set('author', query.author);
       const search = params.toString();
       return call(`/api/stats${search ? `?${search}` : ''}`);
     },

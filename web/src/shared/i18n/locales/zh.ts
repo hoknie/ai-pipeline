@@ -89,6 +89,10 @@ export const zh: Dictionary = {
     waiting: '等待回答：{{count}}',
     queued: '队列中：{{count}}',
   },
+  author: {
+    filter: { label: '作者', all: '所有作者', mine: '我的', empty: '此作者没有运行或任务' },
+    table: { title: '按作者', name: '作者', none: '无作者' },
+  },
   stats: {
     loading: '正在加载统计',
     error: '无法加载统计：{{message}}',

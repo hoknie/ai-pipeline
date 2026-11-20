@@ -88,7 +88,13 @@ export const runsRequests = [
   z.object({ method: z.literal('run'), params: runParams }),
   z.object({
     method: z.literal('status'),
-    params: z.object({ runId: z.string().min(1).optional() }).default({}),
+    params: z
+      .object({
+        runId: z.string().min(1).optional(),
+        /** A user id or `me`: only the runs of this author (server mode). */
+        author: z.string().min(1).max(128).optional(),
+      })
+      .default({}),
   }),
   z.object({
     method: z.literal('finished_runs'),
@@ -101,6 +107,7 @@ export const runsRequests = [
           .min(1)
           .refine((value) => isAbsolute(value), { message: 'repository must be an absolute path' })
           .optional(),
+        author: z.string().min(1).max(128).optional(),
       })
       .default({ limit: 15 }),
   }),

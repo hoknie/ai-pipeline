@@ -267,6 +267,87 @@ describe('the author in the panel API', () => {
   });
 });
 
+describe('the author filter in the panel API', () => {
+  const BOB = { sub: '43', email: 'bob@corp.com', email_verified: true, name: 'Bob' };
+
+  async function twoRuns(h: Harness) {
+    const alice = cookieOf(await browse(ALICE))!;
+    const bob = cookieOf(await browse(BOB))!;
+    const users = (await request(h.socket, 'users_list', {})) as {
+      users: { id: string; email: string }[];
+    };
+    const idOf = (email: string) => users.users.find((user) => user.email === email)!.id;
+    const runs: Record<string, string> = {};
+    for (const [name, email] of [
+      ['alice', 'alice@corp.com'],
+      ['bob', 'bob@corp.com'],
+    ] as const) {
+      const created = (await request(
+        h.socket,
+        'run',
+        { repository: h.repo, pipeline: 'feature', task: name },
+        30_000,
+        idOf(email),
+      )) as { run: { runId: string } };
+      runs[name] = created.run.runId;
+      await h.waitFor(runs[name]!, (view) => view.finished);
+    }
+    return { alice, bob, runs, aliceId: idOf('alice@corp.com') };
+  }
+
+  it('returns only the runs of the author from /api/runs and /api/finished-runs', async () => {
+    const h = await start();
+    const { alice, bob, runs, aliceId } = await twoRuns(h);
+    const ids = (answer: Answer): string[] => {
+      const body = JSON.parse(answer.body) as { id: string }[] | { runs: { id: string }[] };
+      return (Array.isArray(body) ? body : body.runs).map((run) => run.id);
+    };
+    const recent = await send('GET', '/api/runs?author=me', { cookie: bob });
+    expect(recent.status).toBe(200);
+    expect(ids(recent)).toEqual([runs.bob]);
+    const finished = await send(
+      'GET',
+      `/api/finished-runs?repository=${encodeURIComponent(h.repo)}&author=me`,
+      { cookie: alice },
+    );
+    expect(ids(finished)).toEqual([runs.alice]);
+    const named = await send('GET', `/api/finished-runs?author=${aliceId}`, { cookie: bob });
+    expect(ids(named)).toEqual([runs.alice]);
+    expect(ids(await send('GET', '/api/runs', { cookie: bob })).sort()).toEqual(
+      [runs.alice, runs.bob].sort(),
+    );
+  });
+
+  it('returns only the tasks of the author from /api/queue', async () => {
+    const h = await start();
+    const alice = cookieOf(await browse(ALICE))!;
+    const bob = cookieOf(await browse(BOB))!;
+    const headers = { 'content-type': 'application/json', origin: base };
+    const add = (cookie: string, task: string) =>
+      send(
+        'POST',
+        `/api/queue/items?repository=${encodeURIComponent(h.repo)}`,
+        { cookie, ...headers },
+        JSON.stringify({ pipeline: 'feature', task }),
+      );
+    expect((await add(alice, 'a1')).status).toBe(200);
+    expect((await add(bob, 'b1')).status).toBe(200);
+    const tasks = async (cookie: string, query: string) =>
+      (
+        JSON.parse(
+          (
+            await send('GET', `/api/queue?repository=${encodeURIComponent(h.repo)}${query}`, {
+              cookie,
+            })
+          ).body,
+        ) as { items: { task: string }[] }
+      ).items.map((item) => item.task);
+    expect(await tasks(alice, '&author=me')).toEqual(['a1']);
+    expect(await tasks(bob, '&author=me')).toEqual(['b1']);
+    expect(await tasks(bob, '')).toEqual(['a1', 'b1']);
+  });
+});
+
 describe('the audit journal of the sign-ins of the panel', () => {
   it('records a sign-in refused for its domain with the reason and the address of the client', async () => {
     const h = await start('      allowed_domains: [corp.com]\n');
