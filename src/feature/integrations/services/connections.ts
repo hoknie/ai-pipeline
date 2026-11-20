@@ -5,6 +5,7 @@ import type { IntegrationChangesPort } from '../ports/index.ts';
 import type { ConnectionRepository, SecretRepository } from '../repositories/index.ts';
 import {
   refusal,
+  checkSecretFormat,
   secretSpec,
   editedParams,
   validateName,
@@ -67,9 +68,16 @@ export class ConnectionService {
       .map((one) => this.view(one));
   }
 
-  async add(request: NewConnection): Promise<ConnectionView> {
+  /**
+   * Makes a connection. A kind with a command of its own (`createdBy`) is refused here; that
+   * command passes `managed` and makes it.
+   */
+  async add(request: NewConnection, options: { managed?: boolean } = {}): Promise<ConnectionView> {
     const { connections, catalog, registry, now } = this.dependencies;
     const descriptor = catalog.adapter(request.kind).descriptor;
+    if (descriptor.createdBy !== undefined && options.managed !== true) {
+      throw refusal('managed_kind', descriptor.createdBy);
+    }
     validateName(request.name);
     const params = validateParams(descriptor, request.params ?? {});
     if ((request.global === true) === (request.repository !== undefined)) {
@@ -165,7 +173,10 @@ export class ConnectionService {
   async setSecret(id: string, slot: string, value: string): Promise<ConnectionView> {
     const connection = this.dependencies.access.find(id);
     validateSecretValue(value);
-    secretSpec(this.dependencies.catalog.adapter(connection.kind).descriptor, slot);
+    checkSecretFormat(
+      secretSpec(this.dependencies.catalog.adapter(connection.kind).descriptor, slot),
+      value,
+    );
     await this.dependencies.secretService.set(id, slot, value);
     this.announce(id, 'secret');
     return this.view(this.dependencies.access.find(id));

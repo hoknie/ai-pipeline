@@ -98,6 +98,15 @@ const SAMPLES: Record<Method, unknown> = {
   notify_test: { id: 'n1' },
   notify_log: { state: 'failed', limit: 5 },
   notify_channels: {},
+  webhook_list: {},
+  webhook_add: { name: 'ci', url: 'https://ci.example.com/hook', allProjects: true },
+  webhook_edit: { id: 'c1', url: 'https://ci.example.com/v2' },
+  webhook_enable: { id: 'c1' },
+  webhook_disable: { id: 'c1' },
+  webhook_remove: { id: 'c1' },
+  webhook_test: { id: 'c1' },
+  webhook_log: { id: 'c1', state: 'failed', limit: 5 },
+  webhook_redeliver: { id: 7 },
   integration_enable: { id: 'c1' },
   integration_disable: { id: 'c1' },
   integration_check: { id: 'c1' },
@@ -208,9 +217,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 137 methods, each in the request schema once', () => {
+  it('has 146 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(137);
+    expect(methods).toHaveLength(146);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -7,11 +7,14 @@ interface Row {
   project_path: string | null;
   events_json: string;
   enabled: number;
+  failure_streak: number;
+  disabled_reason: string | null;
   created_at: number;
   updated_at: number;
 }
 
-const COLUMNS = 'id, connection_id, project_path, events_json, enabled, created_at, updated_at';
+const COLUMNS =
+  'id, connection_id, project_path, events_json, enabled, failure_streak, disabled_reason, created_at, updated_at';
 
 function toSubscription(row: Row): Subscription {
   return {
@@ -20,6 +23,8 @@ function toSubscription(row: Row): Subscription {
     projectPath: row.project_path,
     events: JSON.parse(row.events_json) as NotificationEventKind[],
     enabled: row.enabled === 1,
+    failureStreak: row.failure_streak,
+    disabledReason: row.disabled_reason,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -53,13 +58,17 @@ export class SubscriptionRepository {
 
   insert(subscription: Subscription): void {
     this.database
-      .prepare(`INSERT INTO notification_subscriptions (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .prepare(
+        `INSERT INTO notification_subscriptions (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
       .run(
         subscription.id,
         subscription.connectionId,
         subscription.projectPath,
         JSON.stringify(subscription.events),
         subscription.enabled ? 1 : 0,
+        subscription.failureStreak,
+        subscription.disabledReason,
         subscription.createdAt,
         subscription.updatedAt,
       );
@@ -75,6 +84,25 @@ export class SubscriptionRepository {
     this.database
       .prepare('UPDATE notification_subscriptions SET enabled = ?, updated_at = ? WHERE id = ?')
       .run(enabled ? 1 : 0, now, id);
+  }
+
+  /** Counts one more failed delivery in a row; returns the count. */
+  addFailure(id: string): number {
+    const row = this.database
+      .prepare(
+        'UPDATE notification_subscriptions SET failure_streak = failure_streak + 1 WHERE id = ? RETURNING failure_streak',
+      )
+      .get(id) as { failure_streak: number } | undefined;
+    return row?.failure_streak ?? 0;
+  }
+
+  /** Sets the failures in a row and why the subscription switched its connection off. */
+  setFailures(id: string, streak: number, reason: string | null): void {
+    this.database
+      .prepare(
+        'UPDATE notification_subscriptions SET failure_streak = ?, disabled_reason = ? WHERE id = ?',
+      )
+      .run(streak, reason, id);
   }
 
   delete(id: string): void {

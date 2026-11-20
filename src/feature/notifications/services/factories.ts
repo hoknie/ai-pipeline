@@ -1,4 +1,9 @@
-import type { ChannelFactoryPort } from '../ports/index.ts';
+import type { ChannelFactoryPort, ChatChannelPort, OutboundChannelPort } from '../ports/index.ts';
+
+/** A channel that edits its messages and listens, as against one that only sends. */
+export function isChatChannel(channel: OutboundChannelPort): channel is ChatChannelPort {
+  return typeof (channel as Partial<ChatChannelPort>).listen === 'function';
+}
 
 /** The channel kinds this build knows, by the kind of the connection. */
 export class ChannelFactories {
@@ -19,6 +24,12 @@ export class ChannelFactories {
 
   get(kind: string): ChannelFactoryPort | undefined {
     return this.factories.get(kind);
+  }
+
+  /** The kind is a chat: it edits its messages and takes answers, and `notify` works with it. */
+  isChat(kind: string): boolean {
+    const factory = this.factories.get(kind);
+    return factory !== undefined && factory.editsMessages !== false;
   }
 
   kinds(): string[] {

@@ -17,3 +17,4 @@ export {
 export { statsView } from './stats.ts';
 export { tagViews } from './tags.ts';
 export { channelView } from './notifications/notifications.ts';
+export { webhookView } from './notifications/webhooks.ts';

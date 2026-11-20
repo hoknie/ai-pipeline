@@ -16,6 +16,8 @@ export interface ParamSpec {
   values?: readonly string[];
   /** A regular expression the whole value must match; absent: any text up to `maxLength`. */
   pattern?: string;
+  /** A check of the kind for what a pattern cannot say; the value passed the limits above already. */
+  validate?: (value: string) => boolean;
   /** The parameter is the identity of something outside; it never changes after the connection is made. */
   immutable?: boolean;
 }
@@ -24,6 +26,8 @@ export interface ParamSpec {
 export interface SecretSpec {
   slot: string;
   required: boolean;
+  /** Whether a value is acceptable; a kind with a format of its own checks it here. */
+  validate?: (value: string) => boolean;
 }
 
 /** What an installed version knows about one kind of connections. */
@@ -35,6 +39,8 @@ export interface AdapterDescriptor {
   directions: readonly Direction[];
   /** Typed inbound operations a verified event of this kind may ask for. */
   operations: readonly InboundOperation['type'][];
+  /** The command that creates connections of this kind; the general `add` refuses them. */
+  createdBy?: string;
 }
 
 /** A connection as the registry keeps it: no secret values, only what is needed to find them. */
@@ -123,6 +129,9 @@ export function validateParams(
     if (spec.values !== undefined && !spec.values.includes(value)) {
       throw refusal('invalid_params', name);
     }
+    if (spec.validate !== undefined && !spec.validate(value)) {
+      throw refusal('invalid_params', name);
+    }
     if (spec.pattern !== undefined && !new RegExp(`^(?:${spec.pattern})$`, 'u').test(value)) {
       throw refusal('invalid_params', name);
     }
@@ -131,6 +140,12 @@ export function validateParams(
     if (spec.required && !(spec.name in params)) throw refusal('invalid_params', spec.name);
   }
   return { ...params };
+}
+
+/** Refuses a value the kind cannot use as the secret of the slot. */
+export function checkSecretFormat(spec: SecretSpec, value: string): void {
+  if (spec.validate !== undefined && !spec.validate(value))
+    throw refusal('invalid_secret', spec.slot);
 }
 
 export function secretSpec(descriptor: AdapterDescriptor, slot: string): SecretSpec {

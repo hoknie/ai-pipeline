@@ -8,12 +8,16 @@ export interface Subscription {
   projectPath: string | null;
   events: NotificationEventKind[];
   enabled: boolean;
+  /** Failed deliveries in a row; a sent one starts the count again. */
+  failureStreak: number;
+  /** Why the subscription switched its connection off; null while nothing did. */
+  disabledReason: string | null;
   createdAt: number;
   updatedAt: number;
 }
 
 /** A delivery is an event of a run or the test message of a subscription. */
-export type DeliveryKind = NotificationEventKind | 'test';
+export type DeliveryKind = NotificationEventKind | 'question_closed' | 'test';
 
 export type DeliveryState = 'pending' | 'sent' | 'failed' | 'closed';
 export const DELIVERY_STATES: readonly DeliveryState[] = ['pending', 'sent', 'failed', 'closed'];
@@ -100,4 +104,21 @@ export interface SubscriptionView {
   project: string | null;
   events: NotificationEventKind[];
   enabled: boolean;
+}
+
+/** What a channel reports of one attempt to send a delivery. */
+export interface AttemptRecord {
+  startedAt: number;
+  durationMs: number;
+  /** The status of the answer; null when none came. */
+  statusCode: number | null;
+  /** A fixed name of what went wrong; null for an accepted attempt. */
+  errorKind: string | null;
+  /** The first characters of the answer, as text. */
+  excerpt: string | null;
+}
+
+export interface Attempt extends AttemptRecord {
+  deliveryId: number;
+  n: number;
 }

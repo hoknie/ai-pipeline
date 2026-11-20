@@ -89,6 +89,35 @@ describe('grouped help', () => {
     expect(setup?.commands).toContain('help');
   });
 
+  it('puts webhook under Setup & maintenance right after notify', async () => {
+    const { stdout } = await aip(['--help']);
+    const setup = stdout.slice(stdout.indexOf('Setup & maintenance:'), stdout.indexOf('Plumbing'));
+    expect(setup.indexOf('\n  notify ')).toBeGreaterThan(-1);
+    expect(setup.indexOf('\n  webhook ')).toBeGreaterThan(setup.indexOf('\n  notify '));
+    expect(setup.indexOf('\n  webhook ')).toBeLessThan(setup.indexOf('\n  login '));
+    expect(HELP_GROUPS.find((group) => group.heading.startsWith('Setup'))?.commands).toEqual(
+      expect.arrayContaining(['notify', 'webhook']),
+    );
+  });
+
+  it('lists the nine subcommands of aip webhook', async () => {
+    const { stdout, code } = await aip(['webhook', '--help']);
+    expect(code).toBe(0);
+    for (const name of [
+      'list',
+      'add',
+      'edit',
+      'enable',
+      'disable',
+      'remove',
+      'test',
+      'log',
+      'redeliver',
+    ]) {
+      expect(stdout).toMatch(new RegExp(`\\n\\s+${name}[ |]`));
+    }
+  });
+
   it('lists overview first under Dashboards & streams, before web', async () => {
     const { stdout } = await aip(['--help']);
     const dashboards = stdout.slice(

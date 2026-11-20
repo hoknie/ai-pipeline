@@ -2,6 +2,7 @@ import { ApiError, withRepository } from './http.ts';
 import { attachmentsApi, type AttachmentsApi } from './catalog/attachmentsApi.ts';
 import { configApi, type ConfigApi } from './configApi.ts';
 import { integrationsApi, type IntegrationsApi } from './integrations/integrationsApi.ts';
+import { webhooksApi, type WebhooksApi } from './integrations/webhooksApi.ts';
 import { queueApi, type QueueApi, type QueueSettingsPatch } from './queueApi.ts';
 import { runActionsApi, type RunActionsApi } from './runActionsApi.ts';
 import { runsApi, type RunsApi } from './runsApi.ts';
@@ -22,6 +23,7 @@ export type {
   NewSubscription,
 } from './integrations/integrationsApi.ts';
 
+export type { NewWebhook } from './integrations/webhooksApi.ts';
 export type { UploadedFile } from './catalog/attachmentsApi.ts';
 
 export interface Api
@@ -33,6 +35,7 @@ export interface Api
     ConfigApi,
     StatsApi,
     IntegrationsApi,
+    WebhooksApi,
     AttachmentsApi {
   observerHistory(query?: ObserverHistoryQuery): Promise<ObserverHistoryPage>;
   /**
@@ -55,6 +58,7 @@ function bound(repository: string | null): Api {
     ...configApi(repository),
     ...statsApi(),
     ...integrationsApi(),
+    ...webhooksApi(),
     ...attachmentsApi(),
     observerHistory,
   };

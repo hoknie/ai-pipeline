@@ -2,6 +2,7 @@ import type { ConfigService } from '../../swarm-config/services/index.ts';
 import type { NotificationsPublishPort } from '../ports/index.ts';
 import type {
   AnswerRepository,
+  AttemptRepository,
   DeliveryOutcomes,
   DeliveryRepository,
 } from '../repositories/index.ts';
@@ -9,6 +10,7 @@ import type {
 import type { NotificationChannels } from './channels.ts';
 import type { ChannelFactories } from './factories.ts';
 import type { SubscriptionService } from './subscriptions.ts';
+import type { FailureStreaks } from './webhooks/index.ts';
 
 /** What the sending and the closing of messages work with. */
 export interface OutboxDependencies {
@@ -16,6 +18,8 @@ export interface OutboxDependencies {
   deliveries: DeliveryRepository;
   outcomes: DeliveryOutcomes;
   answers: AnswerRepository;
+  streaks: FailureStreaks;
+  attempts: AttemptRepository;
   channels: NotificationChannels;
   factories: ChannelFactories;
   config: ConfigService;

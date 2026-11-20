@@ -1,21 +1,25 @@
 import {
+  CHAT_RETRY,
   ChannelFailure,
   emptyEventData,
   notificationRefusal,
+  retryDelay,
+  type RetryPolicy,
   type Delivery,
   type DeliveryView,
 } from '../types/index.ts';
 
+import { isChatChannel } from './factories.ts';
 import { drawOf, publicUrlOf } from './drawing.ts';
 import type { OutboxDependencies } from './outbox.ts';
 import { texts } from '../types/index.ts';
 import { toView } from './journal.ts';
 
 /** The pauses before the next attempt after a temporary refusal; the delivery fails after the last. */
-export const RETRY_MS: readonly number[] = [5_000, 30_000, 120_000, 600_000, 1_800_000];
+export const RETRY_MS: readonly number[] = CHAT_RETRY.pausesMs;
 
 /** A delivery that did not get through in this time since it was made is given up on. */
-export const GIVE_UP_MS = 3_600_000;
+export const GIVE_UP_MS = CHAT_RETRY.giveUpMs ?? 0;
 
 /** Sends the pending deliveries through their channels and decides what a refusal means. */
 export class DeliverySender {
@@ -29,7 +33,7 @@ export class DeliverySender {
 
   /** One attempt for a pending delivery; never throws. */
   async deliver(delivery: Delivery): Promise<void> {
-    const { subscriptions, outcomes, channels, factories, config, publish, now } =
+    const { subscriptions, streaks, outcomes, channels, factories, config, publish, now } =
       this.dependencies;
     const subscription = subscriptions.all().find((one) => one.id === delivery.subscriptionId);
     if (subscription === undefined || !subscription.enabled) {
@@ -39,14 +43,24 @@ export class DeliverySender {
     }
     const opened = channels.open(subscription.connectionId);
     if (opened === null) {
-      this.fail(delivery, subscription.connectionId, unavailable('the connection is disabled'));
+      this.fail(
+        delivery,
+        subscription.id,
+        subscription.connectionId,
+        unavailable('the connection is disabled'),
+      );
       return;
     }
     const missing = factories
       .get(opened.connection.kind)
       ?.missingForSubscription(opened.connection.params);
     if (missing !== null && missing !== undefined) {
-      this.fail(delivery, opened.connection.id, permanentFailure(`${missing} is not set`));
+      this.fail(
+        delivery,
+        subscription.id,
+        opened.connection.id,
+        permanentFailure(`${missing} is not set`),
+      );
       return;
     }
     const until = this.waiting.get(opened.connection.id) ?? 0;
@@ -55,23 +69,31 @@ export class DeliverySender {
       return;
     }
     try {
-      const ref = await opened.channel.send(
-        drawOf(delivery, [], null, opened, publicUrlOf(config)),
-        delivery.shortKey,
-      );
+      const publicUrl = publicUrlOf(config);
+      const ref = await opened.channel.deliver({
+        delivery,
+        draw: drawOf(delivery, [], null, opened, publicUrl),
+        publicUrl,
+      });
       outcomes.markSent(delivery.id, ref, delivery.attempts + 1, now());
+      streaks.delivered(subscription.id);
       publish.journalChanged(delivery.id);
     } catch (error) {
-      this.fail(delivery, opened.connection.id, error);
+      this.fail(delivery, subscription.id, opened.connection.id, error);
     }
   }
 
   /** Sends a test message through a subscription and records it in the journal. */
   async test(subscriptionId: string): Promise<DeliveryView> {
-    const { subscriptions, deliveries, outcomes, channels, publish, now } = this.dependencies;
+    const { subscriptions, deliveries, outcomes, channels, factories, publish, now } =
+      this.dependencies;
     const subscription = subscriptions.find(subscriptionId);
+    const kind = channels.kindOf(subscription.connectionId);
+    if (kind !== null && !factories.isChat(kind)) throw notificationRefusal('use_webhook');
     const opened = channels.open(subscription.connectionId);
-    if (opened === null) throw notificationRefusal('connection_disabled');
+    if (opened === null || !isChatChannel(opened.channel)) {
+      throw notificationRefusal('connection_disabled');
+    }
     const delivery = deliveries.claim(
       {
         subscriptionId,
@@ -99,17 +121,26 @@ export class DeliverySender {
   }
 
   /** What a refusal of the channel means: wait and try again, or give up. */
-  private fail(delivery: Delivery, connectionId: string, error: unknown): void {
-    const { outcomes, publish, now, log } = this.dependencies;
+  private fail(
+    delivery: Delivery,
+    subscriptionId: string,
+    connectionId: string,
+    error: unknown,
+  ): void {
+    const { outcomes, streaks, channels, publish, now, log } = this.dependencies;
     const failure = safeFailure(error);
     if (!(error instanceof ChannelFailure))
       log(`notifications: delivery ${delivery.id}: ${String(error)}`);
     const attempts = delivery.attempts + 1;
     const at = now();
-    if (failure.retryAfterMs !== null) this.waiting.set(connectionId, at + failure.retryAfterMs);
-    const delay = failure.retryAfterMs ?? RETRY_MS[attempts - 1];
-    if (failure.permanent || delay === undefined || delivery.createdAt + GIVE_UP_MS <= at + delay) {
+    const policy: RetryPolicy = channels.policyOf(connectionId);
+    const delay = retryDelay(policy, attempts, failure, at - delivery.createdAt);
+    if (failure.retryAfterMs !== null) {
+      this.waiting.set(connectionId, at + (delay ?? failure.retryAfterMs));
+    }
+    if (delay === null) {
       outcomes.markFailed(delivery.id, attempts, failure.message, at);
+      streaks.failedForGood(subscriptionId, policy, failure);
     } else {
       outcomes.markRetry(delivery.id, attempts, at + delay, failure.message, at);
     }

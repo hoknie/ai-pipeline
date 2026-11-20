@@ -106,3 +106,23 @@ export const NOTIFICATIONS_MIGRATION = `
     updated_at INTEGER NOT NULL
   );
   `;
+
+/**
+ * Outgoing webhooks: every attempt of a delivery with what came back, and the counter of failed
+ * deliveries in a row with the reason a subscription was switched off. A response excerpt is text
+ * of the receiver, never a secret of ours.
+ */
+export const WEBHOOKS_MIGRATION = `
+  CREATE TABLE IF NOT EXISTS notification_attempts (
+    delivery_id INTEGER NOT NULL REFERENCES notification_deliveries (id) ON DELETE CASCADE,
+    n INTEGER NOT NULL,
+    started_at INTEGER NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    status_code INTEGER,
+    error_kind TEXT,
+    response_excerpt TEXT,
+    PRIMARY KEY (delivery_id, n)
+  );
+  ALTER TABLE notification_subscriptions ADD COLUMN failure_streak INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE notification_subscriptions ADD COLUMN disabled_reason TEXT;
+  `;

@@ -10,6 +10,7 @@ import { Button } from '../../shared/ui/forms/button.tsx';
 import { ConnectionCard } from './ConnectionCard.tsx';
 import { JournalSection } from './JournalSection.tsx';
 import { SubscriptionsSection } from './SubscriptionsSection.tsx';
+import { WebhooksSection } from './webhooks/index.ts';
 import { useIntegrations } from './useIntegrations.ts';
 
 /**
@@ -33,7 +34,9 @@ export default function IntegrationsPage({
     return ok;
   };
   const channels = new Map((overview?.channels ?? []).map((one) => [one.connection, one]));
-  const chat = (overview?.connections ?? []).filter((one) =>
+  // webhooks have a section of their own: their addresses and secrets are not edited as parameters
+  const connections = (overview?.connections ?? []).filter((one) => one.kind !== 'webhook');
+  const chat = connections.filter((one) =>
     (overview?.types.find((type) => type.kind === one.kind)?.directions ?? []).includes('outbound'),
   );
   return (
@@ -58,13 +61,13 @@ export default function IntegrationsPage({
             <h2 id="connections-title" className="text-base font-semibold">
               {t('integrations.connections.title')}
             </h2>
-            {overview.connections.length === 0 ? (
+            {connections.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t('integrations.connections.empty')}{' '}
                 <code>aip integration add telegram main --global --param allowed_users=…</code>
               </p>
             ) : (
-              overview.connections.map((connection) => (
+              connections.map((connection) => (
                 <ConnectionCard
                   key={connection.id}
                   connection={connection}
@@ -82,6 +85,7 @@ export default function IntegrationsPage({
             chat={chat}
             done={done}
           />
+          <WebhooksSection api={api} registry={registry} version={version} />
           <JournalSection api={api} subscriptions={overview.subscriptions} version={version} />
         </>
       )}

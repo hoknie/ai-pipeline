@@ -6,16 +6,24 @@ export class ChannelFailure extends Error {
   readonly retryAfterMs: number | null;
   /** The channel does not accept the credentials of the connection. */
   readonly unauthorized: boolean;
+  /** The receiver is gone for good: the connection is switched off at once. */
+  readonly disable: boolean;
 
   constructor(
     message: string,
-    options: { permanent: boolean; retryAfterMs?: number | null; unauthorized?: boolean },
+    options: {
+      permanent: boolean;
+      retryAfterMs?: number | null;
+      unauthorized?: boolean;
+      disable?: boolean;
+    },
   ) {
     super(message);
     this.name = 'ChannelFailure';
     this.permanent = options.permanent;
     this.retryAfterMs = options.retryAfterMs ?? null;
     this.unauthorized = options.unauthorized ?? false;
+    this.disable = options.disable ?? false;
   }
 }
 

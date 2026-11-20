@@ -12,7 +12,7 @@ import type { HandlerTable } from '../types.ts';
  * Every failure of these handlers leaves as one of the fixed refusals of the notifications or of
  * the integrations: an error of a channel or of the database never carries a token or a path.
  */
-async function guarded<T>(work: () => Promise<T> | T): Promise<T> {
+export async function guarded<T>(work: () => Promise<T> | T): Promise<T> {
   try {
     return await work();
   } catch (error) {

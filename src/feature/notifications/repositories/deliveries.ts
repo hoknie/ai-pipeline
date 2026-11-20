@@ -75,6 +75,8 @@ export interface NewDelivery {
 
 export interface JournalFilter {
   subscription?: string | undefined;
+  /** Subscriptions whose deliveries are left out. */
+  exclude?: readonly string[] | undefined;
   state?: DeliveryState | undefined;
   limit: number;
 }
@@ -148,10 +150,10 @@ export class DeliveryRepository {
     );
   }
 
-  /** Pending deliveries whose time has come, oldest first. */
+  /** Pending deliveries whose time has come, oldest first; test calls are sent by their caller only. */
   due(now: number, limit: number): Delivery[] {
     return this.many(
-      "SELECT * FROM notification_deliveries WHERE state = 'pending' AND next_attempt_at <= ? ORDER BY next_attempt_at, id LIMIT ?",
+      "SELECT * FROM notification_deliveries WHERE state = 'pending' AND kind <> 'test' AND next_attempt_at <= ? ORDER BY next_attempt_at, id LIMIT ?",
       now,
       limit,
     );
@@ -161,7 +163,7 @@ export class DeliveryRepository {
   nextAttemptAt(): number | null {
     const row = this.database
       .prepare(
-        "SELECT MIN(next_attempt_at) AS at FROM notification_deliveries WHERE state = 'pending'",
+        "SELECT MIN(next_attempt_at) AS at FROM notification_deliveries WHERE state = 'pending' AND kind <> 'test'",
       )
       .get() as { at: number | null };
     return row.at;
@@ -190,6 +192,10 @@ export class DeliveryRepository {
     if (filter.subscription !== undefined) {
       where.push('subscription_id = ?');
       values.push(filter.subscription);
+    }
+    if (filter.exclude !== undefined && filter.exclude.length > 0) {
+      where.push(`subscription_id NOT IN (${filter.exclude.map(() => '?').join(',')})`);
+      values.push(...filter.exclude);
     }
     if (filter.state !== undefined) {
       where.push('state = ?');

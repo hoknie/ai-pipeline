@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { startReceiver } from '../../fakes/webhook-receiver.ts';
 import { transition } from '../../../src/feature/runs/machine/index.ts';
 
 import { RETRY_MS } from '../../../src/feature/notifications/services/sender.ts';
@@ -384,3 +385,90 @@ describe('the test message and the journal', () => {
     expect(rest.map((one) => one.kind)).toEqual(['question']);
   });
 });
+
+describe('a channel that only sends', () => {
+  const SECRET = 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw';
+
+  async function webhook(h: Harness, url: string): Promise<string> {
+    const view = await h.notifications.webhooks.add({ name: 'ci', url, allProjects: true });
+    await h.base.services.connections.setSecret(view.id, 'signing_secret', SECRET);
+    await h.base.services.connections.enable(view.id);
+    return view.id;
+  }
+
+  it('is told of the end of a question by a delivery of its own', async () => {
+    const hook = await startReceiver();
+    try {
+      const h = harness();
+      current = h;
+      const id = await webhook(h, `${hook.base}/hook`);
+      const state = asking(QUESTIONS);
+      await h.save(state);
+      const asked = state.groups[0]!;
+      asked.decisions.push({ stepId: 'plan', question: '', answer: 'x', by: 'human' });
+      asked.status = 'queued';
+      asked.question = null;
+      asked.questions = null;
+      await h.save(state);
+      expect(hook.received.map((one) => JSON.parse(one.body).type)).toEqual([
+        'question.asked',
+        'question.closed',
+      ]);
+      const first = JSON.parse(hook.received[0]!.body);
+      const second = JSON.parse(hook.received[1]!.body);
+      expect(second.data.closed.by).toBe('human');
+      expect(hook.received[1]!.headers['webhook-id']).not.toBe(
+        hook.received[0]!.headers['webhook-id'],
+      );
+      expect(first.type).toBe('question.asked');
+      expect(h.notifications.webhooks.log(id, {})).toHaveLength(2);
+    } finally {
+      await hook.close();
+    }
+  });
+
+  it('does not hold the chats while a slow receiver thinks', async () => {
+    const hook = await startReceiver();
+    hook.answers.push({ status: 200, delayMs: 400 });
+    try {
+      const { h, connection } = await subscribed();
+      await webhook(h, `${hook.base}/hook`);
+      const started = Date.now();
+      h.states.set('run000000001', asking(QUESTIONS));
+      h.notifications.dispatcher.runChanged(h.states.get('run000000001')!);
+      await until(() => h.channels.of(connection).sent.length === 1);
+      expect(Date.now() - started).toBeLessThan(300);
+      await h.notifications.dispatcher.idle();
+      expect(hook.received).toHaveLength(1);
+    } finally {
+      await hook.close();
+    }
+  });
+
+  it('has at most four requests of a connection in flight', async () => {
+    const hook = await startReceiver();
+    for (let i = 0; i < 6; i += 1) hook.answers.push({ status: 200, delayMs: 150 });
+    try {
+      const h = harness();
+      current = h;
+      await webhook(h, `${hook.base}/hook`);
+      for (let i = 1; i <= 6; i += 1) {
+        const state = asking(QUESTIONS, { id: `run00000000${i}` });
+        h.states.set(state.run.id, state);
+        h.notifications.dispatcher.runChanged(state);
+      }
+      await until(() => hook.received.length >= 4);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(hook.received).toHaveLength(4);
+      await h.notifications.dispatcher.idle();
+      expect(hook.received).toHaveLength(6);
+    } finally {
+      await hook.close();
+    }
+  });
+});
+
+async function until(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 200 && !condition(); i += 1) await new Promise((r) => setTimeout(r, 10));
+  expect(condition()).toBe(true);
+}

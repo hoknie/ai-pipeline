@@ -147,6 +147,37 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
     action: 'notify.test',
     info: (p) => ({ resource: resource('notification', p.id) }),
   },
+  webhook_add: {
+    action: 'webhook.add',
+    info: (p) => ({ details: pick(p, 'name', 'allProjects', 'events') }),
+  },
+  webhook_edit: {
+    action: 'webhook.edit',
+    info: (p) => ({
+      resource: resource('integration', p.id),
+      details: { url: p.url !== undefined, ...pick(p, 'events') },
+    }),
+  },
+  webhook_enable: {
+    action: 'webhook.enable',
+    info: (p) => ({ resource: resource('integration', p.id) }),
+  },
+  webhook_disable: {
+    action: 'webhook.disable',
+    info: (p) => ({ resource: resource('integration', p.id) }),
+  },
+  webhook_remove: {
+    action: 'webhook.remove',
+    info: (p) => ({ resource: resource('integration', p.id) }),
+  },
+  webhook_test: {
+    action: 'webhook.test',
+    info: (p) => ({ resource: resource('integration', p.id) }),
+  },
+  webhook_redeliver: {
+    action: 'webhook.redeliver',
+    info: (p) => ({ resource: resource('notification', p.id) }),
+  },
   integration_remove: {
     action: 'integration.remove',
     info: (p) => ({ resource: resource('integration', p.id) }),

@@ -6,6 +6,8 @@ import {
   slackChannelFactory,
   telegramAdapter,
   telegramChannelFactory,
+  webhookAdapter,
+  webhookChannelFactory,
 } from '../../feature/notifications/clients/index.ts';
 import type {
   ChannelFactoryPort,
@@ -15,11 +17,12 @@ import { createNotificationsServices } from '../../feature/notifications/service
 import type { RegistryService } from '../../feature/repos/services/index.ts';
 import type { RunsServices } from '../../feature/runs/services/index.ts';
 import type { ConfigService } from '../../feature/swarm-config/services/index.ts';
+import { packageVersion } from '../../platform/build/index.ts';
 import type { Database } from '../../platform/sqlite/index.ts';
 
 /** The adapters of the integrations this build brings: the chat kinds of the notifications. */
 export function builtInAdapters(): IntegrationAdapterPort[] {
-  return [telegramAdapter(), slackAdapter()];
+  return [telegramAdapter(), slackAdapter(), webhookAdapter()];
 }
 
 /** What the composition root has at hand when it builds the notifications. */
@@ -66,6 +69,11 @@ export function createNotifications(
       slackChannelFactory({
         base: slackBase,
         proxy: () => probeProxy(slackBase, lower.network.proxy(), environment),
+      }),
+      // Webhook addresses differ from one connection to the next: the proxy of the settings is used as it is.
+      webhookChannelFactory({
+        proxy: () => lower.network.proxy(),
+        version: packageVersion(),
       }),
     ],
     ...(options.notifications?.restartMs === undefined

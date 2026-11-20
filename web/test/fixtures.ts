@@ -35,6 +35,8 @@ import type {
   SpecialistTagFolderView,
   StatsReportView,
   DeliveryView,
+  WebhookDeliveryView,
+  WebhookView,
 } from '../src/shared/api/types.ts';
 
 /** The observers as the daemon sends them: off, one worker, nothing running. */
@@ -829,6 +831,58 @@ export function deliveryView(overrides: Partial<DeliveryView> = {}): DeliveryVie
   };
 }
 
+/** A webhook of all projects that waits for its secret. */
+export function webhookView(overrides: Partial<WebhookView> = {}): WebhookView {
+  return {
+    id: 'w1',
+    name: 'ci',
+    url: 'https://ci.example.com/hook',
+    project: null,
+    events: ['question'],
+    enabled: false,
+    secret: false,
+    disabledReason: null,
+    failureStreak: 0,
+    ...overrides,
+  };
+}
+
+/** A delivery of a webhook with three attempts. */
+export function webhookDeliveryView(
+  overrides: Partial<WebhookDeliveryView> = {},
+): WebhookDeliveryView {
+  return {
+    id: 5,
+    webhookId: 'msg_abc123',
+    type: 'question.asked',
+    run: 'run1',
+    group: 'login',
+    state: 'sent',
+    attempts: [
+      {
+        n: 1,
+        at: 1_700_000_000_000,
+        statusCode: 503,
+        error: 'server_error',
+        durationMs: 20,
+        excerpt: 'down',
+      },
+      {
+        n: 2,
+        at: 1_700_000_005_000,
+        statusCode: null,
+        error: 'timeout',
+        durationMs: 10000,
+        excerpt: null,
+      },
+      { n: 3, at: 1_700_000_065_000, statusCode: 200, error: null, durationMs: 31, excerpt: 'ok' },
+    ],
+    error: null,
+    createdAt: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
 /** A shared Telegram connection without the token, with one subscription of all projects. */
 export function integrationsOverview(
   overrides: Partial<IntegrationsOverview> = {},
@@ -1097,6 +1151,14 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     subscriptionRemove: vi.fn(async () => undefined),
     subscriptionTest: vi.fn(async () => deliveryView()),
     deliveries: vi.fn(async () => []),
+    webhooks: vi.fn(async () => []),
+    webhookAdd: vi.fn(async () => webhookView()),
+    webhookEdit: vi.fn(async () => webhookView()),
+    webhookEnabled: vi.fn(async () => webhookView()),
+    webhookRemove: vi.fn(async () => undefined),
+    webhookTest: vi.fn(async () => ({ ok: true, statusCode: 200, durationMs: 12, error: null })),
+    webhookLog: vi.fn(async () => []),
+    webhookRedeliver: vi.fn(async () => webhookDeliveryView()),
     ...overrides,
   };
   /** Methods that record the repository they were bound to, then call the shared mock. */

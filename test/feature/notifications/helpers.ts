@@ -5,6 +5,7 @@ import type {
   ChannelOptions,
   ChatChannelPort,
   InboundHandler,
+  OutboundMessage,
 } from '../../../src/feature/notifications/ports/index.ts';
 import {
   ChannelFailure,
@@ -16,6 +17,12 @@ import {
   type ExternalRef,
   type NotificationEvent,
 } from '../../../src/feature/notifications/types/index.ts';
+
+import {
+  webhookAdapter,
+  webhookChannelFactory,
+} from '../../../src/feature/notifications/clients/index.ts';
+import type { WebhookFactoryOptions } from '../../../src/feature/notifications/clients/webhook/channel.ts';
 
 import { fixture, type Fixture } from '../integrations/helpers.ts';
 
@@ -64,6 +71,10 @@ export class FakeChannel implements ChatChannelPort {
 
   private target(): string {
     return this.options.connection.params.chat_id ?? '';
+  }
+
+  deliver(message: OutboundMessage): Promise<ExternalRef> {
+    return this.send(message.draw, message.delivery.shortKey);
   }
 
   async send(draw: Draw, shortKey: string): Promise<ExternalRef> {
@@ -242,12 +253,14 @@ export interface Harness {
   close(): Promise<void>;
 }
 
-export function harness(options: { settings?: string; start?: boolean } = {}): Harness {
+export function harness(
+  options: { settings?: string; start?: boolean; webhook?: Partial<WebhookFactoryOptions> } = {},
+): Harness {
   const clock = { time: 1_000_000 };
   const now = () => clock.time;
   let current: NotificationsServices | undefined;
   const base = fixture({
-    adapters: [chatAdapter()],
+    adapters: [chatAdapter(), webhookAdapter()],
     now,
     // The registry tells the channels about every change, as the daemon wires it.
     overrides: {
@@ -278,7 +291,10 @@ export function harness(options: { settings?: string; start?: boolean } = {}): H
       registry: base.registry,
       runs: runs(),
       config,
-      kinds: [channels.factory],
+      kinds: [
+        channels.factory,
+        webhookChannelFactory({ proxy: () => null, version: 'test', ...options.webhook }),
+      ],
       publish: {
         subscriptionsChanged: () => void published.push('subscriptions'),
         journalChanged: (id) => void published.push(`journal:${id}`),

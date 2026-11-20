@@ -6,6 +6,7 @@ import {
   type NotificationEvent,
 } from '../types/index.ts';
 
+import { isChatChannel } from './factories.ts';
 import { drawOf, publicUrlOf } from './drawing.ts';
 import type { OutboxDependencies } from './outbox.ts';
 
@@ -27,12 +28,40 @@ export class QuestionCloser {
     this.dependencies = dependencies;
   }
 
-  /** Marks the question closed; true when a message in a chat has to be redrawn. */
-  close(delivery: Delivery, snapshot: RunSnapshot): boolean {
+  /**
+   * Marks the question closed. `redraw`: a message in a chat has to be drawn again; `announced`: a
+   * channel that cannot edit its messages is told in a delivery of its own.
+   */
+  close(delivery: Delivery, snapshot: RunSnapshot): { redraw: boolean; announced: boolean } {
     const { outcomes, publish, now } = this.dependencies;
-    outcomes.markClosed(delivery.id, encodeClosure(this.closure(delivery, snapshot)), now());
+    const closure = this.closure(delivery, snapshot);
+    outcomes.markClosed(delivery.id, encodeClosure(closure), now());
     publish.journalChanged(delivery.id);
-    return delivery.state === 'sent' && delivery.external !== null;
+    const announced = delivery.state === 'sent' && this.announce(delivery, closure);
+    return { redraw: delivery.state === 'sent' && delivery.external !== null, announced };
+  }
+
+  /** A channel without edits learns of the end of a question from a delivery `<key>/closed`. */
+  private announce(delivery: Delivery, closure: Closure): boolean {
+    const { subscriptions, channels, factories, deliveries, publish, now } = this.dependencies;
+    const subscription = subscriptions.all().find((one) => one.id === delivery.subscriptionId);
+    const opened = subscription && channels.open(subscription.connectionId);
+    if (!opened || factories.isChat(opened.connection.kind)) return false;
+    const made = deliveries.claim(
+      {
+        subscriptionId: delivery.subscriptionId,
+        eventKey: `${delivery.eventKey}/closed`,
+        kind: 'question_closed',
+        run: delivery.run,
+        group: delivery.group,
+        questionKey: null,
+        payload: { ...delivery.payload, closure },
+      },
+      now(),
+    );
+    if (made === null) return false;
+    publish.journalChanged(made.id);
+    return true;
   }
 
   /** Draws the closed message again, in the chat it was sent to; a failure only gets logged. */
@@ -42,7 +71,7 @@ export class QuestionCloser {
     if (delivery?.external == null || delivery.state !== 'closed') return;
     const subscription = subscriptions.all().find((one) => one.id === delivery.subscriptionId);
     const opened = subscription && channels.open(subscription.connectionId);
-    if (!opened) return;
+    if (!opened || !isChatChannel(opened.channel)) return;
     try {
       await opened.channel.update(
         delivery.external,

@@ -22,9 +22,12 @@ export const JOURNAL_LIMIT = 200;
 /** The journal of deliveries: newest first, with only what is safe to show. */
 export class JournalService {
   private readonly deliveries: DeliveryRepository;
+  private readonly hidden: () => readonly string[];
 
-  constructor(deliveries: DeliveryRepository) {
+  /** `hidden`: the subscriptions whose deliveries have a journal of their own (webhooks). */
+  constructor(deliveries: DeliveryRepository, hidden: () => readonly string[] = () => []) {
     this.deliveries = deliveries;
+    this.hidden = hidden;
   }
 
   list(filter: {
@@ -34,7 +37,12 @@ export class JournalService {
   }): DeliveryView[] {
     const limit = Math.min(Math.max(filter.limit ?? 20, 1), JOURNAL_LIMIT);
     return this.deliveries
-      .journal({ subscription: filter.subscription, state: filter.state, limit })
+      .journal({
+        subscription: filter.subscription,
+        exclude: this.hidden(),
+        state: filter.state,
+        limit,
+      })
       .map(toView);
   }
 }

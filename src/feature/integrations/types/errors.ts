@@ -15,6 +15,7 @@ const REFUSALS = {
     'invalid',
     'this parameter cannot be changed; remove the connection and add it again',
   ],
+  managed_kind: ['invalid', 'connections of this kind are created with a command of their own'],
   invalid_slot: ['invalid', 'unknown secret slot of the connection kind'],
   invalid_secret: ['invalid', 'secret value is empty or too long'],
   scope_required: ['invalid', 'choose either one project or the shared scope explicitly'],

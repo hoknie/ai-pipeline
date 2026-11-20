@@ -1,8 +1,9 @@
 import { allGroups, type RunState } from '../../runs/types/index.ts';
-import { notificationEvents } from '../types/index.ts';
+import { notificationEvents, type Delivery } from '../types/index.ts';
 
 import { QuestionCloser, type RunSnapshot } from './closer.ts';
 import type { OutboxDependencies } from './outbox.ts';
+import { Lanes } from './lanes.ts';
 import { DeliverySender } from './sender.ts';
 
 export interface DispatcherDependencies extends OutboxDependencies {
@@ -45,8 +46,12 @@ export class NotificationDispatcher {
   private readonly closer: QuestionCloser;
   /** Plans: records the events and sees which questions closed. */
   private plans: Promise<void> = Promise.resolve();
-  /** Sends and redraws: the only lane that waits for a network. */
+  /** Looks for what is due and redraws messages; the sending itself runs in the lanes below. */
   private network: Promise<void> = Promise.resolve();
+  /** Per connection: a chat sends one message at a time, a webhook several. */
+  private readonly lanes = new Lanes();
+  /** The deliveries being sent now, by id. */
+  private readonly flying = new Map<number, Promise<void>>();
   private timer: NodeJS.Timeout | null = null;
   private pruneTimer: NodeJS.Timeout | null = null;
   private stopped = true;
@@ -73,6 +78,7 @@ export class NotificationDispatcher {
   /** The start: what happened while the daemon was off, the retries that waited, the cleanup. */
   async start(): Promise<void> {
     this.stopped = false;
+    this.dependencies.outcomes.failInterruptedTests(this.dependencies.now());
     this.prune();
     if (this.pruneTimer !== null) clearInterval(this.pruneTimer);
     this.pruneTimer = setInterval(() => this.prune(), DAY_MS);
@@ -97,6 +103,11 @@ export class NotificationDispatcher {
     await this.idle();
   }
 
+  /** Starts sending what is due now, without waiting for it. */
+  wake(): void {
+    this.queueFlush();
+  }
+
   /** Sends what is due now and waits for it. */
   flush(): Promise<void> {
     this.queueFlush();
@@ -106,9 +117,9 @@ export class NotificationDispatcher {
   /** Resolves when everything taken so far has been planned and sent. */
   async idle(): Promise<void> {
     for (;;) {
-      const [plans, network] = [this.plans, this.network];
-      await Promise.all([plans, network]);
-      if (plans === this.plans && network === this.network) return;
+      const [plans, network, flying] = [this.plans, this.network, [...this.flying.values()]];
+      await Promise.all([plans, network, ...flying]);
+      if (plans === this.plans && network === this.network && this.flying.size === 0) return;
     }
   }
 
@@ -142,9 +153,9 @@ export class NotificationDispatcher {
     for (const delivery of deliveries.ofRun(snapshot.run, ['pending', 'sent'])) {
       if (delivery.kind !== 'question') continue;
       if (snapshot.events.some((event) => event.key === delivery.eventKey)) continue;
-      if (this.closer.close(delivery, snapshot)) {
-        this.enqueue(() => this.closer.refresh(delivery.id));
-      }
+      const closed = this.closer.close(delivery, snapshot);
+      if (closed.redraw) this.enqueue(() => this.closer.refresh(delivery.id));
+      if (closed.announced) created = true;
     }
     if (created) this.queueFlush();
   }
@@ -157,17 +168,33 @@ export class NotificationDispatcher {
     this.network = this.network.then(job).catch((error: unknown) => this.fail(error));
   }
 
-  private async sendDue(): Promise<void> {
+  /** Starts what is due; does not wait for the network, so a slow receiver holds nobody. */
+  private sendDue(): Promise<void> {
     const { deliveries, now } = this.dependencies;
     for (let round = 0; round < 50 && !this.stopped; round += 1) {
-      const due = deliveries.due(now(), 20);
+      const due = deliveries.due(now(), 50).filter((one) => !this.flying.has(one.id));
       if (due.length === 0) break;
-      for (const delivery of due) {
-        if (this.stopped) break;
-        await this.sender.deliver(delivery);
-      }
+      for (const delivery of due) this.launch(delivery);
     }
     this.arm();
+    return Promise.resolve();
+  }
+
+  private launch(delivery: Delivery): void {
+    const { subscriptions, channels } = this.dependencies;
+    const connection = subscriptions
+      .all()
+      .find((one) => one.id === delivery.subscriptionId)?.connectionId;
+    const key = connection ?? `subscription:${delivery.subscriptionId}`;
+    const limit = connection === undefined ? 1 : channels.policyOf(connection).concurrency;
+    const job = this.lanes
+      .run(key, limit, () => (this.stopped ? Promise.resolve() : this.sender.deliver(delivery)))
+      .catch((error: unknown) => this.fail(error))
+      .finally(() => {
+        this.flying.delete(delivery.id);
+        this.queueFlush();
+      });
+    this.flying.set(delivery.id, job);
   }
 
   /** Sets the timer to the earliest pending delivery. */

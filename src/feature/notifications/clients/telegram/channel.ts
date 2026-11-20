@@ -1,7 +1,8 @@
 import type {
-  ChannelFactoryPort,
+  ChatChannelFactoryPort,
   ChannelOptions,
   ChatChannelPort,
+  OutboundMessage,
   InboundHandler,
 } from '../../ports/index.ts';
 import {
@@ -77,6 +78,11 @@ export class TelegramChannel implements ChatChannelPort {
     } catch (error) {
       throw toFailure(error);
     }
+  }
+
+  /** The core hands over the delivery; a chat draws it and sends the picture. */
+  deliver(message: OutboundMessage): Promise<ExternalRef> {
+    return this.send(message.draw, message.delivery.shortKey);
   }
 
   async send(draw: Draw, shortKey: string): Promise<ExternalRef> {
@@ -264,7 +270,9 @@ function resultText(result: InboundResult, results: Record<string, string>): { t
 }
 
 /** The channel kind `telegram`: how its parameters are read and how its adapter is built. */
-export function telegramChannelFactory(api: Omit<TelegramApiOptions, 'token'>): ChannelFactoryPort {
+export function telegramChannelFactory(
+  api: Omit<TelegramApiOptions, 'token'>,
+): ChatChannelFactoryPort {
   const languageOf = (params: Readonly<Record<string, string>>): Language =>
     params.language === 'ru' ? 'ru' : 'en';
   return {

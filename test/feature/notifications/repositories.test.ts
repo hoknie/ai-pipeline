@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AnswerRepository,
+  AttemptRepository,
   CursorRepository,
   DeliveryOutcomes,
   DeliveryRepository,
@@ -37,6 +38,8 @@ const subscription = (patch: Partial<Subscription> = {}): Subscription => ({
   projectPath: '/work/app',
   events: ['question'],
   enabled: true,
+  failureStreak: 0,
+  disabledReason: null,
   createdAt: 1,
   updatedAt: 1,
   ...patch,
@@ -227,5 +230,47 @@ describe('answer and cursor repositories', () => {
     expect(cursors.get('c1')).toBe('11');
     cursors.delete('c1');
     expect(cursors.get('c1')).toBeNull();
+  });
+});
+
+describe('attempt repository', () => {
+  const attempt = (statusCode: number | null) => ({
+    startedAt: 5,
+    durationMs: 12.6,
+    statusCode,
+    errorKind: statusCode === 200 ? null : 'server_error',
+    excerpt: 'x'.repeat(3000),
+  });
+
+  it('numbers the attempts of a delivery and cuts the excerpt', () => {
+    const { deliveries, database } = repositories();
+    const attempts = new AttemptRepository(database);
+    const one = deliveries.claim(input('e1'), 1)!;
+    const other = deliveries.claim(input('e2'), 1)!;
+    attempts.insert(one.id, attempt(503));
+    attempts.insert(one.id, attempt(200));
+    attempts.insert(other.id, attempt(500));
+    const list = attempts.ofDelivery(one.id);
+    expect(list.map((entry) => [entry.n, entry.statusCode, entry.errorKind])).toEqual([
+      [1, 503, 'server_error'],
+      [2, 200, null],
+    ]);
+    expect(list[0]?.durationMs).toBe(13);
+    expect(list[0]?.excerpt).toHaveLength(1024);
+    expect(attempts.ofDelivery(other.id)).toHaveLength(1);
+  });
+
+  it('is cleared with the deliveries: by the retention and with the subscription', () => {
+    const { deliveries, outcomes, subscriptions, database } = repositories();
+    const attempts = new AttemptRepository(database);
+    const old = deliveries.claim(input('old', 's1', 'failed'), 1)!;
+    outcomes.markSent(old.id, { message_id: 1 }, 1, 1);
+    attempts.insert(old.id, attempt(200));
+    outcomes.prune(50);
+    expect(attempts.ofDelivery(old.id)).toEqual([]);
+    const kept = deliveries.claim(input('kept'), 1)!;
+    attempts.insert(kept.id, attempt(500));
+    subscriptions.delete('s1');
+    expect(attempts.ofDelivery(kept.id)).toEqual([]);
   });
 });

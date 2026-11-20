@@ -9,6 +9,7 @@ import {
 } from '../../runs/types/index.ts';
 
 import { withoutPaths } from './limits.ts';
+import type { Closure } from './texts.ts';
 
 export const EVENT_KINDS = ['question', 'failed', 'conflict', 'delivery', 'finished'] as const;
 export type NotificationEventKind = (typeof EVENT_KINDS)[number];
@@ -46,6 +47,8 @@ export interface EventData {
   groups: number;
   /** How many decisions the group had when the event was born; one more means the question was answered. */
   asked: number;
+  /** Who closed the question; only on the delivery that tells a channel without edits about it. */
+  closure?: Closure;
 }
 
 export interface NotificationEvent {

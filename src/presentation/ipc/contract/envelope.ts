@@ -17,6 +17,7 @@ import { repositoriesRequests } from './repositories.ts';
 import { runsRequests } from './runs.ts';
 import { statsRequests } from './stats/stats.ts';
 import { tagsRequests } from './tags.ts';
+import { webhooksRequests } from './notifications/webhooks.ts';
 import { z } from 'zod';
 
 export const requestSchema = z.discriminatedUnion('method', [
@@ -28,6 +29,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   ...integrationsRequests,
   ...mcpRemoteRequests,
   ...notificationsRequests,
+  ...webhooksRequests,
   ...tagsRequests,
   ...statsRequests,
   ...observersRequests,

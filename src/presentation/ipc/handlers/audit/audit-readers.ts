@@ -20,6 +20,8 @@ export const readingMethods: readonly Method[] = [
   'notify_list',
   'notify_log',
   'notify_channels',
+  'webhook_list',
+  'webhook_log',
   'tags',
   'stats_report',
   'observers_history',

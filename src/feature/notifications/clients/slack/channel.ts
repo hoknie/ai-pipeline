@@ -1,7 +1,8 @@
 import type {
-  ChannelFactoryPort,
+  ChatChannelFactoryPort,
   ChannelOptions,
   ChatChannelPort,
+  OutboundMessage,
   InboundHandler,
 } from '../../ports/index.ts';
 import {
@@ -71,6 +72,11 @@ export class SlackChannel implements ChatChannelPort {
       throw new ChannelFailure('slack sent no message id', { permanent: false });
     }
     return { chat_id: channel, message_id: sent.ts };
+  }
+
+  /** The core hands over the delivery; a chat draws it and sends the picture. */
+  deliver(message: OutboundMessage): Promise<ExternalRef> {
+    return this.send(message.draw, message.delivery.shortKey);
   }
 
   async send(draw: Draw, shortKey: string): Promise<ExternalRef> {
@@ -230,7 +236,7 @@ export interface SlackFactoryOptions extends Omit<SlackApiOptions, 'secret'> {
 }
 
 /** The channel kind `slack`: how its parameters are read and how its adapter is built. */
-export function slackChannelFactory(factory: SlackFactoryOptions): ChannelFactoryPort {
+export function slackChannelFactory(factory: SlackFactoryOptions): ChatChannelFactoryPort {
   const languageOf = (params: Readonly<Record<string, string>>): Language =>
     params.language === 'ru' ? 'ru' : 'en';
   return {

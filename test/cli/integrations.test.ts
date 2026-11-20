@@ -20,7 +20,12 @@ describe('aip integration', () => {
     const json = JSON.parse((await aip(box, 'integration', 'types', '--json')).stdout) as {
       kind: string;
     }[];
-    expect(json.map((one) => one.kind).sort()).toEqual(['service-registry', 'slack', 'telegram']);
+    expect(json.map((one) => one.kind).sort()).toEqual([
+      'service-registry',
+      'slack',
+      'telegram',
+      'webhook',
+    ]);
     expect(types.stdout).toContain('service-registry');
     const list = await aip(box, 'integration', 'list');
     expect(list.stdout).toContain('No integration connections yet.');

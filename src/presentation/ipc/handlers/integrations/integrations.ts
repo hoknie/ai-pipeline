@@ -3,6 +3,7 @@ import {
   refusal,
   type ConnectionView as RegistryView,
 } from '../../../../feature/integrations/types/index.ts';
+import { displayUrl, WEBHOOK_KIND } from '../../../../feature/notifications/types/index.ts';
 import type { ConnectionView } from '../../contract/index.ts';
 import { channelView } from '../../views/index.ts';
 import type { DaemonServices } from '../../services.ts';
@@ -23,7 +24,12 @@ async function guarded<T>(work: () => Promise<T> | T): Promise<T> {
 }
 
 /** The connection with the state of its channel listener, when it has one. */
-function withChannel(services: DaemonServices, view: RegistryView): ConnectionView {
+function withChannel(services: DaemonServices, shown: RegistryView): ConnectionView {
+  // The address of a webhook may hold a token in its query: it never leaves whole.
+  const view =
+    shown.kind === WEBHOOK_KIND && shown.params.url !== undefined
+      ? { ...shown, params: { ...shown.params, url: displayUrl(shown.params.url) } }
+      : shown;
   const status = services.notifications.channels.statusOf(view.id);
   return { ...view, channel: status === null ? null : channelView(status, view.id) };
 }

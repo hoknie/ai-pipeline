@@ -41,6 +41,8 @@ export interface HttpRequestOptions {
   timeoutMs: number;
   /** The longest answer body read; default 1 MiB. */
   maxResponseBytes?: number;
+  /** A longer answer is cut at the limit and still counts as an answer, instead of failing. */
+  truncateResponse?: boolean;
   /** An http(s) proxy that tunnels with CONNECT; loopback addresses never go through it. */
   proxy?: string | null;
   signal?: AbortSignal;
@@ -155,7 +157,9 @@ function perform(url: URL, options: HttpRequestOptions): Promise<HttpResponse> {
           }
         : {}),
     };
-    const request = send(requestOptions, (response) => readBody(response, limit, done));
+    const request = send(requestOptions, (response) =>
+      readBody(response, limit, options.truncateResponse === true, done),
+    );
     request.on('error', (error: Error & { code?: string }) => {
       const known = httpFailureCode(error);
       done(known === null ? failure('network', error.code) : (error as unknown as AppError));
@@ -169,6 +173,7 @@ function perform(url: URL, options: HttpRequestOptions): Promise<HttpResponse> {
 function readBody(
   response: IncomingMessage,
   limit: number,
+  truncate: boolean,
   done: (error: AppError | null, response?: HttpResponse) => void,
 ): void {
   const chunks: Buffer[] = [];
@@ -177,7 +182,16 @@ function readBody(
     size += chunk.byteLength;
     if (size > limit) {
       response.destroy();
-      done(failure('too_large'));
+      if (!truncate) {
+        done(failure('too_large'));
+        return;
+      }
+      chunks.push(chunk.subarray(0, chunk.byteLength - (size - limit)));
+      done(null, {
+        status: response.statusCode ?? 0,
+        headers: response.headers,
+        body: new Uint8Array(Buffer.concat(chunks)),
+      });
       return;
     }
     chunks.push(chunk);

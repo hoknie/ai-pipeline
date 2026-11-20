@@ -47,6 +47,39 @@ export class DeliveryOutcomes {
       .run(closedBy, now, id);
   }
 
+  /** Deliveries of a subscription that wait for their turn stop waiting: they have failed. */
+  failPendingOfConnection(connectionId: string, error: string, now: number): void {
+    this.database
+      .prepare(
+        `UPDATE notification_deliveries SET state = 'failed', last_error = ?, updated_at = ?
+         WHERE state = 'pending' AND subscription_id IN
+           (SELECT id FROM notification_subscriptions WHERE connection_id = ?)`,
+      )
+      .run(error, now, connectionId);
+  }
+
+  /** A delivery that was sent or failed goes out again; a test call is never repeated. */
+  reopen(id: number, now: number): boolean {
+    const result = this.database
+      .prepare(
+        `UPDATE notification_deliveries SET state = 'pending', attempts = 0, next_attempt_at = ?,
+         last_error = NULL, updated_at = ?
+         WHERE id = ? AND state IN ('sent', 'failed') AND kind <> 'test'`,
+      )
+      .run(now, now, id);
+    return Number(result.changes) > 0;
+  }
+
+  /** A test call that a restart interrupted will not be sent: it has failed. */
+  failInterruptedTests(now: number): void {
+    this.database
+      .prepare(
+        `UPDATE notification_deliveries SET state = 'failed', last_error = 'interrupted', updated_at = ?
+         WHERE state = 'pending' AND kind = 'test'`,
+      )
+      .run(now);
+  }
+
   /** Records who answers before the answer is applied; the state changes when the question closes. */
   setClosedBy(id: number, closedBy: string, now: number): void {
     this.database

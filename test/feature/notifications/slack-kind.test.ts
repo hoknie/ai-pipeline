@@ -11,7 +11,11 @@ const PARAMS = { channel_id: 'C0123456789', allowed_users: 'U01AAAAAAA,U01BBBBBB
 
 describe('slack kind', () => {
   it('is among the adapters this build brings', () => {
-    expect(builtInAdapters().map((one) => one.descriptor.kind)).toEqual(['telegram', 'slack']);
+    expect(builtInAdapters().map((one) => one.descriptor.kind)).toEqual([
+      'telegram',
+      'slack',
+      'webhook',
+    ]);
   });
 
   it('creates a disabled connection and shows that both secrets are missing', async () => {

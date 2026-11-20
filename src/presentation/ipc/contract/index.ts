@@ -16,4 +16,5 @@ export * from './repositories.ts';
 export * from './runs.ts';
 export * from './stats/stats.ts';
 export * from './tags.ts';
+export * from './notifications/webhooks.ts';
 export * from './responses/index.ts';

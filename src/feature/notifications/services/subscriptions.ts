@@ -58,6 +58,45 @@ export function subscribes(subscription: Subscription, event: NotificationEvent)
   );
 }
 
+/** Whether the connection is a chat; one that cannot be found counts as one. */
+export function isChatConnection(
+  integrations: IntegrationsServices,
+  factories: ChannelFactories,
+  connectionId: string,
+): boolean {
+  try {
+    return factories.isChat(integrations.access.find(connectionId).kind);
+  } catch {
+    return true;
+  }
+}
+
+/** Records the events that already happened as closed: only open questions are still sent. */
+export function closeExisting(
+  dependencies: Pick<SubscriptionDependencies, 'deliveries' | 'events' | 'now'>,
+  subscription: Subscription,
+  kinds: readonly NotificationEventKind[],
+): void {
+  const { deliveries, events, now } = dependencies;
+  for (const event of events()) {
+    if (event.kind === 'question' || !kinds.includes(event.kind)) continue;
+    if (!subscribes(subscription, event)) continue;
+    deliveries.claim(
+      {
+        subscriptionId: subscription.id,
+        eventKey: event.key,
+        kind: event.kind,
+        run: event.run,
+        group: event.group,
+        questionKey: null,
+        payload: event.data,
+        closedBy: BEFORE_SUBSCRIPTION,
+      },
+      now(),
+    );
+  }
+}
+
 /** The subscriptions of connections to the events of projects. */
 export class SubscriptionService {
   private readonly dependencies: SubscriptionDependencies;
@@ -66,11 +105,13 @@ export class SubscriptionService {
     this.dependencies = dependencies;
   }
 
-  /** Every subscription, or those that serve a project. */
+  /** Every subscription of a chat, or those that serve a project. */
   async list(repository?: string): Promise<SubscriptionView[]> {
     const root = repository === undefined ? undefined : await this.projectOf(repository);
+    const { integrations, factories } = this.dependencies;
     return this.dependencies.subscriptions
       .all()
+      .filter((one) => isChatConnection(integrations, factories, one.connectionId))
       .filter((one) => root === undefined || one.projectPath === null || one.projectPath === root)
       .map((one) => this.view(one));
   }
@@ -103,6 +144,8 @@ export class SubscriptionService {
       projectPath,
       events,
       enabled: true,
+      failureStreak: 0,
+      disabledReason: null,
       createdAt: now(),
       updatedAt: now(),
     };
@@ -111,9 +154,14 @@ export class SubscriptionService {
     return this.changed(subscription.id);
   }
 
-  async edit(id: string, names: readonly string[]): Promise<SubscriptionView> {
+  async edit(
+    id: string,
+    names: readonly string[],
+    options: { webhook?: boolean } = {},
+  ): Promise<SubscriptionView> {
     const { subscriptions, now } = this.dependencies;
-    const subscription = this.find(id);
+    // A webhook has a command of its own for its events.
+    const subscription = options.webhook === true ? this.find(id) : this.requireChat(id);
     const events = checkedEvents(names);
     subscriptions.setEvents(id, events, now());
     this.closeExisting(
@@ -125,7 +173,7 @@ export class SubscriptionService {
 
   enable(id: string): SubscriptionView {
     const { subscriptions, now, integrations } = this.dependencies;
-    const subscription = this.find(id);
+    const subscription = this.requireChat(id);
     this.requireTarget(integrations.access.find(subscription.connectionId));
     if (!subscription.enabled) {
       subscriptions.setEnabled(id, true, now());
@@ -136,13 +184,13 @@ export class SubscriptionService {
   }
 
   disable(id: string): SubscriptionView {
-    this.find(id);
+    this.requireChat(id);
     this.dependencies.subscriptions.setEnabled(id, false, this.dependencies.now());
     return this.changed(id);
   }
 
   remove(id: string): void {
-    this.find(id);
+    this.requireChat(id);
     this.dependencies.subscriptions.delete(id);
     this.dependencies.publish.subscriptionsChanged();
   }
@@ -153,9 +201,18 @@ export class SubscriptionService {
     return subscription;
   }
 
-  /** The enabled subscriptions that want the event. */
+  /** The enabled subscriptions that want the event; a webhook only while its connection is on. */
   matching(event: NotificationEvent): Subscription[] {
-    return this.dependencies.subscriptions.all().filter((one) => subscribes(one, event));
+    const { integrations, factories } = this.dependencies;
+    return this.dependencies.subscriptions.all().filter((one) => {
+      if (!subscribes(one, event)) return false;
+      if (isChatConnection(integrations, factories, one.connectionId)) return true;
+      try {
+        return integrations.access.find(one.connectionId).enabled;
+      } catch {
+        return false;
+      }
+    });
   }
 
   all(): Subscription[] {
@@ -190,6 +247,16 @@ export class SubscriptionService {
     };
   }
 
+  /** A subscription of a chat connection; one of a webhook is for `aip webhook`. */
+  private requireChat(id: string): Subscription {
+    const subscription = this.find(id);
+    const { integrations, factories } = this.dependencies;
+    if (!isChatConnection(integrations, factories, subscription.connectionId)) {
+      throw notificationRefusal('use_webhook');
+    }
+    return subscription;
+  }
+
   private changed(id: string): SubscriptionView {
     const view = this.view(this.find(id));
     this.dependencies.publish.subscriptionsChanged();
@@ -201,6 +268,8 @@ export class SubscriptionService {
     if (!this.dependencies.factories.has(connection.kind)) {
       throw notificationRefusal('not_a_channel');
     }
+    if (!this.dependencies.factories.isChat(connection.kind))
+      throw notificationRefusal('use_webhook');
   }
 
   /** A subscription is refused while the connection lacks what the channel needs to write. */
@@ -214,26 +283,9 @@ export class SubscriptionService {
     }
   }
 
-  /** Records the events that already happened as closed: only open questions are still sent. */
   private closeExisting(subscription: Subscription, kinds: readonly NotificationEventKind[]): void {
     const { deliveries, events, now } = this.dependencies;
-    for (const event of events()) {
-      if (event.kind === 'question' || !kinds.includes(event.kind)) continue;
-      if (!subscribes(subscription, event)) continue;
-      deliveries.claim(
-        {
-          subscriptionId: subscription.id,
-          eventKey: event.key,
-          kind: event.kind,
-          run: event.run,
-          group: event.group,
-          questionKey: null,
-          payload: event.data,
-          closedBy: BEFORE_SUBSCRIPTION,
-        },
-        now(),
-      );
-    }
+    closeExisting({ deliveries, events, now }, subscription, kinds);
   }
 
   private async projectOf(reference: string): Promise<string> {

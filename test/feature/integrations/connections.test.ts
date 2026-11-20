@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { exampleAdapter, fixture, SENTINEL } from './helpers.ts';
+import { EXAMPLE, exampleAdapter, fixture, SENTINEL } from './helpers.ts';
 
 describe('catalog', () => {
   it('is empty without built-in adapters and refuses every kind', async () => {
@@ -142,5 +142,26 @@ describe('named connections', () => {
     await expect(without.connections.enable(created.id)).rejects.toThrow(
       /unknown integration kind/,
     );
+  });
+});
+
+describe('a kind made by a command of its own', () => {
+  const managed = { ...EXAMPLE, kind: 'managed', createdBy: 'aip managed add' };
+  const request = { kind: 'managed', name: 'one', global: true } as const;
+
+  it('is refused by the general add with the command to use, and made by the service of that command', async () => {
+    const base = fixture({ adapters: [exampleAdapter(), { descriptor: managed }] });
+    await expect(base.services.connections.add(request)).rejects.toThrow(/aip managed add/);
+    expect(await base.services.connections.list()).toEqual([]);
+    const made = await base.services.connections.add(request, { managed: true });
+    expect(made).toMatchObject({ kind: 'managed', name: 'one', enabled: false });
+    expect(await base.services.connections.list()).toHaveLength(1);
+  });
+
+  it('leaves the other kinds as they were', async () => {
+    const base = fixture({ adapters: [exampleAdapter(), { descriptor: managed }] });
+    expect(
+      await base.services.connections.add({ kind: 'example', name: 'plain', global: true }),
+    ).toMatchObject({ kind: 'example' });
   });
 });

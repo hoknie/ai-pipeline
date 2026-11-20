@@ -1,13 +1,17 @@
 import type { IntegrationsServices } from '../../integrations/services/index.ts';
+import { isChatChannel } from './factories.ts';
 import type { Connection, ConnectionChange } from '../../integrations/types/index.ts';
-import type { ChatChannelPort, NotificationsPublishPort } from '../ports/index.ts';
+import { type NotificationsPublishPort, type OutboundChannelPort } from '../ports/index.ts';
 import type {
+  AttemptRepository,
   CursorRepository,
   DeliveryOutcomes,
   SubscriptionRepository,
 } from '../repositories/index.ts';
 import {
+  CHAT_RETRY,
   CONNECTION_REMOVED,
+  type RetryPolicy,
   type ChannelStatus,
   type InboundInput,
   type InboundResult,
@@ -20,6 +24,7 @@ export interface ChannelsDependencies {
   integrations: IntegrationsServices;
   factories: ChannelFactories;
   cursors: CursorRepository;
+  attempts: AttemptRepository;
   subscriptions: SubscriptionRepository;
   outcomes: DeliveryOutcomes;
   /** What the core does with what a chat sends. */
@@ -27,13 +32,15 @@ export interface ChannelsDependencies {
   publish: NotificationsPublishPort;
   log: (message: string) => void;
   now: () => number;
+  /** A connection was enabled or switched off: what the webhooks do about it. */
+  settle?: (id: string, change: ConnectionChange) => void;
   /** The pause before a listener that stopped by itself is started again. */
   restartMs?: number;
 }
 
 /** A channel built from the parameters the connection has now. */
 export interface OpenChannel {
-  channel: ChatChannelPort;
+  channel: OutboundChannelPort;
   connection: Connection;
   language: Language;
 }
@@ -87,13 +94,37 @@ export class NotificationChannels {
     await Promise.all([...this.listeners.keys()].map((id) => this.halt(id)));
   }
 
+  /** The kind of a connection; null when it cannot be found. */
+  kindOf(connectionId: string): string | null {
+    try {
+      return this.dependencies.integrations.access.find(connectionId).kind;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The retries of the kind of a connection; those of a chat when it cannot be found. */
+  policyOf(connectionId: string): RetryPolicy {
+    const { integrations, factories } = this.dependencies;
+    try {
+      const { kind } = integrations.access.find(connectionId);
+      return factories.get(kind)?.retry ?? CHAT_RETRY;
+    } catch {
+      return CHAT_RETRY;
+    }
+  }
+
   /** The channel of a connection with its parameters as they are now; null when it cannot work. */
-  open(connectionId: string): OpenChannel | null {
-    const { integrations, factories, cursors, now } = this.dependencies;
+  open(connectionId: string, options: { disabled?: boolean } = {}): OpenChannel | null {
+    const { integrations, factories, cursors, attempts, now } = this.dependencies;
     let connection: Connection;
     try {
       connection = integrations.access.find(connectionId);
-      integrations.access.authorize(connectionId, connection.projectPath ?? '');
+      if (options.disabled === true) {
+        if (connection.state !== 'ready') return null;
+      } else {
+        integrations.access.authorize(connectionId, connection.projectPath ?? '');
+      }
     } catch {
       return null;
     }
@@ -106,6 +137,8 @@ export class NotificationChannels {
         kind: connection.kind,
         params: connection.params,
       },
+      now,
+      record: (deliveryId, attempt) => attempts.insert(deliveryId, attempt),
       secret: (slot) => integrations.secrets.read(connection.id, slot).catch(() => null),
       cursor: {
         get: () => cursors.get(connection.id),
@@ -138,9 +171,14 @@ export class NotificationChannels {
       this.forget(id);
       return;
     }
+    this.settle(id, change);
     // A change of the parameters, the secret or the state starts the listener again.
     await this.halt(id);
     if (change !== 'disabled') this.sync(id);
+  }
+
+  private settle(id: string, change: ConnectionChange): void {
+    this.dependencies.settle?.(id, change);
   }
 
   /** The connection is gone: its subscriptions, waiting messages and read position go with it. */
@@ -157,7 +195,8 @@ export class NotificationChannels {
     if (this.stopping) return;
     const running = this.listeners.get(id);
     if (running !== undefined && !running.finished) return;
-    if (this.open(id) === null) return;
+    const opened = this.open(id);
+    if (opened === null || !isChatChannel(opened.channel)) return;
     const controller = new AbortController();
     const listener: Listener = { controller, done: Promise.resolve(), finished: false };
     listener.done = this.loop(id, controller.signal).finally(() => {
@@ -179,7 +218,7 @@ export class NotificationChannels {
     const { handle, log, restartMs } = this.dependencies;
     while (!signal.aborted) {
       const opened = this.open(id);
-      if (opened === null) return;
+      if (opened === null || !isChatChannel(opened.channel)) return;
       let last: ChannelStatus | null = null;
       try {
         await opened.channel.listen({ handle: (input) => handle(id, input) }, signal, (status) => {

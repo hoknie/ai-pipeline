@@ -30,8 +30,8 @@ const connection = (patch: Partial<Connection> = {}): Connection => ({
 describe('migration of the integrations', () => {
   it('adds the tables to an older database and keeps what it had', () => {
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -6).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    MIGRATIONS.slice(0, -7).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     old
       .prepare(
         "INSERT INTO runs (id, repository, pipeline, base_commit, branch, created_at, config_json, dirty_warning, next_merge_seq) VALUES ('r1', '/repo', 'f', 'abc', 'b', 1, '{}', 0, 0)",

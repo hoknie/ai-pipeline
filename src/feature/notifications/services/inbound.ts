@@ -28,6 +28,7 @@ import {
 
 import type { NotificationChannels, OpenChannel } from './channels.ts';
 import { drawOf, publicUrlOf } from './drawing.ts';
+import { isChatChannel } from './factories.ts';
 import type { ChannelFactories } from './factories.ts';
 import type { SubscriptionService } from './subscriptions.ts';
 
@@ -220,7 +221,7 @@ export class NotificationInbound {
   private async redraw(delivery: Delivery, opened: OpenChannel): Promise<void> {
     const { deliveries, answers, config, log } = this.dependencies;
     const current = deliveries.find(delivery.id);
-    if (current?.external == null) return;
+    if (current?.external == null || !isChatChannel(opened.channel)) return;
     try {
       await opened.channel.update(
         current.external,
