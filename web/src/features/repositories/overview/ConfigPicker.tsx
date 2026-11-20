@@ -53,12 +53,14 @@ function ChoiceItem({
       onSelect={onSelect}
     >
       <Check className={chosen ? 'opacity-100' : 'opacity-0'} />
-      <span className="flex min-w-0 flex-1 items-center gap-1.5">
-        <ChoiceLabel choice={choice} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <ChoiceLabel choice={choice} />
+        </span>
+        {choice.value === SHARED_CHOICE ? null : (
+          <span className="truncate text-xs text-muted-foreground">{level(choice.level)}</span>
+        )}
       </span>
-      {choice.value === SHARED_CHOICE ? null : (
-        <span className="shrink-0 text-xs text-muted-foreground">{level(choice.level)}</span>
-      )}
     </CommandItem>
   );
 }
