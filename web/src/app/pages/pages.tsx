@@ -37,6 +37,11 @@ const SwarmWorkspace = lazy(() =>
 const StatsPage = lazy(() =>
   import('../../features/stats/index.ts').then((module) => ({ default: module.StatsPage })),
 );
+const IntegrationsPage = lazy(() =>
+  import('../../features/integrations/index.ts').then((module) => ({
+    default: module.IntegrationsPage,
+  })),
+);
 const SettingsPage = lazy(() =>
   import('../../features/settings/index.ts').then((module) => ({ default: module.SettingsPage })),
 );
@@ -163,6 +168,21 @@ export function StatsRoute({ common, registry }: { common: Common; registry: Rep
           })
         }
       />
+    </Suspense>
+  );
+}
+
+export function IntegrationsRoute({
+  common,
+  registry,
+}: {
+  common: Common;
+  registry: RepositoryView[];
+}) {
+  const { t } = useTranslation();
+  return (
+    <Suspense fallback={<Loading what={t('app.loadingIntegrations')} />}>
+      <IntegrationsPage api={common.api} registry={registry} />
     </Suspense>
   );
 }

@@ -215,6 +215,7 @@ web:
   auth: token               # token | none
   port: 7341                # 1..65535
   host: 127.0.0.1           # 127.0.0.1 | localhost | ::1
+  public_url: https://aip.example.com   # optional
 ```
 
 - **`autostart`** defaults to `true`. The daemon starts the panel on `host`:`port` and stops it together with itself.
@@ -228,6 +229,7 @@ web:
   - `none` gives every process and user on this machine control of the runs. On a multi-user machine keep `token`.
   - The `Host` and `Origin` checks stay on in both modes, and the server listens on loopback only.
 - **`port`** and **`host`** are the address of the daemon's panel. `aip web` uses these values when you pass no `--port` and `--host`.
+- **`public_url`** is the address you open the panel at from outside, for example through your own reverse proxy. It is not set by default. It must be an `http://` or `https://` address without login, query or fragment, and is stored without a trailing `/`. It does not change where the panel listens; it is used only for links to tasks in messages of [notifications](../usage/notifications.md).
 
 Opening and controlling the panel is described in [web/README.md](../web/README.md).
 

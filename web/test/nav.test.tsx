@@ -82,7 +82,7 @@ describe('top navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Runs', 'Queue', 'Swarm', 'Statistics', 'Settings']);
+    ).toEqual(['Runs', 'Queue', 'Swarm', 'Statistics', 'Integrations', 'Settings']);
     expect(within(bar!).getByText('web')).toBeTruthy();
     expect(within(bar!).getByRole('button', { name: 'Add repository…' })).toBeTruthy();
     for (const name of [/Command palette/, /^Notifications$/, /^Language/, /^Theme/])

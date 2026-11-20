@@ -110,6 +110,43 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
       },
     }),
   },
+  integration_edit: {
+    action: 'integration.edit',
+    info: (p) => ({
+      resource: resource('integration', p.id),
+      details: {
+        set: Object.keys((p.set as object | undefined) ?? {}),
+        unset: (p.unset as string[] | undefined) ?? [],
+      },
+    }),
+  },
+  notify_add: {
+    action: 'notify.add',
+    info: (p) => ({
+      resource: resource('integration', p.connection),
+      details: pick(p, 'allProjects', 'events'),
+    }),
+  },
+  notify_edit: {
+    action: 'notify.edit',
+    info: (p) => ({ resource: resource('notification', p.id), details: pick(p, 'events') }),
+  },
+  notify_enable: {
+    action: 'notify.enable',
+    info: (p) => ({ resource: resource('notification', p.id) }),
+  },
+  notify_disable: {
+    action: 'notify.disable',
+    info: (p) => ({ resource: resource('notification', p.id) }),
+  },
+  notify_remove: {
+    action: 'notify.remove',
+    info: (p) => ({ resource: resource('notification', p.id) }),
+  },
+  notify_test: {
+    action: 'notify.test',
+    info: (p) => ({ resource: resource('notification', p.id) }),
+  },
   integration_remove: {
     action: 'integration.remove',
     info: (p) => ({ resource: resource('integration', p.id) }),

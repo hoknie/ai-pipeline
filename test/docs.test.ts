@@ -289,6 +289,7 @@ describe('documentation examples', () => {
       auth: 'token',
       port: 7341,
       host: '127.0.0.1',
+      publicUrl: 'https://aip.example.com',
     });
   });
 

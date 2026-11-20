@@ -2,10 +2,16 @@ import { SECRET_LIMIT, SLOT_PATTERN } from '../../../../feature/integrations/typ
 import { queueRepository } from '../queue.ts';
 import { z } from 'zod';
 
-export type {
-  CatalogEntry as IntegrationTypeView,
-  ConnectionView,
-} from '../../../../feature/integrations/types/index.ts';
+import type { ConnectionView as BaseConnectionView } from '../../../../feature/integrations/types/index.ts';
+import type { ChannelStateView } from '../notifications/notifications.ts';
+
+export type { CatalogEntry as IntegrationTypeView } from '../../../../feature/integrations/types/index.ts';
+
+/** A connection as the clients see it: the registry view and, for a channel, how it works now. */
+export interface ConnectionView extends BaseConnectionView {
+  /** The state of the listener of a channel connection; null when there is none. */
+  channel: ChannelStateView | null;
+}
 
 /** The answer of `integration_remove`: the connection and its secrets are gone. */
 export interface IntegrationRemoved {
@@ -35,6 +41,14 @@ export const integrationsRequests = [
       repository: queueRepository.optional(),
       global: z.boolean().optional(),
       params: parameters.optional(),
+    }),
+  }),
+  z.object({
+    method: z.literal('integration_edit'),
+    params: z.object({
+      id: connectionId,
+      set: parameters.optional(),
+      unset: z.array(z.string().min(1).max(64)).max(50).optional(),
     }),
   }),
   z.object({ method: z.literal('integration_remove'), params: z.object({ id: connectionId }) }),

@@ -1,6 +1,11 @@
 export type {
   ApplyResult,
   CatalogEntry,
+  ChannelStateView,
+  ConnectionView,
+  DeliveryView,
+  IntegrationTypeView,
+  SubscriptionView,
   ConfigCatalogResponse,
   ConfigModelsResponse,
   ModelEntry,

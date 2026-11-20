@@ -127,9 +127,10 @@ queue       → runs, tags, repos, swarm-config
 observers   → queue, runs, repos, swarm-config
 stats       → runs, repos, swarm-config
 integrations → repos
+notifications → integrations, runs, repos, swarm-config
 identity    → swarm-config
 access      → identity, swarm-config, repos
-compose     → observers, queue, runs, tags, repos, integrations
+compose     → observers, queue, runs, tags, repos, integrations, notifications
 ```
 
 | Фича           | Область                                                                                                |
@@ -147,6 +148,7 @@ compose     → observers, queue, runs, tags, repos, integrations
 | `observers`    | наблюдатели и группы ремонта                                                                           |
 | `stats`        | журнал использования агентов (токены, время) и отчёт по нему                                           |
 | `integrations` | подключения к внешним системам: реестр, секреты через порт хранилища, вход событий с проверкой и дедупликацией |
+| `notifications` | уведомления во внешние каналы: подписки, журнал доставок, ответы кнопками и текстом, адаптеры каналов (`clients/<канал>/`) |
 | `identity`     | пользователи режима сервера, сессии панели, личные токены, ссылки входа и вход из CLI                  |
 | `access`       | права в режиме сервера (ABAC): каталог действий, пресеты ролей, чистый вычислитель решений, `AccessService` |
 | `compose`      | сценарии нескольких фич: удаление, правка и переезд проекта реестра                                    |
@@ -164,6 +166,15 @@ compose     → observers, queue, runs, tags, repos, integrations
 `app` из сервисов `queue` и `runs`. Значения секретов хранит не база, а `platform/secrets` (Keychain,
 Secret Service или зашифрованный файл с внешним ключом) за портом `SecretStorePort`; новых пакетов
 для этого нет. Конкретные адаптеры (`clients/<вид>/`) приходят отдельными изменениями.
+
+Почему `notifications` видит `integrations`, `runs`, `repos` и `swarm-config`: подписка опирается на
+подключение (`integrations`) и проект (`repos`), события берутся из состояния задач, а ответ из
+мессенджера применяется тем же событием `answer` (`runs`), с правами из настроек (`swarm-config`).
+Источник событий — порт `RunNotifyPort` (`runs/ports/notify.ts`), а об изменениях подключений
+`notifications` узнаёт через порт `IntegrationChangesPort`; оба подставляет `app`. Вид подключения
+канала описывает `notifications/clients/<канал>/kind.ts`, `app` передаёт его каталогу интеграций.
+Таблицы фичи: `notification_subscriptions`, `notification_deliveries` (исходящая очередь и журнал),
+`notification_answers` (черновики ответов), `notification_cursors` (позиция чтения канала).
 
 Почему снятие тега живёт в `queue`, а не в `tags`: оно меняет запуски и элементы очереди, а `queue`
 единственная фича, которая видит и `tags`, и `runs`.

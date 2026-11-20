@@ -7,6 +7,7 @@ import { colorEnabled, createStyle, plainStyle, type Style } from '../format/ind
 import { registerDaemon, registerEvents } from './commands/daemon.ts';
 import { registerGroup } from './commands/group.ts';
 import { registerIntegrations } from './commands/integration/index.ts';
+import { registerNotify } from './commands/notify/index.ts';
 import { registerMcp } from './commands/mcp.ts';
 import { registerOverview } from './commands/overview/index.ts';
 import { registerProvider } from './commands/provider/index.ts';
@@ -83,6 +84,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
   program.commandsGroup(setup!.heading);
   registerSetup(program, io, style);
   registerIntegrations(program, io, style);
+  registerNotify(program, io, style);
   registerServer(program, io, style);
   program.helpCommand('help [command]', 'Show help for a command');
   program.commandsGroup(plumbing!.heading);

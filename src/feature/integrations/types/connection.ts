@@ -2,6 +2,8 @@ import { refusal } from './errors.ts';
 import type { InboundOperation } from './operations.ts';
 
 export type ConnectionScope = 'project' | 'global';
+/** What happened to a connection that others live by. */
+export type ConnectionChange = 'params' | 'enabled' | 'disabled' | 'secret' | 'removed';
 export type ConnectionState = 'ready' | 'cleanup_pending';
 export type Direction = 'inbound' | 'outbound';
 
@@ -12,6 +14,10 @@ export interface ParamSpec {
   maxLength: number;
   /** The only allowed values; absent: any text up to `maxLength`. */
   values?: readonly string[];
+  /** A regular expression the whole value must match; absent: any text up to `maxLength`. */
+  pattern?: string;
+  /** The parameter is the identity of something outside; it never changes after the connection is made. */
+  immutable?: boolean;
 }
 
 /** A secret a kind keeps in the secret store. */
@@ -99,6 +105,9 @@ export function validateParams(
     if (spec.values !== undefined && !spec.values.includes(value)) {
       throw refusal('invalid_params', name);
     }
+    if (spec.pattern !== undefined && !new RegExp(`^(?:${spec.pattern})$`, 'u').test(value)) {
+      throw refusal('invalid_params', name);
+    }
   }
   for (const spec of descriptor.params) {
     if (spec.required && !(spec.name in params)) throw refusal('invalid_params', spec.name);
@@ -124,4 +133,27 @@ export function validateSecretValue(value: string): void {
  */
 export function connectionServes(connection: Connection, project: string): boolean {
   return connection.scope === 'global' || connection.projectPath === project;
+}
+
+/** The parameters after an edit: the set ones over the old, the unset ones gone, all checked by the kind. */
+export function editedParams(
+  descriptor: AdapterDescriptor,
+  current: Record<string, string>,
+  change: { set: Record<string, string>; unset: readonly string[] },
+): Record<string, string> {
+  const setNames = Object.keys(change.set);
+  if (setNames.length === 0 && change.unset.length === 0) throw refusal('nothing_to_change');
+  if (change.unset.some((name) => setNames.includes(name))) throw refusal('conflicting_edit');
+  const specs = new Map(descriptor.params.map((spec) => [spec.name, spec]));
+  for (const name of [...setNames, ...change.unset]) {
+    if (descriptor.secrets.some((secret) => secret.slot === name)) {
+      throw refusal('secret_param', name);
+    }
+    const spec = specs.get(name);
+    if (spec === undefined) throw refusal('invalid_params');
+    if (spec.immutable === true) throw refusal('immutable_param', name);
+  }
+  const merged = { ...current, ...change.set };
+  for (const name of change.unset) delete merged[name];
+  return validateParams(descriptor, merged);
 }

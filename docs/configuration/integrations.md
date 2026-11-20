@@ -1,6 +1,6 @@
 # Integrations
 
-An integration is a local *connection* of a project (or of all projects) to an external system. This version ships the registry, the secret storage and the safe entry and exit points; it has no built-in kinds yet, so `aip integration types` is empty, nothing listens on a new port and nothing connects out.
+An integration is a local *connection* of a project (or of all projects) to an external system. This version ships the registry, the secret storage and the safe entry and exit points, and one built-in kind: `telegram`, a chat for [notifications](../usage/notifications.md). Nothing listens on a new port; a connection reaches out only while it is enabled.
 
 A connection has a kind, a name (unique per kind in its scope), non-secret parameters and secret slots. A project can have several connections of one kind (two accounts). Connections live in the daemon's SQLite database; **secrets never do**.
 
@@ -10,6 +10,7 @@ A connection has a kind, a name (unique per kind in its scope), non-secret param
 aip integration types
 aip integration add <kind> <name> [--repo <project> | --global] [--param key=value]
 aip integration list [--repo <project>]
+aip integration edit <id> [--param key=value] [--unset key]
 aip integration enable <id>
 aip integration disable <id>
 aip integration remove <id>
@@ -18,10 +19,11 @@ aip integration secret remove <id> <slot>
 ```
 
 - A new connection is disabled and has no secrets. `enable` is refused until every required secret is set.
+- `edit` changes non-secret parameters (the whole result is checked against the kind) and keeps the connection enabled; a secret slot in `--param` is refused with the command that sets a secret. The panel can edit parameters too.
 - A secret is read from stdin only (up to 16 KiB); there is no `--value`, so it never lands in the shell history or in `ps`. Errors never repeat the input.
 - Removing a secret of an enabled connection disables it first. `remove` deletes the connection and its secrets; repeat it if it was cut short.
 - A project that has a connection cannot be removed from the daemon; moving a project keeps its connections.
-- Secret commands exist only in the CLI: they are not MCP tools and not in the web panel.
+- Secret commands exist only in the CLI: they are not MCP tools and not in the web panel. The panel lists connections and edits their non-secret parameters; it does not create, enable or remove them.
 
 ## Where secrets are kept
 

@@ -127,6 +127,7 @@ export async function harness(
     | 'timings'
     | 'now'
     | 'integrations'
+    | 'notifications'
     | 'log'
   > = {},
 ): Promise<Harness> {

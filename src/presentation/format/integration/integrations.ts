@@ -2,6 +2,7 @@ import type { ConnectionView, IntegrationTypeView } from '../../ipc/contract/ind
 
 import { type Style, plainStyle } from '../style.ts';
 import { table } from '../table.ts';
+import { formatChannelState } from '../notifications/index.ts';
 
 /** The kinds this build supports; an empty catalog says so. */
 export function formatIntegrationTypes(
@@ -40,16 +41,20 @@ export function formatConnections(
   if (connections.length === 0) return 'No integration connections yet.';
   return table(
     [
-      ['ID', 'KIND', 'NAME', 'SCOPE', 'STATE', 'SECRETS'],
+      ['ID', 'KIND', 'NAME', 'SCOPE', 'STATE', 'PARAMS', 'SECRETS', 'CHANNEL'],
       ...connections.map((connection) => [
         style.argument(connection.id),
         connection.kind,
         connection.name,
         connection.project ?? 'global',
         stateOf(connection),
+        Object.entries(connection.params)
+          .map(([name, value]) => `${name}=${value}`)
+          .join(' ') || '—',
         connection.secrets
           .map((secret) => `${secret.slot}:${secret.present ? 'set' : 'missing'}`)
           .join(' ') || '—',
+        formatChannelState(connection.channel),
       ]),
     ],
     style,

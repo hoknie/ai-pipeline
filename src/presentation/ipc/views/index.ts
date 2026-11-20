@@ -16,3 +16,4 @@ export {
 } from './rows.ts';
 export { statsView } from './stats.ts';
 export { tagViews } from './tags.ts';
+export { channelView } from './notifications/notifications.ts';

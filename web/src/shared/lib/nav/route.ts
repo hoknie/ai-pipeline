@@ -7,7 +7,14 @@ import {
 } from './settingsGroups.ts';
 
 export type View =
-  'runs' | 'queue' | 'specialists' | 'pipelines' | 'providers' | 'stats' | 'settings';
+  | 'runs'
+  | 'queue'
+  | 'specialists'
+  | 'pipelines'
+  | 'providers'
+  | 'stats'
+  | 'integrations'
+  | 'settings';
 
 export interface Route {
   view: View;
@@ -105,6 +112,9 @@ export type StatsPeriodId = (typeof STATS_PERIODS)[number];
 export const statsPeriodOf = (value: string | null): StatsPeriodId =>
   STATS_PERIODS.find((period) => period === value) ?? '30d';
 
+/** The route of a page without parts. */
+const plainRoute = (view: View): Route => ({ view, run: null, group: null, step: null, tab: null });
+
 const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : null);
 
 /** `#runs/<run>/<group>/<step>`, the older `#topology/<pipeline>` opens the topology section; the older `#<run>/<group>` still works. */
@@ -150,6 +160,7 @@ function parseBase(hash: string): Route {
       tab: first === 'new' ? params.get('preset') || null : null,
     };
   }
+  if (head === 'integrations') return plainRoute('integrations');
   if (head === 'stats')
     return {
       view: 'stats',
@@ -252,6 +263,7 @@ function formatBase(route: Route): string {
     const preset = route.run === 'new' && route.tab ? `?preset=${enc(route.tab)}` : '';
     return `#providers/${enc(route.run)}${preset}`;
   }
+  if (route.view === 'integrations') return '#integrations';
   if (route.view === 'stats') {
     const project = route.run ? `&project=${enc(route.run)}` : '';
     return `#stats?period=${statsPeriodOf(route.group)}${project}`;

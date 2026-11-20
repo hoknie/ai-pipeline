@@ -72,6 +72,14 @@ export class DeliveryRepository {
       .run(connectionId, externalEventId);
   }
 
+  /** Forgets the claims older than `before`: an event that old is not repeated by its source. */
+  pruneBefore(before: number): number {
+    const result = this.database
+      .prepare('DELETE FROM integration_deliveries WHERE updated_at < ?')
+      .run(before);
+    return Number(result.changes);
+  }
+
   deleteOf(connectionId: string): void {
     this.database
       .prepare('DELETE FROM integration_deliveries WHERE connection_id = ?')

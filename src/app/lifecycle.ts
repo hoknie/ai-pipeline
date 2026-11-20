@@ -26,6 +26,7 @@ export function createLifecycle(
     processes,
     stats,
     integrations,
+    notifications,
   } = services;
   const auditPruner = createAuditPruner(services, log);
   return {
@@ -57,11 +58,16 @@ export function createLifecycle(
         await observers.observe(true);
         runs.engine.armWake();
       });
+      // Questions that waited while the daemon was off are sent; the bots start listening.
+      await notifications.dispatcher.start();
+      await notifications.channels.start();
       auditPruner.start();
       warnAboutUsersWithoutRole(services, log);
     },
     async stop() {
       auditPruner.stop();
+      await notifications.channels.stop();
+      await notifications.dispatcher.stop();
       runs.engine.halt();
       network.stop();
       processes.stop();

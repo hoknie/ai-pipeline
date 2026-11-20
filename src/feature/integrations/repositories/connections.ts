@@ -80,6 +80,12 @@ export class ConnectionRepository {
       .run(enabled ? 1 : 0, now, id);
   }
 
+  setParams(id: string, params: Record<string, string>, now: number): void {
+    this.database
+      .prepare('UPDATE integration_connections SET params_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(params), now, id);
+  }
+
   /** The tombstone of a removal: the connection stops working and waits for its cleanup. */
   tombstone(id: string, now: number): void {
     this.database

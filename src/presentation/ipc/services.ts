@@ -11,6 +11,7 @@ import type {
 } from '../../feature/observers/services/index.ts';
 import type { IdentityServices } from '../../feature/identity/services/index.ts';
 import type { IntegrationsServices } from '../../feature/integrations/services/index.ts';
+import type { NotificationsServices } from '../../feature/notifications/services/index.ts';
 import type { NetworkMonitor } from '../../feature/network/services/index.ts';
 import type { ProcessService } from '../../feature/processes/services/index.ts';
 import type { QueueServices } from '../../feature/queue/services/index.ts';
@@ -45,6 +46,7 @@ export interface DaemonServices {
   history: ObserverHistoryService;
   stats: StatsServices;
   integrations: IntegrationsServices;
+  notifications: NotificationsServices;
   compose: ComposeServices;
   identity: IdentityServices;
   audit: AuditLog;

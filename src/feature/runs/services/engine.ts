@@ -6,7 +6,12 @@ import {
   type Effect,
   type Event,
 } from '../machine/index.ts';
-import type { ObservePort, QueueAdvancePort, RunsPublishPort } from '../ports/index.ts';
+import type {
+  ObservePort,
+  QueueAdvancePort,
+  RunNotifyPort,
+  RunsPublishPort,
+} from '../ports/index.ts';
 import type { NetworkSnapshot } from '../../network/types/index.ts';
 import {
   type DispatchLimit,
@@ -38,6 +43,8 @@ export interface RunEngineDependencies {
   wakeMarginMs: number;
   queue: QueueAdvancePort;
   observe: ObservePort;
+  /** Hears about every saved run, for the notifications. */
+  notify: RunNotifyPort;
   publish: RunsPublishPort;
   /** The state of the network now: agents do not start while it is down. */
   network: () => NetworkSnapshot;
@@ -90,10 +97,16 @@ export class RunEngine {
 
   /** Writes the run and tells the clients, the queue and the observers. */
   save(state: RunState): void {
-    const { states, publish, queue, observe } = this.dependencies;
+    const { states, publish, queue, observe, notify } = this.dependencies;
     states.write(state);
     publish.runSaved(state);
     queue.runChanged(state);
+    // Takes a copy of what it needs and returns; no waiting for a network here.
+    try {
+      notify.runChanged(state);
+    } catch {
+      // a failing notification never stops a run
+    }
     // Any run, queued or not: an incident of a run started directly is noticed as well.
     observe.request();
   }

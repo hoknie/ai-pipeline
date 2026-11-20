@@ -857,7 +857,13 @@ describe('web settings', () => {
   const web = (text: string) => parseConfig(`${BASE}${text}`).web;
 
   it('default to autostart with a token on 127.0.0.1:7341', () => {
-    expect(web('')).toEqual({ autostart: true, auth: 'token', port: 7341, host: '127.0.0.1' });
+    expect(web('')).toEqual({
+      autostart: true,
+      auth: 'token',
+      port: 7341,
+      host: '127.0.0.1',
+      publicUrl: null,
+    });
   });
 
   it('accept auth none and keep the other fields at their defaults', () => {
@@ -866,7 +872,34 @@ describe('web settings', () => {
       auth: 'none',
       port: 7341,
       host: '127.0.0.1',
+      publicUrl: null,
     });
+  });
+
+  it('keep the external address without the trailing slash and leave the listen address alone', () => {
+    expect(web('  web: { public_url: "https://aip.example.com/" }\n')).toMatchObject({
+      publicUrl: 'https://aip.example.com',
+      port: 7341,
+      host: '127.0.0.1',
+    });
+    expect(web('  web: { public_url: "http://example.com:8080/aip//" }\n').publicUrl).toBe(
+      'http://example.com:8080/aip',
+    );
+  });
+
+  it('reject an external address that is not a plain http(s) address', () => {
+    for (const bad of [
+      'ftp://host',
+      'user:password@host',
+      'https://user:pw@host',
+      'https://host/?a=1',
+      'https://host/#x',
+      'host.example.com',
+      '""',
+    ]) {
+      const text = bad === '""' ? bad : JSON.stringify(bad);
+      expectError(errorsOf(`${BASE}  web: { public_url: ${text} }\n`), 'swarm.web.public_url', '');
+    }
   });
 
   it('reject a host outside loopback, an unknown key and a wrong port', () => {
@@ -889,6 +922,7 @@ describe('web settings', () => {
       auth: 'token',
       port: 7341,
       host: '127.0.0.1',
+      publicUrl: null,
     });
   });
 
@@ -935,6 +969,7 @@ describe('web settings', () => {
       auth: 'token',
       port: 7341,
       host: '127.0.0.1',
+      publicUrl: null,
     });
     write(join(paths.global.directory, 'settings.yaml'), 'max: 2\n');
     expect(loadWebSettings(paths).port).toBe(7341);

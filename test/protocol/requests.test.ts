@@ -87,7 +87,17 @@ const SAMPLES: Record<Method, unknown> = {
   integration_types: {},
   integration_list: {},
   integration_add: { kind: 'example', name: 'main', global: true },
+  integration_edit: { id: 'c1', set: { chat_id: '-1' }, unset: [] },
   integration_remove: { id: 'c1' },
+  notify_list: {},
+  notify_add: { connection: 'c1', repository: '/repo', events: ['question'] },
+  notify_edit: { id: 'n1', events: ['failed'] },
+  notify_enable: { id: 'n1' },
+  notify_disable: { id: 'n1' },
+  notify_remove: { id: 'n1' },
+  notify_test: { id: 'n1' },
+  notify_log: { state: 'failed', limit: 5 },
+  notify_channels: {},
   integration_enable: { id: 'c1' },
   integration_disable: { id: 'c1' },
   integration_secret_set: { id: 'c1', slot: 'token', value: 'v' },
@@ -196,9 +206,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 125 methods, each in the request schema once', () => {
+  it('has 135 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(125);
+    expect(methods).toHaveLength(135);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -5,6 +5,16 @@ const REFUSALS = {
   unknown_kind: ['invalid', 'unknown integration kind'],
   invalid_name: ['invalid', 'invalid connection name'],
   invalid_params: ['invalid', 'invalid connection parameters'],
+  nothing_to_change: ['invalid', 'nothing to change'],
+  conflicting_edit: ['invalid', 'a parameter cannot be both set and unset'],
+  secret_param: [
+    'invalid',
+    'a secret is not a parameter; set it with the secret command of the connection',
+  ],
+  immutable_param: [
+    'invalid',
+    'this parameter cannot be changed; remove the connection and add it again',
+  ],
   invalid_slot: ['invalid', 'unknown secret slot of the connection kind'],
   invalid_secret: ['invalid', 'secret value is empty or too long'],
   scope_required: ['invalid', 'choose either one project or the shared scope explicitly'],

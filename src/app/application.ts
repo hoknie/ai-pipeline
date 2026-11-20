@@ -8,6 +8,7 @@ import { createArtifactsServices } from '../feature/artifacts/services/index.ts'
 import { createComposeServices } from '../feature/compose/services/index.ts';
 import { createDeliveryServices } from '../feature/delivery/services/index.ts';
 import type { IntegrationAdapterPort } from '../feature/integrations/ports/index.ts';
+import type { ChannelFactoryPort } from '../feature/notifications/ports/index.ts';
 import {
   createIntegrationsServices,
   type IntegrationsDependencies,
@@ -31,6 +32,7 @@ import { Snapshots } from '../presentation/ipc/snapshots.ts';
 import { createActors, createIpcContext } from './actors.ts';
 import { wire } from './wire.ts';
 import { createAgents } from './agents.ts';
+import { createNotifications, builtInAdapters } from './notifications/index.ts';
 import { createLifecycle } from './lifecycle.ts';
 import { DEFAULT_TIMINGS, type DaemonTimings } from './timings.ts';
 import { declarePorts, type Ports } from './wiring.ts';
@@ -56,6 +58,8 @@ export interface ApplicationOptions {
   snapshotProcesses?: () => Promise<PsRow[]>;
   /** How often the daemon checks that its socket file is in place; defaults to 5 s. */
   socketCheckMs?: number;
+  /** Channel kinds of the notifications besides the built-in ones, and the pause before a listener restarts; for tests. */
+  notifications?: { kinds?: readonly ChannelFactoryPort[]; restartMs?: number };
   /** Trusted setup of the integrations; the first version builds in no adapter and uses the system store. */
   integrations?: {
     adapters?: readonly IntegrationAdapterPort[];
@@ -120,8 +124,9 @@ function createLower(context: Context) {
       options.integrations?.secretStore ??
       createSecretStore({ stateDirectory: options.stateDirectory, environment }),
     installation: () => installationId(options.stateDirectory),
-    adapters: options.integrations?.adapters ?? [],
+    adapters: options.integrations?.adapters ?? builtInAdapters(),
     operations: ports.integrations.port,
+    changes: ports.integrationChanges.port,
   });
   return {
     agents,
@@ -165,6 +170,7 @@ function createRuns(context: Context, lower: Lower) {
     graceMs: options.graceMs ?? timings.stopGraceMs,
     queue: ports.queue.port,
     observe: ports.observe.port,
+    notify: ports.notify.port,
     publish: ports.runs.port,
     diff: ports.diff.port,
     attachments: ports.attachments.port,
@@ -230,6 +236,7 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     now,
     settingsCacheMs: context.timings.statsSettingsMs,
   });
+  const notifications = createNotifications(context, lower, runs);
   const compose = createComposeServices({
     database,
     registry,
@@ -240,6 +247,7 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     control: queue.control,
     observers: observersServices.observers,
     integrations: lower.integrations.connections,
+    notifications: notifications.subscriptions,
   });
   return {
     delivery,
@@ -249,6 +257,7 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     observers: observersServices.observers,
     history: observersServices.history,
     stats: { ledger, report },
+    notifications,
     compose,
   };
 }

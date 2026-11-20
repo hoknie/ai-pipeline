@@ -23,6 +23,10 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
     },
   });
   ports.integrations.set(integrationOperations(services));
+  // The channels follow the connections; the notifications follow the runs.
+  ports.integrationChanges.set(services.notifications.channels);
+  ports.notify.set(services.notifications.dispatcher);
+  ports.notifications.set(publications.notifications);
   ports.processes.set(publications.processes);
   // Every saved run reaches the clients first, then the usage journal.
   ports.runs.set({

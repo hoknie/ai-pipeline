@@ -80,6 +80,25 @@ export class InboundService {
     return this.dispatch(connection, project, event);
   }
 
+  /**
+   * The claim of an event of a source the daemon itself pulls from (a long poll of the bot of the
+   * connection): there are no bytes to verify, the transport is a request the daemon made with the
+   * secret of the connection. True for the first caller of the id, false for every repeat.
+   */
+  claimEvent(connectionId: string, externalEventId: string): boolean {
+    if (!EVENT_ID_PATTERN.test(externalEventId)) throw refusal('unauthenticated');
+    const connection = this.recheck(connectionId);
+    const { deliveries, now } = this.dependencies;
+    const claimed = deliveries.claim(connection.id, externalEventId, now());
+    if (claimed) deliveries.markApplied(connection.id, externalEventId, {}, now());
+    return claimed;
+  }
+
+  /** Forgets the claims older than `before`. */
+  pruneClaims(before: number): number {
+    return this.dependencies.deliveries.pruneBefore(before);
+  }
+
   /** Runs the trusted verifier on the raw bytes and returns what it accepted. */
   private async verified(request: InboundRequest): Promise<AcceptedEvent> {
     const { catalog, secrets, now } = this.dependencies;

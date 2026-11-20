@@ -1,7 +1,11 @@
 import type { ArtifactsPublishPort } from '../feature/artifacts/ports/index.ts';
 import type { DeliveryAuthorsPort, DeliveryPublishPort } from '../feature/delivery/ports/index.ts';
-import type { IntegrationOperationsPort } from '../feature/integrations/ports/index.ts';
+import type {
+  IntegrationChangesPort,
+  IntegrationOperationsPort,
+} from '../feature/integrations/ports/index.ts';
 import type { NetworkChangedPort } from '../feature/network/ports/index.ts';
+import type { NotificationsPublishPort } from '../feature/notifications/ports/index.ts';
 import type { ObserversPublishPort } from '../feature/observers/ports/index.ts';
 import type { ProcessesPublishPort } from '../feature/processes/ports/index.ts';
 import type { QueuePublishPort, RepairPolicyPort } from '../feature/queue/ports/index.ts';
@@ -13,6 +17,7 @@ import type {
   RunAttachmentsPort,
   RunCommitsPort,
   RunPushPort,
+  RunNotifyPort,
   RunsPublishPort,
 } from '../feature/runs/ports/index.ts';
 import type { ConfigChangedPort } from '../feature/swarm-edit/ports/index.ts';
@@ -83,6 +88,9 @@ export function declarePorts() {
     observers: wiring.port<ObserversPublishPort>('observers.publish'),
     network: wiring.port<NetworkChangedPort>('network.changed'),
     integrations: wiring.port<IntegrationOperationsPort>('integrations.operations'),
+    integrationChanges: wiring.port<IntegrationChangesPort>('integrations.changes'),
+    notify: wiring.port<RunNotifyPort>('runs.notify'),
+    notifications: wiring.port<NotificationsPublishPort>('notifications.publish'),
   };
   return { wiring, ports };
 }

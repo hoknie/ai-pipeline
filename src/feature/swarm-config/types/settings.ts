@@ -4,6 +4,7 @@ import { type RuntimeChain } from './chain.ts';
 import { type Pipeline, type Split, type Step } from './pipeline.ts';
 import { type Provider, type Role, withRegistryDefaults } from './providers/provider.ts';
 import { type CatalogMcpServer } from './specialist.ts';
+import { DEFAULT_WEB_PORT, defaultWeb, type WebSettings } from './web/index.ts';
 import { type Defaults, type Runtime, type Specialist } from './specialist.ts';
 
 export const OUTSIDE_CHANGES = ['warn', 'stop', 'off'] as const;
@@ -94,28 +95,7 @@ export interface NamingSettings {
   model: string;
 }
 
-export const WEB_AUTH_MODES = ['token', 'none'] as const;
-
-export type WebAuth = (typeof WEB_AUTH_MODES)[number];
-
-/** Addresses the web panel may listen on: loopback only. */
-export const WEB_HOSTS = ['127.0.0.1', 'localhost', '::1'] as const;
-
-export type WebHost = (typeof WEB_HOSTS)[number];
-
-export const DEFAULT_WEB_PORT = 7341;
-
-export interface WebSettings {
-  /** The daemon starts the web panel together with itself. */
-  autostart: boolean;
-  auth: WebAuth;
-  port: number;
-  host: WebHost;
-}
-
-export function defaultWeb(): WebSettings {
-  return { autostart: true, auth: 'token', port: DEFAULT_WEB_PORT, host: '127.0.0.1' };
-}
+export * from './web/index.ts';
 
 /** How an agent CLI is started: the command, extra leading arguments and extra environment. */
 export interface RuntimeCommand {

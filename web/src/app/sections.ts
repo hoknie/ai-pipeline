@@ -1,4 +1,12 @@
-import { Activity, BarChart3, Boxes, ListOrdered, Settings, type LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  BarChart3,
+  Boxes,
+  ListOrdered,
+  Plug,
+  Settings,
+  type LucideIcon,
+} from 'lucide-react';
 
 import type { TFunction } from 'i18next';
 
@@ -9,7 +17,7 @@ export interface Section {
   view: View;
   /** Every view the section shows; the section is highlighted for any of them. */
   views: View[];
-  labelKey: 'runs' | 'queue' | 'swarm' | 'stats' | 'settings';
+  labelKey: 'runs' | 'queue' | 'swarm' | 'stats' | 'integrations' | 'settings';
   icon: LucideIcon;
 }
 
@@ -22,6 +30,7 @@ export const SECTIONS: Section[] = [
   { view: 'queue', views: ['queue'], labelKey: 'queue', icon: ListOrdered },
   { view: 'specialists', views: SWARM_VIEWS, labelKey: 'swarm', icon: Boxes },
   { view: 'stats', views: ['stats'], labelKey: 'stats', icon: BarChart3 },
+  { view: 'integrations', views: ['integrations'], labelKey: 'integrations', icon: Plug },
   { view: 'settings', views: ['settings'], labelKey: 'settings', icon: Settings },
 ];
 
@@ -30,10 +39,18 @@ export const showsView = (section: Section, view: View): boolean => section.view
 
 /** A `ctrl` shortcut that goes to a view; the tabs of the swarm have their own letters. */
 export interface SectionShortcut {
-  key: 'r' | 'q' | 's' | 'b' | 'o' | 't' | 'c';
+  key: 'r' | 'q' | 's' | 'b' | 'o' | 't' | 'i' | 'c';
   view: View;
   /** The label in `nav.*`. */
-  labelKey: 'runs' | 'queue' | 'specialists' | 'pipelines' | 'providers' | 'stats' | 'settings';
+  labelKey:
+    | 'runs'
+    | 'queue'
+    | 'specialists'
+    | 'pipelines'
+    | 'providers'
+    | 'stats'
+    | 'integrations'
+    | 'settings';
 }
 
 export const SECTION_SHORTCUTS: SectionShortcut[] = [
@@ -44,6 +61,7 @@ export const SECTION_SHORTCUTS: SectionShortcut[] = [
   { key: 'b', view: 'pipelines', labelKey: 'pipelines' },
   { key: 'o', view: 'providers', labelKey: 'providers' },
   { key: 't', view: 'stats', labelKey: 'stats' },
+  { key: 'i', view: 'integrations', labelKey: 'integrations' },
   { key: 'c', view: 'settings', labelKey: 'settings' },
 ];
 

@@ -73,10 +73,11 @@ export const featureGraph: Record<string, readonly string[]> = {
   observers: ['queue', 'runs', 'repos', 'swarm-config'],
   stats: ['runs', 'repos', 'swarm-config'],
   integrations: ['repos'],
+  notifications: ['integrations', 'runs', 'repos', 'swarm-config'],
   identity: ['swarm-config'],
   audit: [],
   access: ['identity', 'swarm-config', 'repos'],
-  compose: ['observers', 'queue', 'runs', 'tags', 'repos', 'integrations'],
+  compose: ['observers', 'queue', 'runs', 'tags', 'repos', 'integrations', 'notifications'],
 };
 
 /** Presentation sublayers. */
@@ -205,6 +206,7 @@ export const webGraph: Record<string, readonly string[]> = {
   account: [],
   topology: [],
   stats: [],
+  integrations: [],
   tags: [],
   repositories: [],
   providers: ['repositories'],

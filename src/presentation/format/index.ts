@@ -1,4 +1,9 @@
 export { formatApply, formatDiff, formatGroup } from './groups.ts';
+export {
+  formatChannelState,
+  formatDeliveries,
+  formatSubscriptions,
+} from './notifications/index.ts';
 export { formatConnections, formatIntegrationTypes } from './integration/index.ts';
 export { formatAccessActions, formatAccessCheck } from './access/index.ts';
 export { formatAudit } from './audit/index.ts';

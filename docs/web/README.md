@@ -8,6 +8,7 @@ The web panel is a page in your browser. In it you follow runs, answer specialis
 | "Queue" | Add, order and run tasks | [web/queue.md](queue.md) |
 | "Swarm" | One window with the tabs "Providers", "Roles", "Chains", "Specialists" and "Pipeline" | [web/swarm.md](swarm.md) |
 | "Statistics" | Tokens and time by day, project, specialist and model | [web/stats.md](stats.md) |
+| "Integrations" | Connections (non-secret parameters), subscriptions to notifications, the journal of sending | [usage/notifications.md](../usage/notifications.md) |
 | "Settings" | Edit `settings.yaml` and the shared swarm; the system state | [web/settings.md](settings.md) |
 
 The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. The panel talks to the daemon through its [HTTP API](http-api.md).
@@ -85,7 +86,7 @@ The tab lists what the agents of the daemon started: their child processes and t
 
 - `Cmd+K` on macOS, `Ctrl+K` elsewhere, opens the command palette. It searches sections, runs (those waiting for an answer first), groups of the open run, pipelines and specialists, and runs actions such as "New task in the queue" and "New task on a page".
 - Outside input fields and dialogs: `Ctrl+N` opens a new task, `Ctrl+P` opens the project menu, `j` and `k` move to the next and previous run, `?` shows all shortcuts.
-- `Ctrl` and a letter go to a section: `R` runs, `Q` queue, `S` the tab "Specialists", `B` the tab "Pipeline", `O` the tab "Providers" (all three in "Swarm"), `T` statistics, `C` settings. With selected text `Ctrl+C` keeps copying instead of going to the settings.
+- `Ctrl` and a letter go to a section: `R` runs, `Q` queue, `S` the tab "Specialists", `B` the tab "Pipeline", `O` the tab "Providers" (all three in "Swarm"), `T` statistics, `I` integrations, `C` settings. With selected text `Ctrl+C` keeps copying instead of going to the settings.
 - Letters work in any keyboard layout, because the physical key counts.
 - Cancelling a run or a group, removing from the queue, leaving an unsaved form and rereading the configuration ask for confirmation. Focus is on the refusal, and `Esc` refuses.
 - Results of actions are notifications. Errors stay until you dismiss them.

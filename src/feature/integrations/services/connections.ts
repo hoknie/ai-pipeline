@@ -1,14 +1,17 @@
 import { randomBytes } from 'node:crypto';
 
 import type { RegistryService } from '../../repos/services/index.ts';
+import type { IntegrationChangesPort } from '../ports/index.ts';
 import type { ConnectionRepository, SecretRepository } from '../repositories/index.ts';
 import {
   refusal,
   secretSpec,
+  editedParams,
   validateName,
   validateParams,
   validateSecretValue,
   type CatalogEntry,
+  type ConnectionChange,
   type Connection,
   type ConnectionView,
   type SecretStatus,
@@ -22,6 +25,7 @@ export interface ConnectionDependencies {
   connections: ConnectionRepository;
   secrets: SecretRepository;
   catalog: AdapterCatalog;
+  changes: IntegrationChangesPort;
   registry: RegistryService;
   secretService: SecretService;
   access: ConnectionAccess;
@@ -112,6 +116,7 @@ export class ConnectionService {
       // The state may have changed while the backend was checked.
       verify();
       connections.setEnabled(id, true, now());
+      this.announce(id, 'enabled');
       return this.view(this.dependencies.access.find(id));
     });
   }
@@ -119,12 +124,41 @@ export class ConnectionService {
   disable(id: string): ConnectionView {
     this.dependencies.access.find(id);
     this.dependencies.connections.setEnabled(id, false, this.dependencies.now());
+    this.announce(id, 'disabled');
     return this.view(this.dependencies.access.find(id));
   }
 
   /** Removes the connection and its secrets; a failed cleanup leaves it without authority until repeated. */
   async remove(id: string): Promise<void> {
-    await this.dependencies.secretService.removeConnection(id);
+    try {
+      await this.dependencies.secretService.removeConnection(id);
+    } finally {
+      // A connection left in cleanup does no work either: its listener stops in any case.
+      this.announce(id, 'removed');
+    }
+  }
+
+  /**
+   * Changes the non-secret parameters: the set ones over the old, the unset ones gone, the result
+   * checked as a whole by the kind. Id, kind, name, scope, secrets and the enabled state stay.
+   */
+  async edit(
+    id: string,
+    change: { set?: Record<string, string>; unset?: readonly string[] },
+  ): Promise<ConnectionView> {
+    const { connections, catalog, secretService, now } = this.dependencies;
+    return secretService.serialized(id, async () => {
+      const connection = this.dependencies.access.find(id);
+      if (connection.state !== 'ready') throw refusal('cleanup_pending');
+      if (!catalog.has(connection.kind)) throw refusal('unknown_kind');
+      const params = editedParams(catalog.adapter(connection.kind).descriptor, connection.params, {
+        set: change.set ?? {},
+        unset: change.unset ?? [],
+      });
+      connections.setParams(id, params, now());
+      this.announce(id, 'params');
+      return this.view(this.dependencies.access.find(id));
+    });
   }
 
   async setSecret(id: string, slot: string, value: string): Promise<ConnectionView> {
@@ -132,6 +166,7 @@ export class ConnectionService {
     validateSecretValue(value);
     secretSpec(this.dependencies.catalog.adapter(connection.kind).descriptor, slot);
     await this.dependencies.secretService.set(id, slot, value);
+    this.announce(id, 'secret');
     return this.view(this.dependencies.access.find(id));
   }
 
@@ -139,6 +174,7 @@ export class ConnectionService {
     const connection = this.dependencies.access.find(id);
     secretSpec(this.dependencies.catalog.adapter(connection.kind).descriptor, slot);
     await this.dependencies.secretService.remove(id, slot);
+    this.announce(id, 'secret');
     return this.view(this.dependencies.access.find(id));
   }
 
@@ -175,6 +211,15 @@ export class ConnectionService {
       secrets: declared,
       pending: secretService.pending(connection),
     };
+  }
+
+  /** Tells the listeners of the change; what they do with it never fails the change. */
+  private announce(id: string, change: ConnectionChange): void {
+    try {
+      this.dependencies.changes.connectionChanged(id, change);
+    } catch {
+      // the other side logs its own failures
+    }
   }
 
   private async projectOf(

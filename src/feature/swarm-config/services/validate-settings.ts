@@ -54,7 +54,7 @@ const DELIVERY_KEYS = [
 
 const WORKSPACE_KEYS = ['base', 'include'];
 
-const WEB_KEYS = ['autostart', 'auth', 'port', 'host'];
+const WEB_KEYS = ['autostart', 'auth', 'port', 'host', 'public_url'];
 
 const WEB_PORT_RANGE: Range = [1, 65535];
 
@@ -151,7 +151,32 @@ export function checkWeb(ctx: ValidateContext, value: unknown, web: WebSettings)
       web.auth = readChoice<WebAuth>(ctx, field, path, WEB_AUTH_MODES) ?? web.auth;
     if (key === 'port') web.port = readInteger(ctx, field, path, WEB_PORT_RANGE) ?? web.port;
     if (key === 'host') web.host = readChoice<WebHost>(ctx, field, path, WEB_HOSTS) ?? web.host;
+    if (key === 'public_url') web.publicUrl = readPublicUrl(ctx, field, path) ?? web.publicUrl;
   }
+}
+
+/** An absolute http(s) address without login, query and fragment, kept without the trailing `/`. */
+function readPublicUrl(ctx: ValidateContext, value: unknown, path: string): string | null {
+  const text = readString(ctx, value, path);
+  if (text === null) return null;
+  const refuse = (message: string): null => {
+    addError(ctx, path, message);
+    return null;
+  };
+  let url: URL;
+  try {
+    url = new URL(text.trim());
+  } catch {
+    return refuse('must be an absolute http:// or https:// address');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return refuse('must start with http:// or https://');
+  }
+  if (url.username !== '' || url.password !== '')
+    return refuse('must not contain a login or a password');
+  if (text.includes('?') || text.includes('#'))
+    return refuse('must not contain a query or a fragment');
+  return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
 }
 
 export function checkNaming(ctx: ValidateContext, value: unknown, naming: NamingSettings): void {

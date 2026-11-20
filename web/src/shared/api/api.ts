@@ -1,6 +1,7 @@
 import { ApiError, withRepository } from './http.ts';
 import { attachmentsApi, type AttachmentsApi } from './catalog/attachmentsApi.ts';
 import { configApi, type ConfigApi } from './configApi.ts';
+import { integrationsApi, type IntegrationsApi } from './integrations/integrationsApi.ts';
 import { queueApi, type QueueApi, type QueueSettingsPatch } from './queueApi.ts';
 import { runActionsApi, type RunActionsApi } from './runActionsApi.ts';
 import { runsApi, type RunsApi } from './runsApi.ts';
@@ -15,11 +16,24 @@ import {
 export { ApiError, withRepository };
 export type { QueueSettingsPatch };
 export type { StatsQuery } from './statsApi.ts';
+export type {
+  DeliveryQuery,
+  IntegrationsOverview,
+  NewSubscription,
+} from './integrations/integrationsApi.ts';
 
 export type { UploadedFile } from './catalog/attachmentsApi.ts';
 
 export interface Api
-  extends RunsApi, RunActionsApi, QueueApi, SystemApi, ConfigApi, StatsApi, AttachmentsApi {
+  extends
+    RunsApi,
+    RunActionsApi,
+    QueueApi,
+    SystemApi,
+    ConfigApi,
+    StatsApi,
+    IntegrationsApi,
+    AttachmentsApi {
   observerHistory(query?: ObserverHistoryQuery): Promise<ObserverHistoryPage>;
   /**
    * The same API bound to a repository: queue, configuration and pipeline requests carry
@@ -40,6 +54,7 @@ function bound(repository: string | null): Api {
     ...systemApi(),
     ...configApi(repository),
     ...statsApi(),
+    ...integrationsApi(),
     ...attachmentsApi(),
     observerHistory,
   };

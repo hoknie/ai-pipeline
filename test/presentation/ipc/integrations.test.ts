@@ -54,6 +54,7 @@ describe('integration requests', () => {
     expect(methods.filter((method) => method.startsWith('integration_')).sort()).toEqual([
       'integration_add',
       'integration_disable',
+      'integration_edit',
       'integration_enable',
       'integration_list',
       'integration_remove',
@@ -143,11 +144,20 @@ describe('where the methods are not offered', () => {
     });
   }
 
-  it('has no MCP tool and no panel route for connections or secrets', () => {
+  it('has no MCP tool and no panel route that creates connections or touches secrets', () => {
     const root = join(import.meta.dirname, '..', '..', '..', 'src', 'presentation');
+    const own = join('web', 'routes', 'integrations', 'integrations.ts');
     for (const place of ['mcp', 'web']) {
       for (const file of sources(join(root, place))) {
-        expect(readFileSync(file, 'utf8'), file).not.toMatch(/integration_|integrations/);
+        const text = readFileSync(file, 'utf8');
+        if (file.endsWith(own)) {
+          // the panel reads connections and edits their non-secret parameters, nothing more
+          expect(text, file).not.toMatch(
+            /integration_(add|remove|enable|disable|secret_set|secret_remove)/,
+          );
+        } else {
+          expect(text, file).not.toMatch(/integration_/);
+        }
       }
     }
   });

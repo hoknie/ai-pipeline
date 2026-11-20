@@ -2,6 +2,7 @@ import type { Database } from '../../../platform/sqlite/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type {
   IntegrationAdapterPort,
+  IntegrationChangesPort,
   IntegrationOperationsPort,
   SecretStorePort,
 } from '../ports/index.ts';
@@ -37,6 +38,8 @@ export interface IntegrationsDependencies {
   /** The built-in adapters of this build; none in the first version. */
   adapters: readonly IntegrationAdapterPort[];
   operations: IntegrationOperationsPort;
+  /** Told when a connection changes; absent: nobody listens. */
+  changes?: IntegrationChangesPort;
   now: () => number;
   limits?: Partial<InboundLimits>;
   outboundTimeoutMs?: number;
@@ -69,6 +72,7 @@ export function createIntegrationsServices(
     connections,
     secrets: secretRows,
     catalog,
+    changes: dependencies.changes ?? { connectionChanged: () => undefined },
     registry,
     secretService: secrets,
     access,

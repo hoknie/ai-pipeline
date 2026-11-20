@@ -72,6 +72,55 @@ function addReadCommands(kit: Kit): void {
     });
 }
 
+/** A secret slot among the parameters is refused here, with the command that sets a secret. */
+async function refuseSecretParameters(kit: Kit, id: string, names: string[]): Promise<void> {
+  const ctx = kit.context();
+  const [connections, types] = (await Promise.all([
+    call(ctx, 'integration_list', {}),
+    call(ctx, 'integration_types', {}),
+  ])) as [ConnectionView[], IntegrationTypeView[]];
+  const kind = connections.find((one) => one.id === id)?.kind;
+  const slots = types.find((type) => type.kind === kind)?.secrets.map((secret) => secret.slot);
+  const slot = names.find((name) => slots?.includes(name));
+  if (slot !== undefined) {
+    throw usage(
+      `${slot} is a secret, not a parameter: run \`aip integration secret set ${id} ${slot} --stdin\``,
+    );
+  }
+}
+
+function addEditCommand(kit: Kit): void {
+  const { root, examples, context, show } = kit;
+  root
+    .command('edit')
+    .description('Change non-secret parameters of a connection; it stays enabled')
+    .argument('<id>', 'connection id')
+    .option('--param <key=value...>', 'set a parameter', (v, all: string[] = []) => [...all, v])
+    .option('--unset <key...>', 'remove an optional parameter', (v, all: string[] = []) => [
+      ...all,
+      v,
+    ])
+    .option('--json', 'print JSON')
+    .addHelpText(
+      'after',
+      examples([
+        'aip integration edit c1a2b3c4d5e6 --param chat_id=-1001234567890',
+        'aip integration edit c1a2b3c4d5e6 --unset language',
+      ]),
+    )
+    .action(async (id: string, options: { param?: string[]; unset?: string[]; json?: boolean }) => {
+      const set = parseParams(options.param ?? []);
+      const unset = options.unset ?? [];
+      if (Object.keys(set).length === 0 && unset.length === 0) {
+        throw usage('pass at least one --param <key>=<value> or --unset <key>');
+      }
+      await refuseSecretParameters(kit, id, [...Object.keys(set), ...unset]);
+      show(options.json, [
+        (await call(context(), 'integration_edit', { id, set, unset })) as ConnectionView,
+      ]);
+    });
+}
+
 function addWriteCommands(kit: Kit): void {
   const { root, examples, context, show, print, io } = kit;
   root
@@ -173,5 +222,6 @@ export function registerIntegrations(program: Command, io: CliIo, style: Style):
   const kit = integrationKit(program, io, style);
   addReadCommands(kit);
   addWriteCommands(kit);
+  addEditCommand(kit);
   addSecretCommands(kit);
 }

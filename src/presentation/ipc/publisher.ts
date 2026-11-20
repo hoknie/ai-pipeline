@@ -1,6 +1,7 @@
 import type { ArtifactsPublishPort } from '../../feature/artifacts/ports/index.ts';
 import type { DeliveryPublishPort } from '../../feature/delivery/ports/index.ts';
 import type { NetworkChangedPort } from '../../feature/network/ports/index.ts';
+import type { NotificationsPublishPort } from '../../feature/notifications/ports/index.ts';
 import type { ObserversPublishPort } from '../../feature/observers/ports/index.ts';
 import type { ProcessesPublishPort } from '../../feature/processes/ports/index.ts';
 import type { QueuePublishPort } from '../../feature/queue/ports/index.ts';
@@ -14,7 +15,7 @@ import type { GlobalQueueView, QueueView } from './contract/index.ts';
 import { LogSignals } from './log-signals.ts';
 import type { DaemonServices } from './services.ts';
 import type { Snapshots } from './snapshots.ts';
-import { catalogView } from './views/index.ts';
+import { catalogView, channelView } from './views/index.ts';
 
 /** What subscribers of the `queue` event see: runs that occupy places and readiness of the items. */
 function queueSignature(view: QueueView): string {
@@ -59,6 +60,7 @@ export interface PublicationPorts {
   delivery: DeliveryPublishPort;
   artifacts: ArtifactsPublishPort;
   network: NetworkChangedPort;
+  notifications: NotificationsPublishPort;
 }
 
 /** The subscribers of the daemon and the one counter of the events they get. */
@@ -143,6 +145,16 @@ export class Publisher {
       delivery: { runChanged },
       artifacts: { runChanged },
       network: { changed: () => this.send('network', { network: this.services.network.status() }) },
+      notifications: {
+        subscriptionsChanged: () => this.send('notifications', { change: 'subscriptions' }),
+        journalChanged: (delivery) => this.send('notifications', { change: 'journal', delivery }),
+        channelChanged: (connection, status) =>
+          this.send('notifications', {
+            change: 'channel',
+            connection,
+            channel: status === null ? null : channelView(status),
+          }),
+      },
     };
   }
 

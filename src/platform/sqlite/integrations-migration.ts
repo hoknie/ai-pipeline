@@ -48,3 +48,61 @@ export const INTEGRATIONS_MIGRATION = `
     PRIMARY KEY (connection_id, external_event_id)
   );
   `;
+
+/**
+ * Notifications: the subscriptions of connections to the events of projects, the outgoing queue
+ * that is also the journal of deliveries, the drafts of answers collected in a chat and the read
+ * position of every channel. No table holds a secret.
+ */
+export const NOTIFICATIONS_MIGRATION = `
+  CREATE TABLE IF NOT EXISTS notification_subscriptions (
+    id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL,
+    project_path TEXT,
+    events_json TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS notification_subscriptions_by_connection
+    ON notification_subscriptions (connection_id);
+  CREATE INDEX IF NOT EXISTS notification_subscriptions_by_project
+    ON notification_subscriptions (project_path);
+  CREATE TABLE IF NOT EXISTS notification_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    short_key TEXT NOT NULL UNIQUE,
+    subscription_id TEXT NOT NULL REFERENCES notification_subscriptions (id) ON DELETE CASCADE,
+    event_key TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    group_slug TEXT,
+    question_key TEXT,
+    payload_json TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('pending', 'sent', 'failed', 'closed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at INTEGER NOT NULL,
+    last_attempt_at INTEGER,
+    last_error TEXT,
+    external_ref_json TEXT,
+    closed_by TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE (subscription_id, event_key)
+  );
+  CREATE INDEX IF NOT EXISTS notification_deliveries_by_due
+    ON notification_deliveries (state, next_attempt_at);
+  CREATE INDEX IF NOT EXISTS notification_deliveries_by_run ON notification_deliveries (run_id);
+  CREATE TABLE IF NOT EXISTS notification_answers (
+    delivery_id INTEGER NOT NULL REFERENCES notification_deliveries (id) ON DELETE CASCADE,
+    question_index INTEGER NOT NULL,
+    answer TEXT NOT NULL,
+    user_ref TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (delivery_id, question_index)
+  );
+  CREATE TABLE IF NOT EXISTS notification_cursors (
+    connection_id TEXT PRIMARY KEY,
+    cursor TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  `;

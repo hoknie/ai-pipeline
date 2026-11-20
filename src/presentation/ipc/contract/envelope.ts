@@ -7,6 +7,7 @@ import { groupsRequests } from './groups.ts';
 import { auditRequests } from './identity/audit.ts';
 import { identityRequests } from './identity/identity.ts';
 import { integrationsRequests } from './integrations/integrations.ts';
+import { notificationsRequests } from './notifications/notifications.ts';
 import { observersRequests } from './observers.ts';
 import { networkStatusSchema, panelRequests } from './panel.ts';
 import { processesRequests } from './processes.ts';
@@ -24,6 +25,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   ...queueRequests,
   ...repositoriesRequests,
   ...integrationsRequests,
+  ...notificationsRequests,
   ...tagsRequests,
   ...statsRequests,
   ...observersRequests,
@@ -169,6 +171,15 @@ export const streamEventSchema = z.discriminatedUnion('event', [
     }),
   }),
   z.object({ event: z.literal('network'), seq: z.number().int(), network: networkStatusSchema }),
+  /** Subscriptions, the journal or a channel changed; the panel asks again, nothing secret travels. */
+  z.object({
+    event: z.literal('notifications'),
+    seq: z.number().int(),
+    change: z.enum(['subscriptions', 'journal', 'channel']),
+    delivery: z.number().int().optional(),
+    connection: z.string().optional(),
+    channel: z.looseObject({}).nullable().optional(),
+  }),
   /** The log of an attempt has new lines or the attempt ended; never the text of the log. */
   z.strictObject({
     event: z.literal('log'),

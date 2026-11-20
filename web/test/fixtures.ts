@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import { ApiError, type Api } from '../src/shared/api/api.ts';
+import { ApiError, type Api, type IntegrationsOverview } from '../src/shared/api/api.ts';
 import type { ObserverSettings, ObserversView } from '../src/shared/api/observerTypes.ts';
 import type {
   ActionEntry,
@@ -34,6 +34,7 @@ import type {
   SystemView,
   SpecialistTagFolderView,
   StatsReportView,
+  DeliveryView,
 } from '../src/shared/api/types.ts';
 
 /** The observers as the daemon sends them: off, one worker, nothing running. */
@@ -811,6 +812,73 @@ const NO_PER_TASK = {
 };
 
 /** An empty report of the statistics: nothing in the period, collection on. */
+export function deliveryView(overrides: Partial<DeliveryView> = {}): DeliveryView {
+  return {
+    id: 1,
+    subscription: 'n1',
+    event: 'r1/g/needs_human/1',
+    kind: 'question',
+    run: 'run1',
+    group: 'login',
+    state: 'sent',
+    attempts: 1,
+    lastAttemptAt: 1_700_000_000_000,
+    error: null,
+    createdAt: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
+/** A shared Telegram connection without the token, with one subscription of all projects. */
+export function integrationsOverview(
+  overrides: Partial<IntegrationsOverview> = {},
+): IntegrationsOverview {
+  return {
+    connections: [
+      {
+        id: 'c1',
+        kind: 'telegram',
+        name: 'main',
+        scope: 'global',
+        project: null,
+        params: { allowed_users: '111' },
+        enabled: false,
+        state: 'ready',
+        secrets: [{ slot: 'bot_token', required: true, present: false }],
+        pending: false,
+        channel: null,
+      },
+    ],
+    types: [
+      {
+        kind: 'telegram',
+        title: 'Telegram bot',
+        params: [
+          { name: 'chat_id', required: false, maxLength: 20 },
+          { name: 'allowed_users', required: true, maxLength: 400 },
+          { name: 'language', required: false, maxLength: 2, values: ['en', 'ru'] },
+        ],
+        secrets: [{ slot: 'bot_token', required: true }],
+        directions: ['inbound', 'outbound'],
+        operations: [],
+      },
+    ],
+    subscriptions: [
+      {
+        id: 'n1',
+        connection: 'c1',
+        connectionName: 'main',
+        kind: 'telegram',
+        project: null,
+        events: ['question'],
+        enabled: true,
+      },
+    ],
+    channels: [],
+    ...overrides,
+  };
+}
+
 export function statsReportView(overrides: Partial<StatsReportView> = {}): StatsReportView {
   return {
     settings: { enabled: true, exclude: [], backfilledAt: null },
@@ -1020,6 +1088,14 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     setRunObserver: vi.fn(async () => ({})),
     statsReport: vi.fn(async () => statsReportView()),
     statsClear: vi.fn(async () => ({ removed: 0 })),
+    integrations: vi.fn(async () => integrationsOverview()),
+    integrationEdit: vi.fn(async () => integrationsOverview().connections[0]!),
+    subscriptionAdd: vi.fn(async () => integrationsOverview().subscriptions[0]!),
+    subscriptionEvents: vi.fn(async () => integrationsOverview().subscriptions[0]!),
+    subscriptionEnabled: vi.fn(async () => integrationsOverview().subscriptions[0]!),
+    subscriptionRemove: vi.fn(async () => undefined),
+    subscriptionTest: vi.fn(async () => deliveryView()),
+    deliveries: vi.fn(async () => []),
     ...overrides,
   };
   /** Methods that record the repository they were bound to, then call the shared mock. */

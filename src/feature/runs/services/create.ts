@@ -10,6 +10,7 @@ import type {
   ObservePort,
   QueueAdvancePort,
   RunAttachmentsPort,
+  RunNotifyPort,
   RunCommitsPort,
   RunPushPort,
   RunsPublishPort,
@@ -43,6 +44,8 @@ export interface RunsDependencies {
   timings: EffectTimings & { wakeMarginMs: number };
   queue: QueueAdvancePort;
   observe: ObservePort;
+  /** Hears about every saved run; a test that does not care may leave it out. */
+  notify?: RunNotifyPort;
   publish: RunsPublishPort;
   diff: DiffPort;
   agentExit: AgentExitPort;
@@ -75,6 +78,7 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
     wakeMarginMs: timings.wakeMarginMs,
     queue: dependencies.queue,
     observe: dependencies.observe,
+    notify: dependencies.notify ?? { runChanged: () => undefined },
     publish: dependencies.publish,
     network: () => dependencies.network.snapshot(),
     limit: () => {

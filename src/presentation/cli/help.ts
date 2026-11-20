@@ -19,6 +19,7 @@ export const HELP_GROUPS: HelpGroup[] = [
       'init',
       'config',
       'integration',
+      'notify',
       'login',
       'logout',
       'whoami',

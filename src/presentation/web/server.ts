@@ -36,6 +36,7 @@ import { auditRoutes } from './routes/audit/audit.ts';
 import { statsRoutes } from './routes/stats/stats.ts';
 import { sweepUploads, UPLOAD_SWEEP_MS, uploadRoute } from './uploads.ts';
 import { systemRoute } from './routes/system.ts';
+import { integrationsRoutes } from './routes/integrations/integrations.ts';
 import { tagsRoutes } from './routes/tags.ts';
 import type { RawRoute, Route, RouteKit } from './routes/types.ts';
 
@@ -85,6 +86,7 @@ function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
       statsRoutes,
       auditRoutes,
       accessRoutes,
+      integrationsRoutes,
     ].flatMap((routes) => routes(kit)),
   };
 }
