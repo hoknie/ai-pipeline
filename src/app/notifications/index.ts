@@ -2,6 +2,8 @@ import type { IntegrationAdapterPort } from '../../feature/integrations/ports/in
 import type { IntegrationsServices } from '../../feature/integrations/services/index.ts';
 import { probeProxy } from '../../feature/network/types/index.ts';
 import {
+  slackAdapter,
+  slackChannelFactory,
   telegramAdapter,
   telegramChannelFactory,
 } from '../../feature/notifications/clients/index.ts';
@@ -17,7 +19,7 @@ import type { Database } from '../../platform/sqlite/index.ts';
 
 /** The adapters of the integrations this build brings: the chat kinds of the notifications. */
 export function builtInAdapters(): IntegrationAdapterPort[] {
-  return [telegramAdapter()];
+  return [telegramAdapter(), slackAdapter()];
 }
 
 /** What the composition root has at hand when it builds the notifications. */
@@ -46,8 +48,9 @@ export function createNotifications(
   runs: RunsServices,
 ) {
   const { environment, options } = context;
-  // The address of the Bot API is read once here; the tests point it at a fake one.
+  // The addresses of the Bot API and the Web API are read once here; the tests point them at fakes.
   const base = environment.AIP_TELEGRAM_API ?? 'https://api.telegram.org';
+  const slackBase = environment.AIP_SLACK_API ?? 'https://slack.com/api';
   return createNotificationsServices({
     database: context.database,
     now: context.now,
@@ -59,6 +62,10 @@ export function createNotifications(
       telegramChannelFactory({
         base,
         proxy: () => probeProxy(base, lower.network.proxy(), environment),
+      }),
+      slackChannelFactory({
+        base: slackBase,
+        proxy: () => probeProxy(slackBase, lower.network.proxy(), environment),
       }),
     ],
     ...(options.notifications?.restartMs === undefined

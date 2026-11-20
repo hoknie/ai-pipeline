@@ -1,6 +1,6 @@
 # Notifications
 
-The daemon can write to a chat when a task needs you and take your answer from the chat. The first channel is a Telegram bot. The daemon does not need a public address: it asks Telegram for updates itself (long polling).
+The daemon can write to a chat when a task needs you and take your answer from the chat. Channels are a Telegram bot and a Slack app. The daemon does not need a public address: it asks Telegram for updates itself (long polling) and connects to Slack itself (Socket Mode).
 
 A *connection* holds the bot (token, chat, allowed users) and is shared or belongs to one project; a *subscription* says which project sends which events through it. Connections are described in the `aip integration` commands, subscriptions in `aip notify`. A secret is never given in an argument or in the panel.
 
@@ -32,6 +32,51 @@ aip notify test <subscription>
 
 Without `--events` a subscription gets `question` only. `--all-projects` subscribes every project of a shared connection. Questions that are already open when you subscribe are not sent.
 
+## Setting up a Slack app
+
+1. Create an app [from a manifest](https://api.slack.com/apps) and install it in your workspace:
+
+```yaml
+display_information:
+  name: aip
+features:
+  bot_user:
+    display_name: aip
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - channels:history
+      - groups:history
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.channels
+      - message.groups
+  interactivity:
+    is_enabled: true
+  socket_mode_enabled: true
+```
+
+2. Keep the bot token (`xoxb-…`, *OAuth & Permissions*) and create an app-level token with the scope `connections:write` (`xapp-…`, *Basic Information*).
+3. Invite the app to the channel (`/invite @aip`). The channel id (`C…` or `G…`) is in the channel details; your user id (`U…`) is in your profile (*Copy member ID*).
+4. Create the connection, give it both secrets and subscribe a project:
+
+```
+aip integration add slack team --global --param channel_id=C0123456789 --param allowed_users=U01AAAAAAA,U01BBBBBBB
+aip integration secret set <id> bot_token --stdin < bot-token.txt
+aip integration secret set <id> app_token --stdin < app-token.txt
+aip integration enable <id>
+aip notify add <id> --repo . --events question,failed
+aip notify test <subscription>
+```
+
+Optional parameters: `team_id` (`T…`) accepts events of one workspace only, `language` is `en` or `ru`. One Slack app belongs to one daemon: Slack shares events between several connections of the same app.
+
+In Slack, a question has a button for every option (up to 5; more options are a drop-down list), then **Accept recommendations** and **Custom answer**. Write a text answer as a reply in the thread of the message, `N: text` for several questions.
+
+A user outside `allowed_users`, or a press on a closed question, gets a message that only they see. Without the scope `channels:history` (`groups:history` for a private channel) replies in a thread do not arrive; `aip notify test` warns about it.
+
 ## Events
 
 | Event | When |
@@ -55,7 +100,9 @@ Only users from `allowed_users`, in the chat `chat_id`, can answer; anyone else 
 
 ## What leaves your machine
 
-Messages hold the project name, pipeline, task number and title, group title, the question with its options, the reason of a failure or the summary of a step, and a link to the task when [`web.public_url`](../configuration/README.md#web) is set. They do not hold code, diffs or secrets. Texts longer than 4096 characters are shortened; every option stays a button.
+Messages hold the project name, pipeline, task number and title, group title, the question with its options, the reason of a failure or the summary of a step, and a link to the task when [`web.public_url`](../configuration/README.md#web) is set. They do not hold code, diffs or secrets.
+
+Texts longer than the limit of the channel (4096 characters in Telegram, 3000 per block in Slack) are shortened; every option stays a button.
 
 ## Delivery, retries and the journal
 
@@ -70,10 +117,11 @@ The same journal, the state of every channel and the parameters of the connectio
 
 ## Network
 
-Calls to Telegram use the proxy of the [`network`](../configuration/network.md) section, or `HTTPS_PROXY` of the daemon environment. `AIP_TELEGRAM_API` of the daemon environment replaces `https://api.telegram.org`, for a private Bot API server.
+Calls to Telegram and Slack, and the Socket Mode connection, use the proxy of the [`network`](../configuration/network.md) section, or `HTTPS_PROXY` of the daemon environment. `AIP_TELEGRAM_API` of the daemon environment replaces `https://api.telegram.org`, for a private Bot API server; `AIP_SLACK_API` replaces `https://slack.com/api`.
 
 ## Errors
 
 - **401** — the token is wrong or revoked. Polling stops until you replace the secret or enable the connection again.
 - **409** — the bot has a webhook or another program polls it. Delete the webhook of the bot (`deleteWebhook`) or stop the other poller; the daemon asks again once a minute.
 - A subscription to a connection without `chat_id` cannot be enabled; if `chat_id` is removed later, its messages fail with the reason `chat_id is not set`.
+- Slack `invalid_auth` — a token is wrong or revoked; the connection stops until you replace the secret or enable it again. `not_in_channel` — invite the app to the channel; the message is `failed` without retries.

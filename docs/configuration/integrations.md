@@ -1,6 +1,6 @@
 # Integrations
 
-An integration is a local *connection* of a project (or of all projects) to an external system. This version ships the registry, the secret storage and the safe entry and exit points, and one built-in kind: `telegram`, a chat for [notifications](../usage/notifications.md). Nothing listens on a new port; a connection reaches out only while it is enabled.
+An integration is a local *connection* of a project (or of all projects) to an external system. This version ships the registry, the secret storage and the safe entry and exit points, and two built-in kinds: `telegram` and `slack`, chats for [notifications](../usage/notifications.md). Nothing listens on a new port; a connection reaches out only while it is enabled.
 
 A connection has a kind, a name (unique per kind in its scope), non-secret parameters and secret slots. A project can have several connections of one kind (two accounts). Connections live in the daemon's SQLite database; **secrets never do**.
 
