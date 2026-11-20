@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
 import { formatApply, formatGroup, formatRunQueued, formatRunList } from '../format/index.ts';
 import { repositoryArgument } from '../ipc/client/index.ts';
 import type { ApplyResult, GroupView, RunQueued, RunView } from '../ipc/contract/index.ts';
-import { attempt } from './tools.ts';
+import { ALLOW_DUPLICATE, attempt, hintDuplicate, HOST_DUPLICATE_HINT } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
+import { deliveryFields } from './host-queue.ts';
 import { linkInputs, present } from './host-links.ts';
 
 export function registerRun(kit: HostKit): void {
@@ -15,7 +15,7 @@ export function registerRun(kit: HostKit): void {
     {
       title: 'Queue a swarm task',
       description:
-        'Queue a pipeline from the aip/ configuration in a git repository: the task goes to the end of the repository queue, a stopped queue is started, and the run is created when the queue takes the task (the answer says whether it already exists). Pass either task (one text; the pipeline may split it into groups) or groups (explicit list). The run works in its own branches; your working copy is not changed.',
+        'Queue a pipeline from the aip/ configuration in a git repository: the task goes to the end of the repository queue, a stopped queue is started, and the run is created when the queue takes the task (the answer says whether it already exists). Pass either task (one text; the pipeline may split it into groups) or groups (explicit list). The run works in its own branches; your working copy is not changed. A copy of a task that already waits in the queue is refused: the error names the waiting task.',
       inputSchema: {
         pipeline: z.string().describe('Pipeline id from the aip/ configuration'),
         task: z.string().optional().describe('One task text'),
@@ -28,18 +28,7 @@ export function registerRun(kit: HostKit): void {
           .string()
           .optional()
           .describe('Short title of the run, at most 60 characters; otherwise a model names it'),
-        autoDeliver: z
-          .boolean()
-          .optional()
-          .describe(
-            'Deliver merged groups automatically; omit to follow delivery.auto of the configuration',
-          ),
-        deliveryMode: z
-          .enum(DELIVERY_MODES)
-          .optional()
-          .describe(
-            'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
-          ),
+        ...deliveryFields,
         tags,
         parent,
         variant,
@@ -48,6 +37,7 @@ export function registerRun(kit: HostKit): void {
         after,
         links: linkInputs,
         attachments,
+        allowDuplicate: z.boolean().optional().describe(ALLOW_DUPLICATE),
       },
     },
     ({
@@ -66,24 +56,28 @@ export function registerRun(kit: HostKit): void {
       after: afterIds,
       links: taskLinks,
       attachments: files,
+      allowDuplicate,
     }) =>
       attempt(async () => {
-        const queued = (await options.send('run', {
-          repository: repo === undefined ? options.cwd : repositoryArgument(repo, options.cwd),
-          pipeline,
-          ...present({ variant: variantId, provider: providerId }),
-          ...(task !== undefined ? { task } : {}),
-          ...(groups !== undefined ? { groups } : {}),
-          ...(title !== undefined ? { title } : {}),
-          ...(autoDeliver !== undefined ? { autoDeliver } : {}),
-          ...(deliveryMode !== undefined ? { deliveryMode } : {}),
-          ...(tagNames !== undefined ? { tags: tagNames } : {}),
-          ...(parentRef !== undefined ? { parent: parentRef } : {}),
-          ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
-          ...(afterIds !== undefined ? { after: afterIds } : {}),
-          ...(taskLinks !== undefined ? { links: taskLinks } : {}),
-          ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
-        })) as RunQueued;
+        const send = () =>
+          options.send('run', {
+            repository: repo === undefined ? options.cwd : repositoryArgument(repo, options.cwd),
+            pipeline,
+            ...present({ variant: variantId, provider: providerId }),
+            ...(task !== undefined ? { task } : {}),
+            ...(groups !== undefined ? { groups } : {}),
+            ...(title !== undefined ? { title } : {}),
+            ...(autoDeliver !== undefined ? { autoDeliver } : {}),
+            ...(deliveryMode !== undefined ? { deliveryMode } : {}),
+            ...(tagNames !== undefined ? { tags: tagNames } : {}),
+            ...(parentRef !== undefined ? { parent: parentRef } : {}),
+            ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
+            ...(afterIds !== undefined ? { after: afterIds } : {}),
+            ...(taskLinks !== undefined ? { links: taskLinks } : {}),
+            ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
+            ...(allowDuplicate !== undefined ? { allowDuplicate } : {}),
+          });
+        const queued = (await hintDuplicate(HOST_DUPLICATE_HINT, send)) as RunQueued;
         return withData(formatRunQueued(queued), queued);
       }),
   );

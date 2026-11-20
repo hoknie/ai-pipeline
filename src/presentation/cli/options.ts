@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 
 import { parse as parseYaml } from 'yaml';
 
+import { DUPLICATE_TASK_CODE } from '../../feature/queue/types/index.ts';
 import { DELIVERY_MODES, type DeliveryMode } from '../../feature/swarm-config/types/index.ts';
+import { IpcError } from '../ipc/client/index.ts';
 import { proposedGroupSchema } from '../ipc/contract/index.ts';
 
 import type { Command } from 'commander';
@@ -109,4 +111,22 @@ export async function authorParameter(
   const found = users.find((user) => user.email.toLowerCase() === email);
   if (found === undefined) throw usage(`unknown user "${options.author}"`);
   return { author: found.id };
+}
+
+/** The help text of `--allow-duplicate`. */
+export const ALLOW_DUPLICATE_HELP =
+  'add the task even when the same one already waits in the queue; without it a copy is refused';
+
+/** Adds the way around to the refusal of a task that already waits in the queue. */
+export async function withDuplicateHint<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof IpcError && error.remoteCode === DUPLICATE_TASK_CODE) {
+      throw new IpcError(`${error.message}; pass --allow-duplicate to add it again`, {
+        code: error.remoteCode,
+      });
+    }
+    throw error;
+  }
 }

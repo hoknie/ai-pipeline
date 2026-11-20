@@ -33,7 +33,7 @@ async function setup() {
   return { post, queue };
 }
 
-const task = { pipeline: 'feature', task: 'work' };
+const task = { pipeline: 'feature', task: 'work', allowDuplicate: true };
 
 describe('links in the panel', () => {
   it('passes links of a new task and of an edit to the daemon', async () => {
@@ -51,6 +51,20 @@ describe('links in the panel', () => {
     expect(edited.status).toBe(200);
     view = await queue();
     expect(view.items[1]!.links).toEqual([]);
+  });
+
+  it('answers a copy of a waiting task with 409 and the code duplicate_task', async () => {
+    const { post, queue } = await setup();
+    const fresh = { pipeline: 'feature', task: 'fix the login' };
+    expect((await post('/api/queue/items', fresh)).status).toBe(200);
+    const refused = await post('/api/queue/items', fresh);
+    expect(refused.status).toBe(409);
+    const body = (await refused.json()) as { error: string; code?: string };
+    expect(body.code).toBe('duplicate_task');
+    expect(body.error).toContain('task #1 (');
+    expect((await queue()).items).toHaveLength(1);
+    expect((await post('/api/queue/items', { ...fresh, allowDuplicate: true })).status).toBe(200);
+    expect((await queue()).items).toHaveLength(2);
   });
 
   it('links and unlinks two tasks through /api/tasks/link and /api/tasks/unlink', async () => {

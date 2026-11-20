@@ -51,6 +51,7 @@ async function add(h: Harness, title: string): Promise<string> {
     repository: h.repo,
     pipeline: 'feature',
     task: 'work',
+    allowDuplicate: true,
     title,
   })) as QueueView & { item: string };
   return view.item;
@@ -201,6 +202,7 @@ describe('a usage limit of a provider of a by_provider chain', () => {
       repository: h.repo,
       pipeline: 'feature',
       task: 'work',
+      allowDuplicate: true,
     })) as RunCreated;
     const final = await h.waitFor(created.runId, (view) => view.finished);
     expect(final.groups[0]?.status).toBe('merged');
@@ -216,6 +218,7 @@ describe('a run with a provider', () => {
       repository: h.repo,
       pipeline: 'feature',
       task: 'work',
+      allowDuplicate: true,
       provider: 'zai',
     })) as RunCreated;
     const final = await h.waitFor(created.runId, (view) => view.finished);
@@ -238,6 +241,7 @@ describe('a run with a provider', () => {
       repository: h.repo,
       pipeline: 'feature',
       task: 'work',
+      allowDuplicate: true,
       provider: 'anthropic',
     })) as RunCreated;
     const waiting = await h.waitFor(

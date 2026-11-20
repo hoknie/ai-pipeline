@@ -125,7 +125,16 @@ describe('agy launches', () => {
       launch.files.find((file) => file.path.endsWith('/policy.json'))!.content,
     );
     expect(policy.tools).toContain('swarm_queue_add');
+    expect(policy.tools).toContain('swarm_queue_edit');
+    expect(policy.tools).toContain('swarm_queue_remove');
     expect(policy.tools).toContain('swarm_repair_retry');
+    const plain = JSON.parse(
+      runtime.buildLaunch(agyContext()).files.find((file) => file.path.endsWith('/policy.json'))!
+        .content,
+    );
+    for (const tool of ['add', 'edit', 'remove']) {
+      expect(plain.tools).not.toContain(`swarm_queue_${tool}`);
+    }
   });
 
   it('takes the environment executable over the settings and preserves args for naming too', () => {

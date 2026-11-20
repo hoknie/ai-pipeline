@@ -40,6 +40,7 @@ const queueAddParams = z
     links: linkInputs.optional(),
     postponed: z.boolean().optional(),
     attachments: attachmentSources.optional(),
+    allowDuplicate: z.boolean().optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
@@ -61,6 +62,7 @@ const queueAddProjectsParams = z
     notes: z.record(queueRepository, z.string()).optional(),
     tag: z.string().optional(),
     chain: z.boolean().optional(),
+    allowDuplicate: z.boolean().optional(),
     // Declared only to be refused with a clear message: stripped keys would be dropped silently.
     groups: z.unknown().optional(),
     attachments: z.unknown().optional(),
@@ -69,7 +71,10 @@ const queueAddProjectsParams = z
     message: 'groups and attachments are not supported for several projects',
   });
 
-/** A task added by a specialist: the repository is the one of the run the token belongs to. */
+/**
+ * A task added by a specialist: the repository is the one of the run the token belongs to. It has
+ * no `allowDuplicate`: a specialist changes or removes the waiting task instead.
+ */
 export const workerQueueAddParams = z
   .object({
     token: z.string().min(1),
@@ -88,6 +93,40 @@ export const workerQueueAddParams = z
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
   });
+
+/**
+ * A waiting task of its run a specialist changes: the fields it sets when it adds a task. Tags, the
+ * parent, the position, `postponed` and attachments are not among them and are dropped.
+ */
+export const workerQueueEditParams = z
+  .object({
+    token: z.string().min(1),
+    item: queueItem,
+    pipeline: z.string().min(1).optional(),
+    variant: variantId.optional(),
+    provider: providerId.nullable().optional(),
+    task: queueTask.optional(),
+    groups: z.array(proposedGroupSchema).min(1).optional(),
+    title: queueTitle.nullable().optional(),
+    autoDeliver: z.boolean().nullable().optional(),
+    deliveryMode: deliveryModeSchema.nullable().optional(),
+    skip: skipSteps.optional(),
+    after: afterIds.optional(),
+    links: linkInputs.optional(),
+  })
+  .refine((params) => params.task === undefined || params.groups === undefined, {
+    message: 'pass either task or groups',
+  })
+  .refine(
+    ({ token: _token, item: _item, ...fields }) =>
+      Object.values(fields).some((value) => value !== undefined),
+    { message: 'pass at least one field to change' },
+  );
+
+export const workerQueueRemoveParams = z.object({
+  token: z.string().min(1),
+  item: queueItem,
+});
 
 const queueEditParams = z
   .object({
@@ -198,6 +237,8 @@ export const queueRequests = [
     params: z.object({ repository: queueRepository, item: queueItem }),
   }),
   z.object({ method: z.literal('worker_queue_add'), params: workerQueueAddParams }),
+  z.object({ method: z.literal('worker_queue_edit'), params: workerQueueEditParams }),
+  z.object({ method: z.literal('worker_queue_remove'), params: workerQueueRemoveParams }),
   z.object({ method: z.literal('task_link'), params: taskLinkParams }),
   z.object({ method: z.literal('task_unlink'), params: taskLinkParams }),
 ] as const;

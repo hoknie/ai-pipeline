@@ -14,7 +14,7 @@ allow_commands: ["npm test*"]
 tools: [WebFetch]         # tools on top of the set for the permission level
 skills: [grill-me, "review:pr"]
 max: 1                    # at most one such specialist at a time
-queue: false              # true: may add tasks to the queue (swarm_queue_add)
+queue: false              # true: may add tasks to the queue and correct them
 tags: [planning, review]  # labels for the panel; do not affect runs
 prompt: |
   Write a plan: %s
@@ -166,7 +166,7 @@ mcp:
 
 ## Queueing tasks
 
-`queue: true` gives the specialist the MCP tool [`swarm_queue_add`](../hosts/mcp-tools.md#tools-of-a-specialist). The field cannot be set in `defaults`. For Claude the tool is allowed in advance at every permission level.
+`queue: true` gives the specialist the MCP tools [`swarm_queue_add`, `swarm_queue_edit` and `swarm_queue_remove`](../hosts/mcp-tools.md#tools-of-a-specialist). The field cannot be set in `defaults`. For Claude the tools are allowed in advance at every permission level.
 
 - The tool puts a task at the end of the queue of the run's repository, not of its own worktree. The queue does not start.
 - Parameters: `pipeline`, `task` or `groups`, an optional `title`, and `after`.
@@ -174,6 +174,10 @@ mcp:
 - The last step of a pipeline can pass results on, for example by queueing a `feature` task for each prepared change.
 - An unknown pipeline, invalid parameters, or a call after the attempt has ended return an error to the specialist.
 - The task gets [tags automatically](../usage/tags.md#tags-of-tasks-a-specialist-queues); a specialist cannot set them.
+- A copy of a task that already waits in the queue [is refused](../usage/queue.md#adding-and-ordering-tasks), and a specialist cannot override it. The error names the waiting task: the specialist changes or removes that one.
+- `swarm_queue_edit` changes and `swarm_queue_remove` removes a waiting task of the specialist's run: a task whose parent is this run. Any specialist of the run with `queue: true` can do it, also at a later step.
+- `swarm_queue_edit` takes `item` and the fields to change: `pipeline`, `variant`, `provider`, `task` or `groups`, `title`, `autoDeliver`, `deliveryMode`, `skip`, `after`, `links`. The parent stays the run.
+- A task of a person or of another run, and a task that has become a run, is refused. A person who sets a running run as the [parent](../usage/tags.md#parent-of-a-task) of a task hands that task to the specialists of the run.
 
 ## Tags
 

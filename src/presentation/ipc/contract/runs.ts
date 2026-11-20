@@ -79,6 +79,7 @@ const runParams = z
     after: afterIds.optional(),
     links: linkInputs.optional(),
     attachments: attachmentSources.optional(),
+    allowDuplicate: z.boolean().optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',

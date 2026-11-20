@@ -31,7 +31,8 @@ interface Action {
   split?: { title: string; task: string }[];
   /**
    * Calls swarm_queue_add with these arguments; its text result goes to queued.jsonl. `$last` in
-   * `after` stands for the id on the last line of queued.jsonl.
+   * `after` stands for the id on the last line of queued.jsonl, `$n` in a text for the number of
+   * its lines.
    */
   queue?: Record<string, unknown>;
   /**
@@ -39,6 +40,13 @@ interface Action {
    * previous call returned. The results go to queued.jsonl.
    */
   queueChain?: Record<string, unknown>[];
+  /**
+   * Calls the queue tools of a specialist in order: `swarm_queue_add`, `swarm_queue_edit` or
+   * `swarm_queue_remove`. `$1`, `$2`… in `item`, `after` and the targets of `links` stand for the id the first, second…
+   * `swarm_queue_add` of this list returned, `$last` for the id the last one of an earlier attempt
+   * returned. The results go to queued.jsonl.
+   */
+  queueTools?: { name: string; arguments: Record<string, unknown> }[];
   /**
    * Reports through the real worker MCP server (`aip mcp --worker`) instead of sending the same
    * requests straight to the daemon socket, which is the default: starting a node process for
@@ -228,6 +236,13 @@ function connectDirect(workerArgs: string[]) {
           await ipc(socket, 'split', { token, groups });
           return toolText(
             `Recorded ${groups.length} group(s). Call swarm_report when you are done.`,
+          );
+        }
+        if (request.name === 'swarm_queue_edit' || request.name === 'swarm_queue_remove') {
+          const change = request.name === 'swarm_queue_edit' ? 'edit' : 'remove';
+          await ipc(socket, `worker_queue_${change}`, { token, ...input });
+          return toolText(
+            `${change === 'edit' ? 'Changed' : 'Removed'} ${String(input.item)}. Call swarm_report when you are done.`,
           );
         }
         if ((input.task === undefined) === (input.groups === undefined))
@@ -658,6 +673,17 @@ if (!action.noReport) {
   }
   if (action.split)
     await client.callTool({ name: 'swarm_split', arguments: { groups: action.split } });
+  // `$n` in a task text is the number of calls already written to queued.jsonl: a script entry
+  // that several attempts repeat queues a different task each time, not a copy.
+  const numbered = <T>(value: T): T => {
+    let lines = 0;
+    try {
+      lines = readFileSync(join(state, 'queued.jsonl'), 'utf8').trim().split('\n').length;
+    } catch {
+      // nothing queued yet
+    }
+    return JSON.parse(JSON.stringify(value).replaceAll('$n', String(lines))) as T;
+  };
   if (action.queue) {
     const lastQueued = (() => {
       try {
@@ -673,7 +699,10 @@ if (!action.noReport) {
           after: action.queue.after.map((id) => (id === '$last' ? lastQueued : id)),
         }
       : action.queue;
-    const queued = await client.callTool({ name: 'swarm_queue_add', arguments: queueArguments });
+    const queued = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: numbered(queueArguments),
+    });
     appendFileSync(join(state, 'queued.jsonl'), `${JSON.stringify({ step, group, queued })}\n`);
   }
   if (action.queueChain) {
@@ -684,10 +713,52 @@ if (!action.noReport) {
         : undefined;
       const queued = (await client.callTool({
         name: 'swarm_queue_add',
-        arguments: { ...entry, ...(after ? { after } : {}) },
+        arguments: numbered({ ...entry, ...(after ? { after } : {}) }),
       })) as { content?: { text?: string }[] };
       previous = /Queued (\S+)/.exec(queued.content?.[0]?.text ?? '')?.[1] ?? previous;
       appendFileSync(join(state, 'queued.jsonl'), `${JSON.stringify({ step, group, queued })}\n`);
+    }
+  }
+  if (action.queueTools) {
+    const added: string[] = [];
+    // `$last`: the id the last `swarm_queue_add` of an earlier attempt returned
+    let last = '';
+    try {
+      const lines = readFileSync(join(state, 'queued.jsonl'), 'utf8').trim().split('\n');
+      last = lines.map((line) => /Queued (\S+) for/.exec(line)?.[1]).findLast(Boolean) ?? '';
+    } catch {
+      // nothing queued yet
+    }
+    const resolve = (value: unknown): unknown => {
+      if (value === '$last') return last;
+      return typeof value === 'string' && /^\$\d+$/.test(value)
+        ? (added[Number(value.slice(1)) - 1] ?? value)
+        : value;
+    };
+    for (const call of action.queueTools) {
+      const { item, after, links } = call.arguments;
+      const queued = (await client.callTool({
+        name: call.name,
+        arguments: {
+          ...call.arguments,
+          ...(item === undefined ? {} : { item: resolve(item) }),
+          ...(Array.isArray(after) ? { after: after.map(resolve) } : {}),
+          ...(Array.isArray(links)
+            ? {
+                links: (links as { kind: string; target: unknown }[]).map((link) => ({
+                  ...link,
+                  target: resolve(link.target),
+                })),
+              }
+            : {}),
+        },
+      })) as { content?: { text?: string }[]; isError?: boolean };
+      const id = /Queued (\S+)/.exec(queued.content?.[0]?.text ?? '')?.[1];
+      if (call.name === 'swarm_queue_add') added.push(queued.isError ? '' : (id ?? ''));
+      appendFileSync(
+        join(state, 'queued.jsonl'),
+        `${JSON.stringify({ step, group, name: call.name, queued })}\n`,
+      );
     }
   }
   const verdict = action.verdict ?? 'done';

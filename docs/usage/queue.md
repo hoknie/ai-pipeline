@@ -19,6 +19,7 @@ aip queue add feature --task "Later" --postpone      # postponed: a running queu
 
 - `aip queue list --all` prints the queue of every enabled project under a heading with its name and slug, ordered by name; a project without a queue shows an empty stopped one. With `--json` it prints an array of queues. It cannot be combined with `--repo`. Without enabled projects it prints `No enabled projects`.
 - `aip queue add` does not start the queue. `aip run start` starts a stopped queue and lifts the pause.
+- A copy of a waiting task is refused: the same pipeline, variant and provider with the same text or the same groups. The error names the waiting task. `--allow-duplicate` on `aip queue add` and `aip run start` (MCP `allowDuplicate`) adds the copy. A task that already became a run is not compared, and an edit is not checked.
 - A waiting task shows when it was added (`added 2026-11-01 14:32`).
 - Delivery for one task is set with [`--delivery-mode` and `--auto-deliver`](../configuration/delivery.md#settings-for-one-task).
 - A task that has become a run can no longer be edited or removed from the queue. Manage the run with `aip run list` and `aip run cancel`.

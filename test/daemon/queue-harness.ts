@@ -37,6 +37,8 @@ export async function add(h: Harness, task: string, extra: Record<string, unknow
     // the fake agent counts its script per group: one task text makes the counter global
     task: 'work',
     title: task,
+    // so every task of a test is a copy of the first one, on purpose
+    allowDuplicate: true,
     ...extra,
   })) as QueueView & { item: string };
   return view;
@@ -76,5 +78,6 @@ export async function run_(h: Harness, title: string, after: string[]): Promise<
     task: 'work',
     title,
     after,
+    allowDuplicate: true,
   })) as RunQueued;
 }

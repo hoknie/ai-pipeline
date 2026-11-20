@@ -1,5 +1,9 @@
 import { AppError, invalid, type ErrorKind } from '../../platform/errors/index.ts';
 import { IpcError } from '../ipc/client/index.ts';
+import { DUPLICATE_TASK_CODE } from '../../feature/queue/types/index.ts';
+
+/** The `code` of the answer to a task whose copy already waits in the queue. */
+export const DUPLICATE_TASK_PANEL_CODE = 'duplicate_task';
 
 /** Kinds a panel error may have; each has one HTTP status. */
 export type PanelKind = Extract<
@@ -71,6 +75,9 @@ export function renderPanelError(error: unknown): {
           ...(error.remoteCode === undefined ? {} : { code: error.remoteCode }),
         },
       };
+    }
+    if (error.remoteCode === DUPLICATE_TASK_CODE) {
+      return { status: 409, body: { error: error.message, code: DUPLICATE_TASK_PANEL_CODE } };
     }
     return { status: daemonErrorStatus(error.message), body: { error: error.message } };
   }

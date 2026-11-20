@@ -247,10 +247,16 @@ describe('claude adapter', () => {
           ).args,
         );
         expect(allowed).toContain('mcp__aip__swarm_queue_add');
+        // the right to queue is also the right to correct the tasks of the run
+        expect(allowed).toContain('mcp__aip__swarm_queue_edit');
+        expect(allowed).toContain('mcp__aip__swarm_queue_remove');
         expect(allowed).toContain('mcp__aip__swarm_report');
       }
     }
-    expect(between(runtime.buildLaunch(context()).args)).not.toContain('mcp__aip__swarm_queue_add');
+    const plain = between(runtime.buildLaunch(context()).args);
+    for (const tool of ['add', 'edit', 'remove']) {
+      expect(plain).not.toContain(`mcp__aip__swarm_queue_${tool}`);
+    }
   });
 
   it('allows the artifact tool to every specialist in every edit mode', () => {

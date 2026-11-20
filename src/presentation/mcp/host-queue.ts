@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
-import { attempt } from './tools.ts';
+import { ALLOW_DUPLICATE, attempt, hintDuplicate, HOST_DUPLICATE_HINT } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
 import { linkInputs, present } from './host-links.ts';
 
@@ -19,6 +19,22 @@ export function registerQueue(kit: HostKit): void {
   );
 }
 
+/** How a new task is delivered: both follow the configuration when omitted. */
+export const deliveryFields = {
+  autoDeliver: z
+    .boolean()
+    .optional()
+    .describe(
+      'Deliver merged groups automatically; omit to follow delivery.auto of the configuration',
+    ),
+  deliveryMode: z
+    .enum(DELIVERY_MODES)
+    .optional()
+    .describe(
+      'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
+    ),
+};
+
 export function registerQueueAdd(kit: HostKit): void {
   const { server, tags, parent, variant, skip, after, attachments, repo, queueGroups, showQueue } =
     kit;
@@ -27,24 +43,13 @@ export function registerQueueAdd(kit: HostKit): void {
     {
       title: 'Add a task to the queue',
       description:
-        'Put a task at the end of the repository queue. Pass either task or groups. It does not start the queue: call swarm_queue_start.',
+        'Put a task at the end of the repository queue. Pass either task or groups. It does not start the queue: call swarm_queue_start. A copy of a task that already waits in the queue is refused: the error names the waiting task.',
       inputSchema: {
         pipeline: z.string().describe('Pipeline id from swarm.yaml'),
         task: z.string().optional().describe('One task text'),
         groups: queueGroups.optional(),
         title: z.string().optional().describe('Title of the run, at most 60 characters'),
-        autoDeliver: z
-          .boolean()
-          .optional()
-          .describe(
-            'Deliver merged groups automatically; omit to follow delivery.auto of the configuration',
-          ),
-        deliveryMode: z
-          .enum(DELIVERY_MODES)
-          .optional()
-          .describe(
-            'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
-          ),
+        ...deliveryFields,
         tags,
         parent,
         variant,
@@ -57,6 +62,7 @@ export function registerQueueAdd(kit: HostKit): void {
           .boolean()
           .optional()
           .describe('true: a running queue does not take the task until you clear the flag'),
+        allowDuplicate: z.boolean().optional().describe(ALLOW_DUPLICATE),
         repo,
       },
     },
@@ -76,24 +82,28 @@ export function registerQueueAdd(kit: HostKit): void {
       links: taskLinks,
       attachments: files,
       postponed,
+      allowDuplicate,
       repo: where,
     }) =>
       attempt(() =>
-        showQueue(
-          'queue_add',
-          {
-            pipeline,
-            ...present({ variant: variantId, provider: providerId }),
-            ...present({ task, groups, title }),
-            ...(autoDeliver !== undefined ? { autoDeliver } : {}),
-            ...(deliveryMode !== undefined ? { deliveryMode } : {}),
-            ...(tagNames !== undefined ? { tags: tagNames } : {}),
-            ...(parentRef !== undefined ? { parent: parentRef } : {}),
-            ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),
-            ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
-            ...(postponed !== undefined ? { postponed } : {}),
-          },
-          where,
+        hintDuplicate(HOST_DUPLICATE_HINT, () =>
+          showQueue(
+            'queue_add',
+            {
+              pipeline,
+              ...present({ variant: variantId, provider: providerId }),
+              ...present({ task, groups, title }),
+              ...(autoDeliver !== undefined ? { autoDeliver } : {}),
+              ...(deliveryMode !== undefined ? { deliveryMode } : {}),
+              ...(tagNames !== undefined ? { tags: tagNames } : {}),
+              ...(parentRef !== undefined ? { parent: parentRef } : {}),
+              ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),
+              ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
+              ...(postponed !== undefined ? { postponed } : {}),
+              ...(allowDuplicate !== undefined ? { allowDuplicate } : {}),
+            },
+            where,
+          ),
         ),
       ),
   );

@@ -137,6 +137,8 @@ export interface QueueProjectsFields {
   task: string;
   title?: string;
   postponed?: boolean;
+  /** Only `true` is sent: the task is added where its copy already waits. */
+  allowDuplicate?: boolean;
   autoDeliver?: boolean;
   deliveryMode?: DeliveryMode;
   skip?: string[];
@@ -182,6 +184,8 @@ export interface QueueFields {
   links?: LinkInput[];
   /** Run id or task number; the task gets the linked task tag of that run. */
   parent?: string | null;
+  /** Only `true` is sent: a new task is added though its copy already waits in the queue. */
+  allowDuplicate?: boolean;
   /** Ids of the files uploaded before; they become the attachments of the task. */
   uploads?: string[];
   /** Names of attachments to remove; an edit only. */

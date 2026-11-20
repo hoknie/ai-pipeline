@@ -145,7 +145,15 @@ export const queueHandlers = {
   queue_dismiss: async (params, context) =>
     queueAnswer(context, await context.services.queue.control.dismiss(params)),
   worker_queue_add: async (params, context) => {
-    const { queue, item } = await context.services.queue.items.workerAdd(params);
+    const { queue, item } = await context.services.queue.worker.add(params);
+    return { ...queueAnswer(context, queue), item };
+  },
+  worker_queue_edit: async (params, context) => {
+    const { queue, item } = await context.services.queue.worker.edit(params);
+    return { ...queueAnswer(context, queue), item };
+  },
+  worker_queue_remove: async (params, context) => {
+    const { queue, item } = await context.services.queue.worker.remove(params);
     return { ...queueAnswer(context, queue), item };
   },
   task_link: (params, context) =>

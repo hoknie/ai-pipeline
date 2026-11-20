@@ -239,6 +239,7 @@ describe('run goes through the queue', () => {
       repository: h.repo,
       pipeline: 'feature',
       task: 'work',
+      allowDuplicate: true,
       ...extra,
     } as never) as Promise<RunQueued>;
 

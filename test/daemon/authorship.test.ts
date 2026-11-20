@@ -55,7 +55,7 @@ async function signIn(h: Harness, email: string): Promise<string> {
 }
 
 const task = (extra: Record<string, unknown> = {}) =>
-  ({ repository: '', pipeline: 'feature', task: 'work', ...extra }) as never;
+  ({ repository: '', pipeline: 'feature', task: 'work', allowDuplicate: true, ...extra }) as never;
 
 describe('the author of a task and of a run', () => {
   it('is the user who added the task; an edit by another user does not change it', async () => {

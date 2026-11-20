@@ -2,6 +2,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { DUPLICATE_TASK_CODE } from '../../src/feature/queue/types/index.ts';
+import { IpcError } from '../../src/presentation/ipc/client/index.ts';
 import { createHostServer } from '../../src/presentation/mcp/host.ts';
 import { groupView, runView } from '../../src/presentation/ipc/views/index.ts';
 import type { QueueView } from '../../src/presentation/ipc/contract/index.ts';
@@ -1150,5 +1152,39 @@ describe('host MCP attachments', () => {
         },
       },
     ]);
+  });
+  it('adds the way out to the refusal of a copy and passes allowDuplicate only when given', async () => {
+    const calls: { method: string; params: Record<string, unknown> }[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      if (params.allowDuplicate === true) {
+        return method === 'run' ? { item: 'q1', number: 1, run: null, queue: VIEW } : VIEW;
+      }
+      throw new IpcError(
+        'task #12 (q1) with the same pipeline and task already waits in the queue',
+        { code: DUPLICATE_TASK_CODE },
+      );
+    });
+    const copy = { pipeline: 'feature', task: 'Build the login' };
+    for (const name of ['swarm_queue_add', 'swarm_run']) {
+      const refused = await client.callTool({ name, arguments: copy });
+      expect(refused.isError).toBe(true);
+      expect(textOf(refused)).toContain('task #12 (q1)');
+      expect(textOf(refused)).toContain('allowDuplicate');
+      const added = await client.callTool({ name, arguments: { ...copy, allowDuplicate: true } });
+      expect(added.isError).not.toBe(true);
+    }
+    expect(calls.map((call) => [call.method, call.params.allowDuplicate])).toEqual([
+      ['queue_add', undefined],
+      ['queue_add', true],
+      ['run', undefined],
+      ['run', true],
+    ]);
+    const { tools } = await client.listTools();
+    for (const name of ['swarm_queue_add', 'swarm_run']) {
+      const tool = tools.find((one) => one.name === name);
+      expect(tool?.description).toContain('already waits in the queue is refused');
+      expect(tool?.inputSchema.properties).toHaveProperty('allowDuplicate');
+    }
   });
 });

@@ -64,6 +64,7 @@ async function addIn(
     repository,
     pipeline: 'feature',
     task: 'work',
+    allowDuplicate: true,
     title,
     ...extra,
   })) as { item: string };
@@ -416,6 +417,7 @@ describe('the global queue moves', () => {
       repository: h.repo,
       pipeline: 'feature',
       task: 'work',
+      allowDuplicate: true,
     })) as { queue: AnyQueue };
     expect(queued.queue.scope).toBe('global');
     await waitGlobal(h, (view) => view.items.length === 0 && view.runs.length === 0);

@@ -50,6 +50,8 @@ const addProjects = async (h: Harness, params: Record<string, unknown>): Promise
   (await h.call('queue_add_projects', {
     pipeline: 'feature',
     task: 'Email field in the profile',
+    // the tests add the same task several times, on purpose
+    allowDuplicate: true,
     ...params,
   } as never)) as Added[];
 
@@ -84,10 +86,36 @@ describe('a task in several projects', () => {
     }
   });
 
+  it('refuses the whole request when the task already waits in one of the projects', async () => {
+    const { h, lib, web } = await twoProjects();
+    const waiting = (await h.call('queue_add', {
+      repository: lib,
+      pipeline: 'feature',
+      task: 'Email field in the profile',
+    })) as QueueView & { item: string };
+    await expect(
+      addProjects(h, { repositories: ['web', 'lib'], allowDuplicate: false }),
+    ).rejects.toThrow(
+      `task #1 (${waiting.item}) with the same pipeline and task already waits in the queue of project \`lib\``,
+    );
+    expect((await queueIn(h, web)).items).toEqual([]);
+    expect((await queueIn(h, lib)).items).toHaveLength(1);
+    // asked for, the copy is added to both
+    await addProjects(h, { repositories: ['web', 'lib'], allowDuplicate: true });
+    expect((await queueIn(h, lib)).items).toHaveLength(2);
+    expect((await queueIn(h, web)).items).toHaveLength(1);
+  });
+
   it('puts the items at the end of the queues', async () => {
     const { h, lib } = await twoProjects();
     for (const title of ['A', 'B']) {
-      await h.call('queue_add', { repository: lib, pipeline: 'feature', task: 'x', title });
+      await h.call('queue_add', {
+        repository: lib,
+        pipeline: 'feature',
+        task: 'x',
+        title,
+        allowDuplicate: true,
+      });
     }
     const [first] = await addProjects(h, { repositories: ['lib', 'web'] });
     const queue = await queueIn(h, lib);

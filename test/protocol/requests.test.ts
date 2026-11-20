@@ -137,6 +137,8 @@ const SAMPLES: Record<Method, unknown> = {
   web_stop: {},
   report: { token: 't', verdict: 'done', summary: 'done' },
   worker_queue_add: { token: 't', pipeline: 'feature', task: 'do it' },
+  worker_queue_edit: { token: 't', item: 'q1', title: 'Fix' },
+  worker_queue_remove: { token: 't', item: 'q1' },
   artifact_publish: { token: 't', fileName: 'a.md', content: 'text' },
   split: { token: 't', groups: [{ title: 'a', task: 'b' }] },
   worker_run_show: { token: 't', run: '#1' },
@@ -220,9 +222,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 149 methods, each in the request schema once', () => {
+  it('has 151 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(149);
+    expect(methods).toHaveLength(151);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

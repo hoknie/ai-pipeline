@@ -10,7 +10,7 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 
 | Tool | Parameters | What it does |
 |---|---|---|
-| `swarm_run` | `pipeline`, `task` or `groups[{title, task}]`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `attachments?`, `repo?` | Puts a task at the end of the repository's queue and starts a stopped queue. The answer is `{item, run, queue}`. `run` is the created run, or `null` if the task waits |
+| `swarm_run` | `pipeline`, `task` or `groups[{title, task}]`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `attachments?`, `allowDuplicate?`, `repo?` | Puts a task at the end of the repository's queue and starts a stopped queue. The answer is `{item, run, queue}`. `run` is the created run, or `null` if the task waits |
 | `swarm_status` | `run_id?` | Without `run_id`, the active runs and the 10 latest; with `run_id`, the table of groups |
 | `swarm_group` | `run_id`, `group`, `tail_lines?` | Step attempts, verdicts, remarks, tokens and the tail of the log |
 | `swarm_cancel` | `run_id`, `group?` | Stops a group or a whole run |
@@ -22,7 +22,7 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 | `swarm_mark_delivered` | `run_id`, `groups?` | Marks merged groups as delivered when you merged them by hand (the command is `aip run mark-delivered`) |
 | `swarm_queue` | `repo?` | The queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order with their readiness and predecessors, and the runs that hold a place |
 | `swarm_run_provider` | `run_id`, `provider` (`null`: none) | Switches a run that is not finished to another provider of the tiers; a running step on a tier whose item changes is stopped without a commit and starts again. Resetting to `null` does not stop a running step |
-| `swarm_queue_add` | `pipeline`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `links?`, `attachments?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
+| `swarm_queue_add` | `pipeline`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `links?`, `attachments?`, `postponed?`, `allowDuplicate?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
 | `swarm_queue_edit` | `item`, `pipeline?`, `variant?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `links?`, `postponed?`, `position?`, `repo?` | Changes or moves a waiting task (1 is first). `deliveryMode: null` follows the config. `after`, `skip`, `links` replace the list, `[]` clears it. A returned run's task takes only `skip`, `after`, `position` |
 | `swarm_queue_remove` | `item`, `repo?` | Removes a waiting task |
 | `swarm_queue_start` | `parallel?`, `repo?` | Starts the queue and continues one that stopped on a problem |
@@ -38,6 +38,7 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 - `links` of `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` is a list of `{kind, target}` (`blocked_by`, `parent`, `related`, `duplicates`). It cannot be combined with `after` or `parent`; an edit replaces every link.
 - `swarm_task_link` and `swarm_task_unlink` (`source`, `kind`, `target`, `repo?`) add or remove one link. A task a specialist queues gets a `parent` link to its run. See [task links](../usage/queue.md#task-links).
 - `parent` of `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` takes a run id or a task number; `null` on edit removes it. See [Parent of a task](../usage/tags.md#parent-of-a-task).
+- `allowDuplicate: true` of `swarm_run` and `swarm_queue_add` adds a task whose [copy already waits](../usage/queue.md#adding-and-ordering-tasks) in the queue; without it the copy is refused and the error names the waiting task.
 - Queue behaviour, `after` and `skip` are described in [usage/queue.md](../usage/queue.md). Tags are in [usage/tags.md](../usage/tags.md); the tag catalog cannot be managed through MCP.
 
 ## Tools of a specialist
@@ -51,10 +52,14 @@ Specialists inside a run get their own MCP server (`aip mcp --worker`) with othe
 | `swarm_run_show` | Every step | Reads a run of the same repository without changing it: `run` (id, task number `#333` or a panel link `…#runs/<id>[/<group>]`), `group?`, `tail_lines?` |
 | `swarm_split` | The split step | Proposes the [groups](../configuration/pipelines.md#split) of a task |
 | `swarm_queue_add` | A specialist with [`queue: true`](../configuration/specialists.md#queueing-tasks) | Puts a task in the queue of the run's repository: `pipeline`, `task` or `groups`, `title?`, `deliveryMode?`, `variant?`, `skip?`, `after?`, `links?` (no `parent`) |
+| `swarm_queue_edit` | A specialist with `queue: true` | Changes a waiting task of the specialist's run: `item` and at least one of `pipeline`, `variant`, `provider`, `task` or `groups`, `title`, `autoDeliver`, `deliveryMode`, `skip`, `after`, `links` (no `parent`) |
+| `swarm_queue_remove` | A specialist with `queue: true` | Removes a waiting task of the specialist's run: `item` |
 
 `swarm_run_show` shows only runs of the repository the specialist's run belongs to; any other run is refused. Without a group it returns the run overview and the full task of every group, with a group (from the parameter or from the link) every attempt of the group and the tail of its latest log.
 
 `swarm_queue_add` of a specialist works with the repository of the run, not with the directory where the specialist works. The task always gets the [linked task tag](../usage/tags.md#tags-of-tasks-a-specialist-queues) of its run. A predecessor id from an earlier answer keeps working after that item has started, because it then points to its run.
+
+A copy of a waiting task is refused. `swarm_queue_edit` and `swarm_queue_remove` take only the waiting tasks whose parent is the specialist's run; see [Queueing tasks](../configuration/specialists.md#queueing-tasks).
 
 ## Run data
 

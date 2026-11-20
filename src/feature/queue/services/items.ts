@@ -11,15 +11,15 @@ import {
   DEFAULT_VARIANT,
   checkVariant,
   findPipeline,
-  findSpecialist,
   providerProblem,
   variantSkip,
 } from '../../swarm-config/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
-import { knownTags, mergeTags, resolveManualTags } from '../../tags/types/index.ts';
+import { mergeTags, resolveManualTags } from '../../tags/types/index.ts';
 import {
   addItem,
   queueItemId,
+  refuseDuplicate,
   removeItem,
   startQueue,
   type Enqueued,
@@ -30,7 +30,6 @@ import {
   type QueueChange,
   type LinkPlan,
   type TaskFields,
-  type WorkerTaskRequest,
 } from '../types/index.ts';
 
 import type { QueueAdvance } from './advance.ts';
@@ -90,6 +89,7 @@ export class QueueItems {
     const { after } = plan;
     const manual = resolveManualTags(tags.of(repository), params.tags ?? []);
     const { postponed: _postponed, ...task } = fields({ ...params, after });
+    refuseDuplicate(queue, task, params.allowDuplicate);
     if (plan.parent !== null) this.checkNewItem(queue, task, moment);
     const parentTag = await links.parentTag(repository, plan.parent);
     const own = mergeTags(parentTag ? [parentTag.id] : [], manual);
@@ -163,59 +163,6 @@ export class QueueItems {
     return store.save(queue);
   }
 
-  /** A task from a specialist with `queue: true` goes to the queue of the repository of its run. */
-  workerAdd(params: WorkerTaskRequest): Promise<QueueChange> {
-    const { runs, store, taskTags, links, tags, now } = this.dependencies;
-    return runs.engine.serial(async () => {
-      const key = runs.effects.attemptFor(params.token);
-      if (!key) throw rejected('unknown or expired report token');
-      const state = runs.states.get(key.run);
-      const attempt = state.groups
-        .find((group) => group.slug === key.group)
-        ?.attempts.find((candidate) => candidate.seq === key.seq);
-      if (!attempt || attempt.status !== 'running') {
-        throw rejected('unknown or expired report token');
-      }
-      if (findSpecialist(state.run.config, attempt.specialist)?.queue !== true) {
-        throw rejected(`specialist \`${attempt.specialist}\` may not add tasks to the queue`);
-      }
-      // Every task carries the linked task tag of its run, then the other tags of the run.
-      const repository = state.run.repository;
-      this.dependencies.registry.requireEnabled(repository);
-      await this.ensureItem(
-        repository,
-        params.pipeline,
-        params.variant,
-        params.skip,
-        params.provider,
-      );
-      const queue = store.of(repository);
-      if (params.links?.some((link) => link.kind === 'parent')) {
-        throw rejected("a specialist's task has its run as the parent");
-      }
-      const { after } = links.plan(repository, params, params.links);
-      this.checkNewItem(
-        queue,
-        fields({
-          ...params,
-          after,
-          author: state.run.author,
-          createdBySystem: state.run.createdBySystem,
-        }),
-        now(),
-      );
-      const tag = await taskTags.linkedTagFor(state);
-      const inherited = mergeTags([tag.id], knownTags(tags.of(repository), state.run.tags));
-      // The task of a specialist has the author of the run it comes from.
-      return this.addTo(
-        repository,
-        { ...params, author: state.run.author, createdBySystem: state.run.createdBySystem },
-        inherited,
-        state.run.id,
-      );
-    });
-  }
-
   /** Rejects an unknown pipeline or variant, or a `skip` that does not fit the pipeline with it. */
   async ensureItem(
     repository: string,
@@ -242,12 +189,22 @@ export class QueueItems {
     return this.dependencies.links.resolveAfter(ids);
   }
 
-  private async addTo(
+  /**
+   * Adds a task to the queue of `repository`, which advances. `inherited` replaces the tags of the
+   * request and `specialistRun` is the parent: both are set for a task of a specialist.
+   */
+  async addTo(
     repository: string,
     params: TaskFields &
       Pick<
         QueueAddRequest,
-        'tags' | 'parent' | 'postponed' | 'attachments' | 'author' | 'createdBySystem'
+        | 'tags'
+        | 'parent'
+        | 'postponed'
+        | 'attachments'
+        | 'author'
+        | 'createdBySystem'
+        | 'allowDuplicate'
       >,
     inherited?: string[],
     specialistRun?: string,
@@ -267,6 +224,7 @@ export class QueueItems {
     const { after } = plan;
     let own = inherited ?? resolveManualTags(tags.of(repository), params.tags ?? []);
     const task = fields({ ...params, after });
+    refuseDuplicate(queue, task, params.allowDuplicate);
     if (specialistRun !== undefined) plan.parent = specialistRun;
     else if (plan.parent !== null) {
       this.checkNewItem(queue, task, moment);
@@ -311,7 +269,7 @@ export class QueueItems {
   }
 
   /** Runs the checks of `addItem` on a copy of the queue: nothing changes. */
-  private checkNewItem(queue: Queue, fields: ItemFields, now: number): void {
+  checkNewItem(queue: Queue, fields: ItemFields, now: number): void {
     addItem(
       structuredClone(queue),
       fields,

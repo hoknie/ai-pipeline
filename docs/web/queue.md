@@ -48,6 +48,8 @@ The buttons are on one row under the form, on the right: "Cancel", "Add and cont
 
 **"Add and continue"**, next to "Add" in the new task dialog, adds the task and keeps the form open: the title, the text, the groups and every link row except "Parent" are cleared, the other settings stay, and the focus returns to the text. The form of an existing task has no such button.
 
+A copy of a task that [already waits](../usage/queue.md#adding-and-ordering-tasks) in the queue is refused: the form stays open, names the waiting task and offers "Add anyway". Changing the pipeline, the variant, the provider, the text or the groups removes the notice.
+
 ### Links
 
 The [links](../usage/queue.md#task-links) of a task are edited in the "Links" block of the task form; the links of a run — in the "Links" section of its page.

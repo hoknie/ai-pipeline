@@ -6,11 +6,20 @@ import {
   OBSERVER_SPECIALIST,
   findSpecialist,
 } from '../../../src/feature/swarm-config/types/index.ts';
+import { workerToolNames } from '../../../src/feature/agents/types/index.ts';
 import { createWorkerServer } from '../../../src/presentation/mcp/worker.ts';
 import { createClaudeRuntime } from '../../../src/feature/agents/clients/claude/index.ts';
 import { config } from '../runs/helpers.ts';
 
 describe('aip tools of the worker server and the claude allowlist', () => {
+  it('names the three queue tools together, and none without the right to queue', () => {
+    const queue = ['swarm_queue_add', 'swarm_queue_edit', 'swarm_queue_remove'];
+    const withQueue = workerToolNames({ split: false, queue: true, repair: false });
+    const without = workerToolNames({ split: true, queue: false, repair: true });
+    expect(withQueue.filter((name) => name.startsWith('swarm_queue_'))).toEqual(queue);
+    expect(without.filter((name) => name.startsWith('swarm_queue_'))).toEqual([]);
+  });
+
   it('allows every tool the worker server offers', async () => {
     const server = createWorkerServer({
       token: 't',

@@ -1063,4 +1063,36 @@ describe('cli', () => {
     expect(unknown.code).not.toBe(0);
     expect(unknown.stderr).toContain('unknown tag `nope`');
   }, 120_000);
+  it('refuses a copy of a waiting task and adds it with --allow-duplicate', async () => {
+    const box = sandbox(PIPELINE_CONFIG);
+    const first = JSON.parse(
+      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'Fix the login', '--json')).stdout,
+    ) as { item: string };
+    const copy = await aipFast(box, 'queue', 'add', 'feature', '--task', 'Fix the login');
+    expect(copy.code).not.toBe(0);
+    expect(copy.stderr).toContain(`task #1 (${first.item})`);
+    expect(copy.stderr).toContain('--allow-duplicate');
+    const started = await aipFast(box, 'run', 'start', 'feature', '--task', 'Fix the login');
+    expect(started.code).not.toBe(0);
+    expect(started.stderr).toContain('--allow-duplicate');
+    const count = async (): Promise<number> =>
+      (
+        JSON.parse((await aipFast(box, 'queue', 'list', '--json')).stdout) as {
+          items: unknown[];
+        }
+      ).items.length;
+    expect(await count()).toBe(1);
+    const again = await aipFast(
+      box,
+      ...['queue', 'add', 'feature', '--task', 'Fix the login', '--allow-duplicate'],
+    );
+    expect(again.code).toBe(0);
+    expect(await count()).toBe(2);
+    for (const command of [
+      ['queue', 'add'],
+      ['run', 'start'],
+    ]) {
+      expect((await aipFast(box, ...command, '--help')).stdout).toContain('--allow-duplicate');
+    }
+  });
 });

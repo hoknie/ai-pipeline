@@ -5,6 +5,8 @@ export const WORKER_TOOLS = {
   runShow: 'swarm_run_show',
   split: 'swarm_split',
   queue: 'swarm_queue_add',
+  queueEdit: 'swarm_queue_edit',
+  queueRemove: 'swarm_queue_remove',
   answer: 'swarm_repair_answer',
   retry: 'swarm_repair_retry',
   cancel: 'swarm_repair_cancel',
@@ -20,7 +22,10 @@ export function workerToolNames(options: {
     WORKER_TOOLS.artifact,
     WORKER_TOOLS.runShow,
     ...(options.split ? [WORKER_TOOLS.split] : []),
-    ...(options.queue ? [WORKER_TOOLS.queue] : []),
+    // a specialist that may queue tasks may also change and remove the waiting tasks of its run
+    ...(options.queue
+      ? [WORKER_TOOLS.queue, WORKER_TOOLS.queueEdit, WORKER_TOOLS.queueRemove]
+      : []),
     ...(options.repair ? [WORKER_TOOLS.answer, WORKER_TOOLS.retry, WORKER_TOOLS.cancel] : []),
   ];
 }

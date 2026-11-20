@@ -109,6 +109,7 @@ async function finishedRun(h: Harness, repository: string, title: string): Promi
     repository,
     pipeline: 'feature',
     task: 'p',
+    allowDuplicate: true,
     title,
   })) as QueueView & { item: string };
   const created = (await h.call('queue_run_now', { repository, item: added.item })) as {
@@ -571,7 +572,7 @@ describe('tags of tasks from a specialist', () => {
   it('passes the tags of an explore run to its tasks and from them to the started runs', async () => {
     const h = await start(SCOUT_CONFIG);
     h.script({
-      explore: [{ queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } }],
+      explore: [{ queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't$n' }] } }],
     });
     await addTag(h, 'auth');
     await addTag(h, 'v2');
@@ -591,7 +592,7 @@ describe('tags of tasks from a specialist', () => {
     for (const run of runs) await h.waitFor(run.id, (view) => view.finished);
   });
 
-  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't$n' }] } };
 
   it('creates one tag for a run without tags and gives it to the run and both tasks', async () => {
     const h = await start(SCOUT_CONFIG);
@@ -768,7 +769,12 @@ describe('tags of tasks from a specialist', () => {
 });
 
 describe('tags along dependencies', () => {
-  const TASK = { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] };
+  // every task of these tests is a copy of the first one, on purpose
+  const TASK = {
+    pipeline: 'feature',
+    groups: [{ title: 'g', task: 't' }],
+    allowDuplicate: true,
+  };
 
   async function add(h: Harness, extra: Record<string, unknown>): Promise<string> {
     const added = (await h.call('queue_add', {
@@ -874,7 +880,7 @@ describe('tags along dependencies', () => {
 });
 
 describe('tags of linked tasks', () => {
-  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't$n' }] } };
 
   /** An explore run puts two tasks in the queue and gets the tag `fix-login` of a linked task. */
   async function chain(): Promise<{ h: Harness; explore: RunView }> {
@@ -988,7 +994,7 @@ describe('tags of linked tasks', () => {
 });
 
 describe('parent of a task', () => {
-  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't$n' }] } };
 
   /** A run of the `feature` pipeline made from the queue; the queue stays stopped. */
   async function parentRun(h: Harness, title: string): Promise<RunView> {
@@ -1010,6 +1016,8 @@ describe('parent of a task', () => {
       repository: h.repo,
       pipeline: 'feature',
       task: 'child',
+      // several children of one parent are copies of each other, on purpose
+      allowDuplicate: true,
       ...extra,
     })) as QueueView;
 
@@ -1201,7 +1209,7 @@ describe('parent of a task', () => {
 });
 
 describe('linked task tag of every task from a specialist', () => {
-  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't$n' }] } };
 
   async function exploreWith(h: Harness, tags: string[], title: string): Promise<string> {
     const added = (await h.call('queue_add', {

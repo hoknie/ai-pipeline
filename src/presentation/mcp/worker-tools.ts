@@ -24,7 +24,10 @@ import { attempt, type Send } from './tools.ts';
 export interface WorkerOptions {
   token: string;
   split: boolean;
-  /** Also serve swarm_queue_add: the specialist may add tasks to the queue of the run's repository. */
+  /**
+   * Also serve swarm_queue_add, swarm_queue_edit and swarm_queue_remove: the specialist may add
+   * tasks to the queue of the run's repository and correct the waiting tasks of its run.
+   */
   queue?: boolean;
   /** Also serve swarm_repair_*: the observer of an incident answers, retries or cancels. */
   repair?: boolean;

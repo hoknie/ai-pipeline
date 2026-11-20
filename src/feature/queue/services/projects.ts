@@ -11,6 +11,7 @@ import { cleanName, defaultTagColor, tagNamed, type Tag } from '../../tags/types
 import {
   addItem,
   queueItemId,
+  refuseDuplicate,
   type AddedToProject,
   type ItemFields,
   type Queue,
@@ -107,16 +108,8 @@ export class QueueProjects {
       params.tag === undefined || params.tag.trim() === '' ? null : cleanName(params.tag);
     const color = name === null ? null : this.sharedColor(roots, name);
     for (const root of roots) {
-      const label = this.labelOf(root);
-      registry.requireEnabled(root);
-      await this.ensureIn(root, label, params);
-      await this.inProject(label, () =>
-        this.checkNewItem(
-          store.of(root),
-          fields({ ...params, task: texts.get(root) ?? params.task, after }),
-          moment,
-        ),
-      );
+      const task = fields({ ...params, task: texts.get(root) ?? params.task, after });
+      await this.checkProject(root, params, task, moment);
     }
 
     const snapshots = new Map(roots.map((root) => [root, structuredClone(store.of(root))]));
@@ -169,6 +162,21 @@ export class QueueProjects {
     for (const root of roots) this.dependencies.publish.queueSaved(store.of(root));
     for (const root of roots) await advance.advance(root);
     return added;
+  }
+
+  /** Every check of the task in one project: the project, the configuration, a copy, the item. */
+  private async checkProject(
+    root: string,
+    params: QueueAddProjectsRequest,
+    task: ItemFields,
+    moment: number,
+  ): Promise<void> {
+    const { store, registry } = this.dependencies;
+    const label = this.labelOf(root);
+    registry.requireEnabled(root);
+    await this.ensureIn(root, label, params);
+    refuseDuplicate(store.of(root), task, params.allowDuplicate, ` of project \`${label}\``);
+    await this.inProject(label, () => this.checkNewItem(store.of(root), task, moment));
   }
 
   /** Runs the checks of `addItem` on a copy of the queue: nothing changes. */

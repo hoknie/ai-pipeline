@@ -16,11 +16,13 @@ import { usage, type CliIo } from '../io.ts';
 import { linkInputsOf } from '../links.ts';
 import {
   addAuthorOptions,
+  ALLOW_DUPLICATE_HELP,
   attachmentSources,
   authorParameter,
   collect,
   parseDeliveryMode,
   readGroups,
+  withDuplicateHint,
   type AuthorOptions,
 } from '../options.ts';
 import { watch } from '../watch.ts';
@@ -63,6 +65,7 @@ interface StartOptions {
   after?: string[];
   attach?: string[];
   link?: string[];
+  allowDuplicate?: boolean;
   json?: boolean;
 }
 
@@ -93,6 +96,7 @@ function startParams(pipeline: string, options: StartOptions) {
     ...(options.after !== undefined ? { after: options.after } : {}),
     ...(links !== undefined ? { links } : {}),
     ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
+    ...(options.allowDuplicate ? { allowDuplicate: true } : {}),
   };
 }
 
@@ -145,6 +149,7 @@ function addStart(kit: RunKit): void {
       collect,
     )
     .option('--attach <path>', 'file to attach to the task; repeat for several', collect)
+    .option('--allow-duplicate', ALLOW_DUPLICATE_HELP)
     .option('--json', 'print JSON')
     .addHelpText(
       'after',
@@ -160,7 +165,9 @@ function addStart(kit: RunKit): void {
       ]),
     )
     .action(async (pipeline: string, options: StartOptions) => {
-      const queued = (await call(context(), 'run', startParams(pipeline, options))) as RunQueued;
+      const queued = (await withDuplicateHint(() =>
+        call(context(), 'run', startParams(pipeline, options)),
+      )) as RunQueued;
       output(options.json, formatRunQueued(queued, activeStyle), queued);
     });
 }

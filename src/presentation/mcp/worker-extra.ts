@@ -4,7 +4,7 @@ import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
 import { FEEDBACK_LIMIT } from '../../feature/runs/types/index.ts';
 import { RUN_TITLE_LIMIT, WORKER_TOOLS } from '../../feature/agents/types/index.ts';
 import { invalid } from '../../platform/errors/index.ts';
-import { attempt } from './tools.ts';
+import { attempt, hintDuplicate } from './tools.ts';
 import { linkInputs, present } from './host-links.ts';
 import type { WorkerKit } from './worker-tools.ts';
 
@@ -49,7 +49,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
       {
         title: 'Add a task to the queue',
         description:
-          'Put a task at the end of the queue of the repository this run belongs to, to be started later as its own run. Pass either task or groups; pass after with ids to order dependent tasks: ids returned by earlier calls, waiting items of the queues of any project or runs of any repository. The answer contains the id of the new item. It does not start the queue. Call swarm_report afterwards as usual.',
+          'Put a task at the end of the queue of the repository this run belongs to, to be started later as its own run. Pass either task or groups; pass after with ids to order dependent tasks: ids returned by earlier calls, waiting items of the queues of any project or runs of any repository. The answer contains the id of the new item. A copy of a task that already waits in the queue is refused: to correct a task you queued, change it with swarm_queue_edit or remove it with swarm_queue_remove. It does not start the queue. Call swarm_report afterwards as usual.',
         inputSchema: {
           pipeline: z.string().min(1).describe('Pipeline id of the configuration, e.g. feature'),
           task: z.string().trim().min(1).optional().describe('One task text'),
@@ -96,15 +96,106 @@ export function registerQueueAdd(kit: WorkerKit): void {
           if ((fields.task === undefined) === (fields.groups === undefined)) {
             throw invalid('mcp.invalid_arguments', 'pass either task or groups');
           }
-          const result = (await options.send('worker_queue_add', {
-            token: options.token,
-            pipeline,
-            ...present(fields),
-          })) as { item?: string };
+          const result = (await hintDuplicate(WORKER_DUPLICATE_HINT, () =>
+            options.send('worker_queue_add', {
+              token: options.token,
+              pipeline,
+              ...present(fields),
+            }),
+          )) as { item?: string };
           return `Queued ${result.item ?? 'the task'} for pipeline ${pipeline}. It starts when the queue runs.`;
         }),
     );
   }
+}
+
+/** The way out for a specialist: the waiting task is corrected, no copy is added. */
+const WORKER_DUPLICATE_HINT =
+  'change the waiting task with swarm_queue_edit or remove it with swarm_queue_remove instead of adding a copy';
+
+const ownItem = z
+  .string()
+  .min(1)
+  .describe('Id of a waiting task this run queued, as swarm_queue_add returned it');
+
+/** The fields of a queued task a specialist may change; `null` resets a field to its default. */
+const editFields = {
+  pipeline: z.string().min(1).optional().describe('Pipeline id of the configuration'),
+  task: z.string().trim().min(1).optional().describe('One task text; replaces the groups'),
+  groups: z
+    .array(z.object({ title: z.string().trim().min(1), task: z.string().trim().min(1) }))
+    .min(1)
+    .optional()
+    .describe('Explicit groups; replace the task text'),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(RUN_TITLE_LIMIT)
+    .nullable()
+    .optional()
+    .describe(`Title of the run, at most ${RUN_TITLE_LIMIT} characters; null: none`),
+  autoDeliver: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe('Deliver merged groups automatically; null: follow delivery.auto'),
+  deliveryMode: z
+    .enum(DELIVERY_MODES)
+    .nullable()
+    .optional()
+    .describe('worktree, commit or branch; null: follow delivery.mode'),
+  variant: z.string().optional().describe('Id of a variant of the pipeline'),
+  provider: z.string().nullable().optional().describe('Id of a provider of the tiers; null: none'),
+  skip: z.array(z.string()).optional().describe('Ids of pipeline steps to skip; replaces the list'),
+  after: z
+    .array(z.string().min(1))
+    .optional()
+    .describe('Ids that must be done first; replaces the list, [] clears it'),
+  links: linkInputs,
+};
+
+/** `swarm_queue_edit` and `swarm_queue_remove`: a specialist corrects the tasks its run queued. */
+export function registerQueueFix(kit: WorkerKit): void {
+  const { options, server } = kit;
+  if (!options.queue) return;
+  server.registerTool(
+    WORKER_TOOLS.queueEdit,
+    {
+      title: 'Change a task this run queued',
+      description:
+        'Change a waiting task this run put into the queue: its text or groups, title, pipeline, variant, provider, delivery, skipped steps, after or links. Pass item and at least one field; a field that is not passed stays. Use it to correct a task instead of adding a copy. A task of another run or of a person, and a task that already became a run, is refused. The parent of the task stays this run. It does not start the queue. Call swarm_report afterwards as usual.',
+      inputSchema: { item: ownItem, ...editFields },
+    },
+    ({ item, ...fields }) =>
+      attempt(async () => {
+        const changes = Object.fromEntries(
+          Object.entries(fields).filter(([, value]) => value !== undefined),
+        );
+        if (Object.keys(changes).length === 0) {
+          throw invalid('mcp.invalid_arguments', 'pass at least one field to change');
+        }
+        if (fields.task !== undefined && fields.groups !== undefined) {
+          throw invalid('mcp.invalid_arguments', 'pass either task or groups');
+        }
+        await options.send('worker_queue_edit', { token: options.token, item, ...changes });
+        return `Changed ${item}. Call swarm_report when you are done.`;
+      }),
+  );
+  server.registerTool(
+    WORKER_TOOLS.queueRemove,
+    {
+      title: 'Remove a task this run queued',
+      description:
+        'Remove a waiting task this run put into the queue; the tasks that waited for it no longer do. A task of another run or of a person, and a task that already became a run, is refused. Call swarm_report afterwards as usual.',
+      inputSchema: { item: ownItem },
+    },
+    ({ item }) =>
+      attempt(async () => {
+        await options.send('worker_queue_remove', { token: options.token, item });
+        return `Removed ${item}. Call swarm_report when you are done.`;
+      }),
+  );
 }
 
 export function registerRepair(kit: WorkerKit): void {

@@ -67,6 +67,8 @@ export const workerMethods: readonly Method[] = [
   'split',
   'worker_run_show',
   'worker_queue_add',
+  'worker_queue_edit',
+  'worker_queue_remove',
   'mcp_remote_forward',
   'artifact_publish',
   'repair_action',

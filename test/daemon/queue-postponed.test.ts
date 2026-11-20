@@ -99,6 +99,7 @@ describe('postponed items', () => {
       repository: h.repo,
       pipeline: 'feature',
       task: 'work',
+      allowDuplicate: true,
       title: 'R',
       after: [a.item],
       ...({ postponed: true } as object),

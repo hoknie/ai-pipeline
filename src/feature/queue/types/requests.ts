@@ -39,6 +39,8 @@ export interface QueueAddRequest extends TaskFields {
   createdBySystem?: boolean | undefined;
   /** Files to attach: absolute paths; a specialist's task has none. */
   attachments?: AttachmentSource[] | undefined;
+  /** Adds the task even when the same one already waits in the queue. */
+  allowDuplicate?: boolean | undefined;
 }
 
 /** `queue_add_projects`: one task for the queues of several repositories. */
@@ -56,6 +58,8 @@ export interface QueueAddProjectsRequest extends TaskFields {
   tag?: string | undefined;
   /** Each task waits for the one of the previous project. */
   chain?: boolean | undefined;
+  /** Adds the task even where the same one already waits in the queue. */
+  allowDuplicate?: boolean | undefined;
 }
 
 /** One item of `queue_add_projects`. */
@@ -70,6 +74,24 @@ export interface AddedToProject {
 /** `worker_queue_add`: a task a specialist adds to the queue of its run's repository. */
 export interface WorkerTaskRequest extends TaskFields {
   token: string;
+}
+
+/** `worker_queue_edit`: the fields of a waiting task of its run a specialist changes. */
+export interface WorkerTaskEditRequest extends Omit<
+  ItemPatch,
+  'tags' | 'after' | 'position' | 'postponed'
+> {
+  token: string;
+  item: string;
+  after?: string[] | undefined;
+  /** Replaces the links of the task except its parent, which stays the run. */
+  links?: LinkInput[] | undefined;
+}
+
+/** `worker_queue_remove`: a waiting task of its run a specialist removes. */
+export interface WorkerTaskRemoveRequest {
+  token: string;
+  item: string;
 }
 
 /** `queue_edit`: the fields of an item to change. */

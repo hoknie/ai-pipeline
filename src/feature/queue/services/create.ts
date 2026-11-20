@@ -16,6 +16,7 @@ import { QueueProjects } from './projects.ts';
 import { QueueScope } from './scope.ts';
 import { QueueStore } from './store.ts';
 import { TaskTags } from './task-tags.ts';
+import { WorkerTasks } from './worker/tasks.ts';
 
 export interface QueueServices {
   store: QueueStore;
@@ -24,6 +25,8 @@ export interface QueueServices {
   items: QueueItems;
   projects: QueueProjects;
   edit: QueueEdit;
+  /** The queue as a specialist with `queue: true` works with it. */
+  worker: WorkerTasks;
   control: QueueControl;
   taskTags: TaskTags;
   links: TaskLinks;
@@ -84,6 +87,7 @@ export function createQueueServices(dependencies: {
     items,
     projects,
     edit,
+    worker: new WorkerTasks({ ...shared, items, edit }),
     control: new QueueControl(shared),
     taskTags,
     links,

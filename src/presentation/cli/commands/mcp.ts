@@ -71,7 +71,10 @@ export function registerMcp(program: Command, io: CliIo, style: Style): void {
     .option('--remote <server>', 'relay the messages of an agent to a server of a connection')
     .option('--socket <path>', 'daemon socket (worker mode)')
     .option('--split', 'also serve swarm_split (split step)')
-    .option('--queue', 'also serve swarm_queue_add (specialist with queue: true)')
+    .option(
+      '--queue',
+      'also serve swarm_queue_add, swarm_queue_edit and swarm_queue_remove (specialist with queue: true)',
+    )
     .option('--repair', 'also serve swarm_repair_* (observer of an incident)')
     .addHelpText('after', examples(['aip mcp', 'aip mcp --queue']))
     .action((options: McpOptions) => runMcp(options, io, style));

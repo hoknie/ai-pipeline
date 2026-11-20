@@ -663,6 +663,52 @@ describe('tag requests', () => {
     });
   });
 
+  it('takes allowDuplicate on every request of a person that adds a task, not from a specialist', () => {
+    const fresh = { pipeline: 'feature', task: 'x', allowDuplicate: true };
+    for (const method of ['run', 'queue_add']) {
+      const parsed = parse(method, { repository: '/r', ...fresh });
+      expect('request' in parsed && parsed.request.params).toHaveProperty('allowDuplicate', true);
+      expect('error' in parse(method, { repository: '/r', ...fresh, allowDuplicate: 'yes' })).toBe(
+        true,
+      );
+    }
+    const several = parse('queue_add_projects', { repositories: ['/a', '/b'], ...fresh });
+    expect('request' in several && several.request.params).toHaveProperty('allowDuplicate', true);
+    const worker = parse('worker_queue_add', { token: 't', ...fresh });
+    expect('request' in worker && worker.request.params).not.toHaveProperty('allowDuplicate');
+  });
+
+  it('takes from a specialist the fields of a task to change, and at least one of them', () => {
+    const own = { token: 't', item: 'q1' };
+    const edit = (fields: Record<string, unknown>) =>
+      parse('worker_queue_edit', { ...own, ...fields });
+    for (const fields of [
+      { after: ['q0'] },
+      { links: [{ kind: 'blocked_by', target: 'q0' }] },
+      { task: 'new text' },
+      { groups: [{ title: 'a', task: 'b' }] },
+      { title: null },
+      { provider: null, variant: 'fast', pipeline: 'feature' },
+      { autoDeliver: null, deliveryMode: 'commit', skip: ['qa'] },
+    ]) {
+      expect('request' in edit(fields)).toBe(true);
+    }
+    expect('error' in edit({})).toBe(true);
+    expect('error' in edit({ task: 'a', groups: [{ title: 'a', task: 'b' }] })).toBe(true);
+    expect('error' in parse('worker_queue_edit', { item: 'q1', title: 'x' })).toBe(true);
+    // what a specialist may not change is dropped, and alone it leaves nothing to change
+    const mixed = edit({ title: 'API', postponed: true, tags: ['a'], parent: 'r0', position: 1 });
+    expect('request' in mixed && mixed.request.params).toEqual({ ...own, title: 'API' });
+    expect('error' in edit({ postponed: true })).toBe(true);
+    expect('error' in edit({ attach: [{ path: '/tmp/a' }] })).toBe(true);
+  });
+
+  it('takes the token and the item of a task a specialist removes', () => {
+    expect('request' in parse('worker_queue_remove', { token: 't', item: 'q1' })).toBe(true);
+    expect('error' in parse('worker_queue_remove', { token: 't' })).toBe(true);
+    expect('error' in parse('worker_queue_remove', { item: 'q1' })).toBe(true);
+  });
+
   it('drops tags from a task added by a specialist', () => {
     const parsed = parse('worker_queue_add', { token: 't', pipeline: 'f', task: 'x', tags: ['a'] });
     expect('request' in parsed && parsed.request.params).not.toHaveProperty('tags');

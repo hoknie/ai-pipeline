@@ -5,11 +5,13 @@ import { call } from './context.ts';
 import { usage } from './io.ts';
 import { linkInputsOf } from './links.ts';
 import {
+  ALLOW_DUPLICATE_HELP,
   attachmentSources,
   collect,
   parseDeliveryMode,
   parseNotes,
   readGroups,
+  withDuplicateHint,
   type QueueTaskOptions,
 } from './options.ts';
 import type { QueueKit } from './commands/queue.ts';
@@ -21,6 +23,7 @@ type AddOptions = Omit<QueueTaskOptions, 'repo'> & {
   chain?: boolean;
   note?: string[];
   link?: string[];
+  allowDuplicate?: boolean;
 };
 
 /** The flags that fit only one project or only several; a wrong mix is a usage error. */
@@ -60,17 +63,19 @@ function taskFields(pipeline: string, options: AddOptions) {
     ...(links !== undefined ? { links } : {}),
     ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
     ...(options.postpone ? { postponed: true } : {}),
+    ...(options.allowDuplicate ? { allowDuplicate: true } : {}),
   };
 }
 
 export function addAdd(kit: QueueKit): void {
-  const { print, output, examples, context, showQueue, queue, taskOptions } = kit;
+  const { examples, queue, taskOptions } = kit;
   taskOptions(
     queue
       .command('add')
       .description('Add a task to the end of the queue; it does not start the queue')
       .argument('<pipeline>', 'pipeline id from swarm.yaml')
-      .option('--postpone', 'postpone the task: a running queue does not take it'),
+      .option('--postpone', 'postpone the task: a running queue does not take it')
+      .option('--allow-duplicate', ALLOW_DUPLICATE_HELP),
   )
     .option(
       '-r, --repo <path>',
@@ -101,43 +106,52 @@ export function addAdd(kit: QueueKit): void {
         'aip queue add feature --task "Fix the layout" --attach shot.png --attach spec.pdf',
         'aip queue add feature --task "Follow-up" --parent 115',
         'aip queue add feature --task "Later" --postpone',
+        'aip queue add feature --task "Run the benchmark" --allow-duplicate',
         'aip queue add feature --task "Email field" --repo lib --repo web --chain --tag-all email',
       ]),
     )
-    .action(async (pipeline: string, options: AddOptions) => {
-      if ((options.task === undefined) === (options.groups === undefined)) {
-        throw usage('pass exactly one of --task and --groups');
-      }
-      const repos = options.repo ?? ['.'];
-      const several = repos.length > 1;
-      checkRepos(options, several);
-      const task = taskFields(pipeline, options);
-      if (several) {
-        const parsed = parseNotes(options.note);
-        const notes =
-          parsed === undefined
-            ? undefined
-            : Object.fromEntries(
-                Object.entries(parsed).map(([key, text]) => [repositoryArgument(key), text]),
-              );
-        const added = (await call(context(), 'queue_add_projects', {
-          ...task,
-          task: options.task ?? '',
-          repositories: repos.map((repo) => repositoryArgument(repo)),
-          ...(notes !== undefined ? { notes } : {}),
-          ...(options.tagAll !== undefined ? { tag: options.tagAll } : {}),
-          ...(options.chain === true ? { chain: true } : {}),
-        })) as AddedToProjectView[];
-        output(options.json, formatAddedToProjects(added, kit.activeStyle), added);
-        return;
-      }
-      const view = (await call(context(), 'queue_add', {
+    .action((pipeline: string, options: AddOptions) => add(kit, pipeline, options));
+}
+
+/** `aip queue add`: one project, or the same task for several. */
+async function add(kit: QueueKit, pipeline: string, options: AddOptions): Promise<void> {
+  const { print, output, context, showQueue } = kit;
+  if ((options.task === undefined) === (options.groups === undefined)) {
+    throw usage('pass exactly one of --task and --groups');
+  }
+  const repos = options.repo ?? ['.'];
+  const several = repos.length > 1;
+  checkRepos(options, several);
+  const task = taskFields(pipeline, options);
+  if (several) {
+    const parsed = parseNotes(options.note);
+    const notes =
+      parsed === undefined
+        ? undefined
+        : Object.fromEntries(
+            Object.entries(parsed).map(([key, text]) => [repositoryArgument(key), text]),
+          );
+    const added = (await withDuplicateHint(() =>
+      call(context(), 'queue_add_projects', {
         ...task,
-        repository: repositoryArgument(repos[0] ?? '.'),
-        ...(options.tag !== undefined ? { tags: options.tag } : {}),
-        ...(typeof options.parent === 'string' ? { parent: options.parent } : {}),
-      })) as QueueView & { item: string };
-      if (!options.json) print(`Added ${view.item}.`);
-      await showQueue(options.json, view);
-    });
+        task: options.task ?? '',
+        repositories: repos.map((repo) => repositoryArgument(repo)),
+        ...(notes !== undefined ? { notes } : {}),
+        ...(options.tagAll !== undefined ? { tag: options.tagAll } : {}),
+        ...(options.chain === true ? { chain: true } : {}),
+      }),
+    )) as AddedToProjectView[];
+    output(options.json, formatAddedToProjects(added, kit.activeStyle), added);
+    return;
+  }
+  const view = (await withDuplicateHint(() =>
+    call(context(), 'queue_add', {
+      ...task,
+      repository: repositoryArgument(repos[0] ?? '.'),
+      ...(options.tag !== undefined ? { tags: options.tag } : {}),
+      ...(typeof options.parent === 'string' ? { parent: options.parent } : {}),
+    }),
+  )) as QueueView & { item: string };
+  if (!options.json) print(`Added ${view.item}.`);
+  await showQueue(options.json, view);
 }

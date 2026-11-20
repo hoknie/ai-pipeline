@@ -1,6 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { registerQueueAdd, registerRepair, registerSplit } from './worker-extra.ts';
+import {
+  registerQueueAdd,
+  registerQueueFix,
+  registerRepair,
+  registerSplit,
+} from './worker-extra.ts';
 import { registerRunShow } from './worker-read.ts';
 import { registerArtifact, registerReport, workerKit, type WorkerOptions } from './worker-tools.ts';
 
@@ -13,6 +18,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
   registerRunShow(kit);
   registerSplit(kit);
   registerQueueAdd(kit);
+  registerQueueFix(kit);
   registerRepair(kit);
   return kit.server;
 }

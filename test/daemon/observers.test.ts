@@ -525,7 +525,13 @@ describe('Observer actions', () => {
     });
     await configure(h);
     for (const title of ['one', 'two']) {
-      await h.call('queue_add', { repository: h.repo, pipeline: 'feature', groups: GROUPS, title });
+      await h.call('queue_add', {
+        repository: h.repo,
+        pipeline: 'feature',
+        groups: GROUPS,
+        title,
+        allowDuplicate: true,
+      });
     }
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
     await h.call('queue_start', { repository: h.repo });

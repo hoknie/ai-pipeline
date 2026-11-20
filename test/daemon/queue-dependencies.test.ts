@@ -412,6 +412,7 @@ const addIn = async (
     repository,
     pipeline: 'feature',
     task: 'work',
+    allowDuplicate: true,
     title,
     ...extra,
   })) as QueueView & { item: string };

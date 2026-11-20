@@ -2,6 +2,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
 
+import { DUPLICATE_TASK_CODE } from '../../src/feature/queue/types/index.ts';
+import { IpcError } from '../../src/presentation/ipc/client/index.ts';
 import { createWorkerServer } from '../../src/presentation/mcp/worker.ts';
 
 async function connect(
@@ -286,6 +288,118 @@ describe('worker MCP server', () => {
         },
       },
     ]);
+  });
+
+  it('offers swarm_queue_edit and swarm_queue_remove only with the right to queue', async () => {
+    const without = await connect(false, async () => null);
+    const names = (await without.listTools()).tools.map((tool) => tool.name);
+    expect(names).not.toContain('swarm_queue_edit');
+    expect(names).not.toContain('swarm_queue_remove');
+    const client = await connect(false, async () => null, true);
+    const tools = (await client.listTools()).tools;
+    const edit = tools.find((tool) => tool.name === 'swarm_queue_edit');
+    const remove = tools.find((tool) => tool.name === 'swarm_queue_remove');
+    expect(Object.keys(edit?.inputSchema.properties ?? {}).sort()).toEqual(
+      [
+        'item',
+        'pipeline',
+        'variant',
+        'provider',
+        'task',
+        'groups',
+        'title',
+        'autoDeliver',
+        'deliveryMode',
+        'skip',
+        'after',
+        'links',
+      ].sort(),
+    );
+    expect(Object.keys(remove?.inputSchema.properties ?? {})).toEqual(['item']);
+    const add = tools.find((tool) => tool.name === 'swarm_queue_add');
+    expect(add?.description).toContain('swarm_queue_edit');
+    expect(add?.description).toContain('swarm_queue_remove');
+    expect(Object.keys(add?.inputSchema.properties ?? {})).not.toContain('allowDuplicate');
+  });
+
+  it('changes and removes a task of the run and names it in the answer', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return { item: 'q3' };
+      },
+      true,
+    );
+    const edited = await client.callTool({
+      name: 'swarm_queue_edit',
+      arguments: { item: 'q3', after: ['q2'], title: null },
+    });
+    expect(edited.isError).toBeFalsy();
+    expect(textOf(edited)).toContain('Changed q3');
+    const removed = await client.callTool({
+      name: 'swarm_queue_remove',
+      arguments: { item: 'q3' },
+    });
+    expect(removed.isError).toBeFalsy();
+    expect(textOf(removed)).toContain('Removed q3');
+    expect(calls).toEqual([
+      {
+        method: 'worker_queue_edit',
+        params: { token: 'token-1', item: 'q3', after: ['q2'], title: null },
+      },
+      { method: 'worker_queue_remove', params: { token: 'token-1', item: 'q3' } },
+    ]);
+  });
+
+  it('refuses a change without a field or with both a task and groups, and passes a refusal of the queue', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        throw new Error('task q9 was not queued by this run');
+      },
+      true,
+    );
+    const empty = await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q3' } });
+    expect(empty.isError).toBe(true);
+    expect(textOf(empty)).toContain('pass at least one field to change');
+    const both = await client.callTool({
+      name: 'swarm_queue_edit',
+      arguments: { item: 'q3', task: 'a', groups: [{ title: 'g', task: 't' }] },
+    });
+    expect(both.isError).toBe(true);
+    expect(textOf(both)).toContain('pass either task or groups');
+    expect(calls).toEqual([]);
+    const foreign = await client.callTool({
+      name: 'swarm_queue_remove',
+      arguments: { item: 'q9' },
+    });
+    expect(foreign.isError).toBe(true);
+    expect(textOf(foreign)).toBe('task q9 was not queued by this run');
+  });
+
+  it('tells a specialist to change or remove the waiting task when its copy is refused', async () => {
+    const client = await connect(
+      false,
+      async () => {
+        throw new IpcError(
+          'task #12 (q1) with the same pipeline and task already waits in the queue',
+          { code: DUPLICATE_TASK_CODE },
+        );
+      },
+      true,
+    );
+    const refused = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'Implement web-i18n', after: ['q0'] },
+    });
+    expect(refused.isError).toBe(true);
+    expect(textOf(refused)).toContain('task #12 (q1)');
+    expect(textOf(refused)).toContain('swarm_queue_edit');
+    expect(textOf(refused)).toContain('swarm_queue_remove');
   });
 
   it('passes links of a queued task from a specialist and offers no parent', async () => {

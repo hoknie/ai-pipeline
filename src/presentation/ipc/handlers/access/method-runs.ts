@@ -58,6 +58,8 @@ export const runMethods = {
   worker_run_show: worker,
   artifact_publish: worker,
   worker_queue_add: worker,
+  worker_queue_edit: worker,
+  worker_queue_remove: worker,
   mcp_remote_forward: worker,
   queues: { action: 'queue.read', target: anywhere },
   queue: onProject('queue.read'),
