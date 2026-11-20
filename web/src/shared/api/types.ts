@@ -4,6 +4,7 @@ export type {
   ChannelStateView,
   ConnectionView,
   DeliveryView,
+  IntegrationSenderView,
   IntegrationTypeView,
   RegistrySkillView,
   ProjectLinkView,

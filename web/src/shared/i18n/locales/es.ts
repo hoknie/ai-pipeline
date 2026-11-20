@@ -180,7 +180,7 @@ export const es: Dictionary = {
           },
           allowed_users: {
             label: 'Quién puede responder',
-            hint: 'Ids de usuarios de Telegram separados por comas; vacío significa todos en el chat. Cada persona ve su id enviando /id al bot.',
+            hint: 'Ids de usuarios de Telegram; sin ellos nadie puede responder desde el chat. Cada persona ve su id enviando /id al bot.',
           },
           language: {
             label: 'Idioma de los mensajes del bot',
@@ -207,7 +207,7 @@ export const es: Dictionary = {
           },
           allowed_users: {
             label: 'Quién puede responder',
-            hint: 'Ids de usuarios de Slack separados por comas; vacío significa todos en el canal. En Slack abra el perfil y copie el ID de miembro (U…).',
+            hint: 'Ids de usuarios de Slack; sin ellos nadie puede responder desde el canal. Elija a quien pulsó un botón hace poco o copie el ID de miembro (U…) del perfil.',
           },
           language: {
             label: 'Idioma de los mensajes del bot',
@@ -267,6 +267,18 @@ export const es: Dictionary = {
     },
     params: {
       save: 'Guardar parámetros',
+    },
+    users: {
+      add: 'Añadir un id de usuario',
+      remove: 'Quitar {{user}}',
+      invalid: 'Id no válido',
+      suggestions: 'Escribieron al bot hace poco',
+      refresh: 'Actualizar',
+      emptyTelegram:
+        'Nadie ha escrito hace poco. Pida a la persona que envíe /id al bot en el chat: aparecerá aquí.',
+      emptySlack:
+        'Nadie ha pulsado un botón hace poco. Pida a la persona que pulse un botón bajo una pregunta de la aplicación en el canal: aparecerá aquí.',
+      warning: 'Ningún usuario está permitido: las respuestas del chat se rechazan para todos.',
     },
     subscriptions: {
       title: 'Suscripciones',

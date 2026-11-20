@@ -101,6 +101,7 @@ export function KindPage({
               onEnabled={actions.onEnabled}
               onRemove={actions.onRemove}
               onCheck={checked ? actions.onCheck : undefined}
+              loadSenders={api.integrationSenders}
             />
           ))
         )}

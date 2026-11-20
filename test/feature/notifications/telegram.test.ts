@@ -7,6 +7,7 @@ import {
   TEXT_LIMIT,
 } from '../../../src/feature/notifications/clients/telegram/render.ts';
 import type {
+  ChannelOptions,
   ChatChannelPort,
   InboundHandler,
 } from '../../../src/feature/notifications/ports/index.ts';
@@ -43,7 +44,7 @@ afterEach(async () => {
 
 function channel(
   params: Record<string, string> = {},
-  options: { token?: string | null } = {},
+  options: { token?: string | null; seen?: ChannelOptions['seen'] } = {},
 ): ChatChannelPort {
   const factory = telegramChannelFactory({ base: api.base, proxy: () => null });
   return factory.create({
@@ -53,6 +54,7 @@ function channel(
       kind: 'telegram',
       params: { chat_id: String(CHAT), allowed_users: String(USER), ...params },
     },
+    ...(options.seen === undefined ? {} : { seen: options.seen }),
     secret: () => Promise.resolve(options.token === undefined ? api.token : options.token),
     cursor: {
       get: () => cursor,
@@ -303,6 +305,7 @@ describe('telegram channel: updates', () => {
     expect(factory.allows(params, '-555', '111')).toBe(false);
     expect(factory.allows(params, String(CHAT), '222')).toBe(false);
     expect(factory.allows({ allowed_users: '111' }, String(CHAT), '111')).toBe(false);
+    expect(factory.allows({ chat_id: String(CHAT) }, String(CHAT), '111')).toBe(false);
   });
 
   it('asks for a reply with force_reply and takes the text from the reply to the prompt', async () => {
@@ -434,5 +437,69 @@ describe('telegram kind', () => {
     expect(factory.missingForSubscription({ chat_id: '5', allowed_users: '1' })).toBeNull();
     expect(factory.language({ language: 'ru' })).toBe('ru');
     expect(factory.language({})).toBe('en');
+  });
+});
+
+describe('telegram channel: people seen', () => {
+  const people = () => {
+    const found: { user: string; label: string | null }[] = [];
+    return { found, seen: (person: { user: string; label: string | null }) => found.push(person) };
+  };
+
+  it('reports who asks for /id, presses a button or replies, by username or by name', async () => {
+    api.push({
+      message: {
+        message_id: 1,
+        chat: { id: CHAT },
+        from: { id: 111, username: 'alice' },
+        text: '/id',
+      },
+    });
+    api.push({
+      callback_query: {
+        id: 'cb',
+        from: { id: 222, first_name: 'Bob', last_name: 'Ray' },
+        message: { message_id: 7, chat: { id: CHAT } },
+        data: 'ABCDEFGHIJ:r',
+      },
+    });
+    api.push({
+      message: {
+        message_id: 2,
+        chat: { id: CHAT },
+        from: { id: 333 },
+        text: 'yes',
+        reply_to_message: { message_id: 9, text: 'Question' },
+      },
+    });
+    const { found, seen } = people();
+    const { seen: handled } = listen(channel({}, { seen }));
+    await until(() => handled.length === 2, 'handled');
+    expect(found).toEqual([
+      { user: '111', label: '@alice' },
+      { user: '222', label: 'Bob Ray' },
+      { user: '333', label: null },
+    ]);
+  });
+
+  it('does not report a bot, and a failing report does not stop the handling', async () => {
+    api.push({
+      message: { message_id: 1, chat: { id: CHAT }, from: { id: 5, is_bot: true }, text: '/id' },
+    });
+    api.callback({ chat: CHAT, user: USER, message: 7, data: 'ABCDEFGHIJ:r' });
+    const found: string[] = [];
+    const { seen: handled } = listen(
+      channel(
+        {},
+        {
+          seen: (person) => {
+            found.push(person.user);
+            throw new Error('boom');
+          },
+        },
+      ),
+    );
+    await until(() => handled.length === 1, 'handled');
+    expect(found).toEqual(['111']);
   });
 });

@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
-import type { IntegrationTypeView } from '../../../shared/api/types.ts';
+import type { IntegrationSenderView, IntegrationTypeView } from '../../../shared/api/types.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
+import { UserListField } from './UserListField.tsx';
 import { defaultValueLabel, paramHint, paramLabel, valueLabel } from '../kindLabels.ts';
 
 export type Param = IntegrationTypeView['params'][number];
@@ -35,6 +36,7 @@ export function ParamField({
   value,
   onChange,
   prefix = 'param',
+  loadSenders,
 }: {
   kind: string;
   param: Param;
@@ -42,6 +44,8 @@ export function ParamField({
   onChange: (value: string) => void;
   /** Keeps the ids apart when several forms are on the page. */
   prefix?: string;
+  /** Reads the recent senders of the connection for a list of users; absent: no hints. */
+  loadSenders?: () => Promise<IntegrationSenderView[]>;
 }) {
   const { t } = useTranslation();
   const id = `${prefix}-${param.name}`;
@@ -54,7 +58,18 @@ export function ParamField({
         {param.required ? ' *' : ''}
       </Label>
       <code className="text-xs text-muted-foreground">{param.name}</code>
-      {param.values === undefined ? (
+      {param.userList === true ? (
+        <UserListField
+          id={id}
+          kind={kind}
+          pattern={param.pattern}
+          maxLength={param.maxLength}
+          value={value}
+          onChange={onChange}
+          describedBy={hintId}
+          loadSenders={loadSenders}
+        />
+      ) : param.values === undefined ? (
         <Input
           id={id}
           value={value}

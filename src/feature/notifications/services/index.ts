@@ -6,3 +6,4 @@ export * from './inbound.ts';
 export * from './journal.ts';
 export * from './subscriptions.ts';
 export * from './webhooks/index.ts';
+export * from './senders/index.ts';

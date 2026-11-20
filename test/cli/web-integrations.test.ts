@@ -92,6 +92,37 @@ describe('the panel API of integrations', () => {
     expect(JSON.parse(text).connections[0].secrets[0].present).toBe(true);
   });
 
+  it('lists who wrote to the chat lately, without those who are allowed, and needs an id', async () => {
+    const { get, id } = await setup();
+    const empty = await get(`/api/integrations/senders?id=${id}`);
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual([]);
+    expect((await get('/api/integrations/senders')).status).toBe(400);
+    expect((await get('/api/integrations/senders?id=nope')).status).toBeGreaterThanOrEqual(400);
+
+    await enable(id);
+    for (const [user, username] of [
+      [111, 'alice'],
+      [222, 'bob'],
+    ] as const) {
+      fake!.push({
+        message: {
+          message_id: user,
+          chat: { id: -1001 },
+          from: { id: user, username },
+          text: '/id',
+        },
+      });
+    }
+    const deadline = Date.now() + 5000;
+    let listed: { user: string; label: string | null }[] = [];
+    while (listed.length === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      listed = (await (await get(`/api/integrations/senders?id=${id}`)).json()) as typeof listed;
+    }
+    expect(listed).toMatchObject([{ user: '222', label: '@bob' }]);
+  });
+
   it('edits the non-secret parameters and refuses a secret in any field', async () => {
     const { post, get, id } = await setup();
     const edited = await post('/api/integrations/edit', { id, set: { chat_id: '-77' } });

@@ -122,6 +122,27 @@ describe('the listeners of the channels', () => {
   });
 });
 
+describe('the people the channels saw', () => {
+  it('forgets them when the secret is replaced or the connection is removed', async () => {
+    const h = setup();
+    const id = await chatConnection(h.base);
+    await settle(h);
+    h.channels.built.at(-1)!.options.seen?.({ user: '5', label: '@eve' });
+    expect(h.notifications.senders.forConnection(id)).toHaveLength(1);
+    await h.base.services.connections.setSecret(id, 'token', 'new');
+    await settle(h);
+    expect(h.notifications.senders.forConnection(id)).toEqual([]);
+    h.channels.built.at(-1)!.options.seen?.({ user: '5', label: '@eve' });
+    expect(h.notifications.senders.forConnection(id)).toHaveLength(1);
+    await h.base.services.connections.edit(id, { set: { language: 'ru' } });
+    await settle(h);
+    expect(h.notifications.senders.forConnection(id)).toHaveLength(1);
+    await h.base.services.connections.remove(id);
+    await settle(h);
+    expect(() => h.notifications.senders.forConnection(id)).toThrow();
+  });
+});
+
 describe('changing the parameters of an enabled connection', () => {
   it('restarts the listener with the new parameters and keeps the read position', async () => {
     const h = setup();

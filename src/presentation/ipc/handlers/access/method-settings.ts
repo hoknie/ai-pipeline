@@ -33,6 +33,7 @@ export const settingsMethods = {
   repository_move: onShared('project.update'),
   repository_remove: onShared('project.remove'),
   integration_types: onShared('integration.read'),
+  integration_senders: onShared('integration.read'),
   integration_list: onShared('integration.read'),
   integration_add: onShared('integration.write'),
   integration_edit: onShared('integration.write'),

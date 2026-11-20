@@ -12,7 +12,8 @@ export const slackDescriptor: AdapterDescriptor = {
     // Slack user ids, separated by commas: the only people whose answers are accepted.
     {
       name: 'allowed_users',
-      required: true,
+      required: false,
+      userList: true,
       maxLength: 400,
       pattern: '[UW][A-Z0-9]{8,}(,[UW][A-Z0-9]{8,})*',
     },

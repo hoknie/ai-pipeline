@@ -31,7 +31,7 @@ export const CHAT: AdapterDescriptor = {
   title: 'Chat',
   params: [
     { name: 'chat_id', required: false, maxLength: 20 },
-    { name: 'allowed_users', required: false, maxLength: 100 },
+    { name: 'allowed_users', required: false, maxLength: 100, userList: true },
     { name: 'language', required: false, maxLength: 2, values: ['en', 'ru'] },
   ],
   secrets: [{ slot: 'token', required: true }],

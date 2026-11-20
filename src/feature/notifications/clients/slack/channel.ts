@@ -166,6 +166,7 @@ export class SlackChannel implements ChatChannelPort {
         await this.ephemeral(envelope.channel, envelope.user, t.results.forbidden);
         return;
       }
+      this.see(envelope.user, envelope.label);
       const result = await handler.handle({
         type: 'action',
         // One press is one event, in whatever envelope Slack delivers it.
@@ -189,6 +190,7 @@ export class SlackChannel implements ChatChannelPort {
       return;
     }
     if (!this.ownTeam(envelope.team)) return;
+    this.see(envelope.user, null);
     const result = await handler.handle({
       type: 'text',
       event: envelope.envelopeId,
@@ -200,6 +202,15 @@ export class SlackChannel implements ChatChannelPort {
     const answer = replyText(result, t.results);
     if (answer !== undefined) {
       await this.ephemeral(envelope.channel, envelope.user, answer, envelope.thread);
+    }
+  }
+
+  /** Tells the core who is acting; a failure of that never stops the handling of the event. */
+  private see(user: string, label: string | null): void {
+    try {
+      this.options.seen?.({ user, label });
+    } catch {
+      // the list of recent senders is a convenience
     }
   }
 

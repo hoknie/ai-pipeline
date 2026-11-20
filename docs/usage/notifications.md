@@ -7,19 +7,21 @@ A *connection* holds the bot (token, chat, allowed users) and is shared or belon
 ## Setting up a Telegram bot
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and keep its token.
-2. Create the connection with your Telegram user id in `allowed_users` (the ids of everyone whose answers count, separated by commas). Write to the bot `/id` to learn your user id, in the chat you want to use to learn the chat id too.
+2. Create the connection. `allowed_users` (the Telegram user ids of everyone whose answers count, separated by commas) is optional: without it nobody can answer from the chat. Write to the bot `/id` to learn your user id, in the chat you want to use to learn the chat id too.
 
 ```
-aip integration add telegram main --global --param allowed_users=111,222
+aip integration add telegram main --global
 aip integration secret set <id> bot_token --stdin < token.txt
 aip integration enable <id>
 ```
 
-3. Write `/id` to the bot in the chat that should get the messages (a private chat, a group or a supergroup) and set the chat:
+3. Write `/id` to the bot in the chat that should get the messages (a private chat, a group or a supergroup) and set the chat and the users who may answer:
 
 ```
-aip integration edit <id> --param chat_id=-1001234567890
+aip integration edit <id> --param chat_id=-1001234567890 --param allowed_users=111,222
 ```
+
+In the panel (Settings → Integrations → Telegram) the users are chips, and the people who wrote to the bot lately (`/id`, a button press or a reply) are offered under the field as «Recently wrote to the bot». The list is kept in the daemon's memory for 7 days, up to 20 people per connection, and is lost when the daemon restarts.
 
 4. Subscribe a project and check the channel:
 
@@ -63,7 +65,7 @@ settings:
 4. Create the connection, give it both secrets and subscribe a project:
 
 ```
-aip integration add slack team --global --param channel_id=C0123456789 --param allowed_users=U01AAAAAAA,U01BBBBBBB
+aip integration add slack team --global --param channel_id=C0123456789
 aip integration secret set <id> bot_token --stdin < bot-token.txt
 aip integration secret set <id> app_token --stdin < app-token.txt
 aip integration enable <id>
@@ -71,7 +73,7 @@ aip notify add <id> --repo . --events question,failed
 aip notify test <subscription>
 ```
 
-Optional parameters: `team_id` (`T…`) accepts events of one workspace only, `language` is `en` or `ru`. One Slack app belongs to one daemon: Slack shares events between several connections of the same app.
+Optional parameters: `allowed_users` (without it nobody can answer from the channel; the panel offers people who pressed a button or replied in a thread lately), `team_id` (`T…`) accepts events of one workspace only, `language` is `en` or `ru`. One Slack app belongs to one daemon: Slack shares events between several connections of the same app.
 
 In Slack, a question has a button for every option (up to 5; more options are a drop-down list), then **Accept recommendations** and **Custom answer**. Write a text answer as a reply in the thread of the message, `N: text` for several questions.
 
@@ -96,7 +98,7 @@ Only `question` messages have buttons; the others are information.
 - **Custom answer** (and **Rework** for a step review) asks for a reply to the bot's prompt. Write `N: text`, where `N` is the question number; a task with one question takes plain text.
 - A step review has **Accept** and **Rework**.
 
-Only users from `allowed_users`, in the chat `chat_id`, can answer; anyone else gets a refusal and nothing changes. A button pressed after the question was answered elsewhere (panel, CLI, autopilot, another chat) changes nothing: the message is already closed and says who closed it.
+Only users from `allowed_users`, in the chat `chat_id`, can answer (an empty list allows nobody; the card of the connection in the panel warns about it); anyone else gets a refusal and nothing changes. A button pressed after the question was answered elsewhere (panel, CLI, autopilot, another chat) changes nothing: the message is already closed and says who closed it.
 
 ## What leaves your machine
 

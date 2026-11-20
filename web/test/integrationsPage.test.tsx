@@ -147,7 +147,9 @@ describe('the page of integrations', () => {
       }),
     });
     const card = screen.getByTestId('connection-c1');
-    fireEvent.change(within(card).getByLabelText(/^Who may answer/), { target: { value: 'x' } });
+    const users = within(card).getByLabelText(/^Who may answer/);
+    fireEvent.change(users, { target: { value: '222' } });
+    fireEvent.keyDown(users, { key: 'Enter' });
     fireEvent.click(within(card).getByRole('button', { name: 'Save parameters' }));
     expect(await screen.findByText(/allowed_users: not a list of ids/)).toBeTruthy();
     expect(api.integrationEdit).toHaveBeenCalledTimes(1);
@@ -243,9 +245,12 @@ describe('paramsChange', () => {
   const params = integrationsOverview().types[0]!.params;
 
   it('sets what changed, removes an optional parameter that was cleared, keeps a required one', () => {
+    const required = params.map((one) =>
+      one.name === 'allowed_users' ? { ...one, required: true } : one,
+    );
     expect(
       paramsChange(
-        params,
+        required,
         { allowed_users: '1', chat_id: '5' },
         { chat_id: '', allowed_users: '' },
       ),
@@ -254,6 +259,13 @@ describe('paramsChange', () => {
       paramsChange(params, { allowed_users: '1' }, { chat_id: ' -9 ', allowed_users: '1' }),
     ).toEqual({ set: { chat_id: '-9' }, unset: [] });
     expect(paramsChange(params, { allowed_users: '1' }, {})).toEqual({ set: {}, unset: [] });
+  });
+
+  it('removes the list of users that was emptied: it is optional', () => {
+    expect(paramsChange(params, { allowed_users: '1' }, { allowed_users: '' })).toEqual({
+      set: {},
+      unset: ['allowed_users'],
+    });
   });
 });
 
@@ -337,7 +349,9 @@ describe('a new connection', () => {
     expect(form.querySelector('input[type="password"]')).toBeNull();
     expect(within(form).queryByLabelText(/bot_token/)).toBeNull();
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'main' } });
-    fireEvent.change(within(form).getByLabelText(/^Who may answer/), { target: { value: '111' } });
+    const users = within(form).getByLabelText(/^Who may answer/);
+    fireEvent.change(users, { target: { value: '111' } });
+    fireEvent.keyDown(users, { key: 'Enter' });
     fireEvent.click(within(form).getByRole('button', { name: 'Create connection' }));
     await waitFor(() =>
       expect(api.integrationAdd).toHaveBeenCalledWith({
@@ -346,6 +360,31 @@ describe('a new connection', () => {
         params: { allowed_users: '111' },
       }),
     );
+  });
+
+  it('makes a connection without users, which is allowed', async () => {
+    const api = await open();
+    const form = screen.getByRole('form', { name: 'New connection' });
+    expect(within(form).getByLabelText(/^Who may answer/)).toBeTruthy();
+    expect(within(form).queryByText(/\*/)).toBeNull();
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'quiet' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Create connection' }));
+    await waitFor(() =>
+      expect(api.integrationAdd).toHaveBeenCalledWith({ kind: 'telegram', name: 'quiet' }),
+    );
+  });
+
+  it('warns on the card of a connection that allows nobody', async () => {
+    const overview = integrationsOverview();
+    overview.connections[0] = { ...overview.connections[0]!, params: {} };
+    await open({ integrations: vi.fn(async () => overview) });
+    const card = screen.getByTestId('connection-c1');
+    expect(within(card).getByText(/No user is allowed/)).toBeTruthy();
+  });
+
+  it('shows no warning when users are allowed', async () => {
+    await open();
+    expect(screen.queryByText(/No user is allowed/)).toBeNull();
   });
 
   it('can be made for one project', async () => {
@@ -371,11 +410,11 @@ describe('a new connection', () => {
     });
     const form = screen.getByRole('form', { name: 'New connection' });
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'main' } });
-    fireEvent.change(within(form).getByLabelText(/^Who may answer/), { target: { value: 'x' } });
+    fireEvent.change(within(form).getByLabelText(/^Chat/), { target: { value: 'x' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Create connection' }));
     expect(await screen.findByText(/allowed_users: not a list of ids/)).toBeTruthy();
     expect((within(form).getByLabelText('Name') as HTMLInputElement).value).toBe('main');
-    expect((within(form).getByLabelText(/^Who may answer/) as HTMLInputElement).value).toBe('x');
+    expect((within(form).getByLabelText(/^Chat/) as HTMLInputElement).value).toBe('x');
   });
 });
 

@@ -19,6 +19,7 @@ import {
 } from '../types/index.ts';
 
 import type { ChannelFactories } from './factories.ts';
+import type { RecentSenders } from './senders/index.ts';
 
 export interface ChannelsDependencies {
   integrations: IntegrationsServices;
@@ -30,6 +31,8 @@ export interface ChannelsDependencies {
   /** What the core does with what a chat sends. */
   handle: (connectionId: string, input: InboundInput) => Promise<InboundResult>;
   publish: NotificationsPublishPort;
+  /** Who the channels saw writing; cleared when the connection is gone or its secret changes. */
+  senders: RecentSenders;
   log: (message: string) => void;
   now: () => number;
   /** A connection was enabled or switched off: what the webhooks do about it. */
@@ -116,7 +119,7 @@ export class NotificationChannels {
 
   /** The channel of a connection with its parameters as they are now; null when it cannot work. */
   open(connectionId: string, options: { disabled?: boolean } = {}): OpenChannel | null {
-    const { integrations, factories, cursors, attempts, now } = this.dependencies;
+    const { integrations, factories, cursors, attempts, senders, now } = this.dependencies;
     let connection: Connection;
     try {
       connection = integrations.access.find(connectionId);
@@ -138,6 +141,7 @@ export class NotificationChannels {
         params: connection.params,
       },
       now,
+      seen: (person) => senders.note(connection.id, person, now()),
       record: (deliveryId, attempt) => attempts.insert(deliveryId, attempt),
       secret: (slot) => integrations.secrets.read(connection.id, slot).catch(() => null),
       cursor: {
@@ -166,6 +170,8 @@ export class NotificationChannels {
   }
 
   private async react(id: string, change: ConnectionChange): Promise<void> {
+    // Another bot or another workspace behind the connection: the people seen so far are not its.
+    if (change === 'removed' || change === 'secret') this.dependencies.senders.clear(id);
     if (change === 'removed') {
       await this.halt(id);
       this.forget(id);

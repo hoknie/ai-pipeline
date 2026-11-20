@@ -197,10 +197,15 @@ describe('aip integration', () => {
     expect(bad.stderr).toContain('allowed_users');
     const unknown = await aip(box, 'integration', 'edit', id, '--param', 'nothing=1');
     expect(unknown.code).toBe(1);
-    const required = await aip(box, 'integration', 'edit', id, '--unset', 'allowed_users');
-    expect(required.code).toBe(1);
+    const empty = await aip(box, 'integration', 'edit', id, '--param', 'allowed_users=');
+    expect(empty.code).toBe(1);
+    expect(empty.stderr).toContain('allowed_users');
     const list = (await aip(box, 'integration', 'list', '--json')).stdout;
     expect(list).toContain('"allowed_users": "111"');
+    // The list of users is optional: it can be removed, and then nobody may answer.
+    const removed = await aip(box, 'integration', 'edit', id, '--unset', 'allowed_users');
+    expect(removed.code).toBe(0);
+    expect((await aip(box, 'integration', 'list', '--json')).stdout).not.toContain('allowed_users');
   });
 });
 

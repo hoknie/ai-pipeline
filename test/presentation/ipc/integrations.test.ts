@@ -10,6 +10,7 @@ import {
   parseRequest,
   requestSchema,
 } from '../../../src/presentation/ipc/contract/index.ts';
+import { actionOf } from '../../../src/presentation/ipc/handlers/access/method-actions.ts';
 import { handle } from '../../../src/presentation/ipc/handlers/index.ts';
 import type { IpcContext } from '../../../src/presentation/ipc/handlers/types.ts';
 import { SENTINEL } from '../../feature/integrations/helpers.ts';
@@ -29,6 +30,7 @@ describe('integration requests', () => {
       ['integration_enable', { id: 'c1' }],
       ['integration_disable', { id: 'c1' }],
       ['integration_check', { id: 'c1' }],
+      ['integration_senders', { id: 'c1' }],
       ['integration_skills', { id: 'c1', query: 'go' }],
       ['integration_skills', { repository: '/repo' }],
       ['integration_secret_set', { id: 'c1', slot: 'token', value: 'v' }],
@@ -36,6 +38,13 @@ describe('integration requests', () => {
     ] as const) {
       expect(parse(method, params)).toMatchObject({ request: { method } });
     }
+  });
+
+  it('needs a connection id for the recent senders, and the right to read integrations', () => {
+    for (const params of [{}, { id: '' }, { id: 'x'.repeat(65) }]) {
+      expect(parse('integration_senders', params)).toMatchObject({ code: 'invalid_params' });
+    }
+    expect(actionOf('integration_senders', { id: 'c1' })).toBe('integration.read');
   });
 
   it('refuses a slot that is not a name, an empty or oversized value and extra shapes', () => {
@@ -66,6 +75,7 @@ describe('integration requests', () => {
       'integration_remove',
       'integration_secret_remove',
       'integration_secret_set',
+      'integration_senders',
       'integration_skills',
       'integration_types',
     ]);
@@ -143,6 +153,43 @@ describe('integration handlers', () => {
   });
 });
 
+describe('the recent senders handler', () => {
+  const senders = [{ user: '222', label: '@bob', at: 5 }];
+  const context = (forConnection: (id: string) => unknown): IpcContext =>
+    ({
+      actor: { kind: 'local' },
+      services: { notifications: { senders: { forConnection } } },
+    }) as unknown as IpcContext;
+
+  it('answers with the people the service lists', async () => {
+    const asked: string[] = [];
+    const answer = await handle(
+      { method: 'integration_senders', params: { id: 'c1' } },
+      context((id) => (asked.push(id), senders)),
+    );
+    expect(answer).toEqual(senders);
+    expect(asked).toEqual(['c1']);
+  });
+
+  it('keeps the refusal of an unknown connection and hides any other failure', async () => {
+    const request = { method: 'integration_senders', params: { id: 'c1' } } as const;
+    const unknown = await handle(
+      request,
+      context(() => {
+        throw refusal('not_found');
+      }),
+    ).catch((caught: Error) => caught);
+    expect((unknown as Error).message).toBe('connection not found');
+    const other = await handle(
+      request,
+      context(() => {
+        throw new Error(`boom ${SENTINEL}`);
+      }),
+    ).catch((caught: Error) => caught);
+    expect((other as Error).message).toBe('integration request failed');
+  });
+});
+
 describe('where the methods are not offered', () => {
   function sources(directory: string): string[] {
     return readdirSync(directory).flatMap((name) => {
@@ -160,6 +207,7 @@ describe('where the methods are not offered', () => {
         if (file.endsWith(own)) {
           // the panel manages connections and their non-secret parameters; secrets stay with the CLI
           expect(text, file).not.toMatch(/integration_secret_(set|remove)/);
+          expect(text, file).toContain('integration_senders');
         } else {
           expect(text, file).not.toMatch(/integration_/);
         }

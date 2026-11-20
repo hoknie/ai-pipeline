@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type {
   ChannelStateView,
   ConnectionView,
+  IntegrationSenderView,
   IntegrationTypeView,
 } from '../../../shared/api/types.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
@@ -82,6 +83,7 @@ export function ConnectionCard({
   onEnabled,
   onRemove,
   onCheck,
+  loadSenders,
 }: {
   connection: ConnectionView;
   type: IntegrationTypeView | undefined;
@@ -94,9 +96,14 @@ export function ConnectionCard({
   onRemove: (id: string) => Promise<boolean>;
   /** Present for the kinds that can be checked; the outcome comes back in `lastCheck`. */
   onCheck?: (id: string) => Promise<boolean>;
+  /** Reads the recent senders of the chat of the connection, for the list of users. */
+  loadSenders?: (id: string) => Promise<IntegrationSenderView[]>;
 }) {
   const { t } = useTranslation();
   const params = type?.params ?? [];
+  const unlisted = params.some(
+    (param) => param.userList === true && !connection.params[param.name],
+  );
   return (
     <section
       className="flex flex-col gap-3 rounded-lg border bg-card p-3"
@@ -129,7 +136,17 @@ export function ConnectionCard({
       {onCheck === undefined ? null : <CheckStatus check={connection.lastCheck} />}
       {channel?.error ? <p className="text-xs text-status-err">{channel.error}</p> : null}
       <SecretList connection={connection} />
-      <ParamsForm connection={connection} params={params} onEdit={onEdit} />
+      {unlisted ? (
+        <p role="status" className="text-xs text-status-warn">
+          {t('integrations.users.warning')}
+        </p>
+      ) : null}
+      <ParamsForm
+        connection={connection}
+        params={params}
+        onEdit={onEdit}
+        loadSenders={loadSenders}
+      />
     </section>
   );
 }

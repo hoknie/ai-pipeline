@@ -165,7 +165,7 @@ export const zh: Dictionary = {
           },
           allowed_users: {
             label: '谁可以回复',
-            hint: 'Telegram 用户 ID，以逗号分隔；留空表示聊天中的所有人。每个人向机器人发送 /id 即可查看自己的 ID。',
+            hint: 'Telegram 用户 ID；不填则无人可从聊天中回复。每个人向机器人发送 /id 即可查看自己的 ID。',
           },
           language: {
             label: '机器人消息语言',
@@ -192,7 +192,7 @@ export const zh: Dictionary = {
           },
           allowed_users: {
             label: '谁可以回复',
-            hint: 'Slack 用户 ID，以逗号分隔；留空表示频道中的所有人。在 Slack 中打开个人资料并复制成员 ID（U…）。',
+            hint: 'Slack 用户 ID；不填则无人可从频道中回复。可选择最近点过按钮的人，或在个人资料中复制成员 ID（U…）。',
           },
           language: {
             label: '机器人消息语言',
@@ -250,6 +250,16 @@ export const zh: Dictionary = {
     },
     params: {
       save: '保存参数',
+    },
+    users: {
+      add: '添加用户 ID',
+      remove: '移除 {{user}}',
+      invalid: 'ID 无效',
+      suggestions: '最近给机器人发过消息',
+      refresh: '刷新',
+      emptyTelegram: '最近没有人发过消息。请让对方在聊天中向机器人发送 /id，他们会出现在这里。',
+      emptySlack: '最近没有人点过按钮。请让对方点击频道中应用提问下方的按钮，他们会出现在这里。',
+      warning: '未允许任何用户：聊天中的回复对所有人都会被拒绝。',
     },
     subscriptions: {
       title: '订阅',

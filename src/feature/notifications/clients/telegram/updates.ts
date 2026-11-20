@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-const user = z.object({ id: z.number().int(), is_bot: z.boolean().optional() });
+const user = z.object({
+  id: z.number().int(),
+  is_bot: z.boolean().optional(),
+  username: z.string().optional(),
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+});
 const chat = z.object({ id: z.number().int() });
 
 const message = z.object({
@@ -58,4 +64,16 @@ export function isIdCommand(text: string): boolean {
 
 export function isCommand(text: string): boolean {
   return text.trim().startsWith('/');
+}
+
+/** A person of Telegram as a panel shows them: `@username`, else the first and the last name. */
+export function personOf(from: z.infer<typeof user>): { user: string; label: string | null } {
+  const name = [from.first_name, from.last_name].filter((one) => one !== undefined && one !== '');
+  const label = from.username ? `@${from.username}` : name.join(' ');
+  return { user: String(from.id), label: label === '' ? null : label };
+}
+
+/** Whether the sender is a person: a bot is never offered as a user to allow. */
+export function isPerson(from: z.infer<typeof user> | undefined): from is z.infer<typeof user> {
+  return from !== undefined && from.is_bot !== true;
 }

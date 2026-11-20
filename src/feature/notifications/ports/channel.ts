@@ -68,6 +68,8 @@ export interface ChannelOptions {
   /** The secret of the connection; read at the moment of a call. */
   secret: (slot: string) => Promise<string | null>;
   cursor: CursorStore;
+  /** A person was seen writing to the chat: pressing a button, replying, asking for the ids. */
+  seen?: (person: { user: string; label: string | null }) => void;
 }
 
 /** A built-in kind of a channel: how to read its parameters and how to build its adapter. */

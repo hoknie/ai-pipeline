@@ -55,6 +55,8 @@ export const notificationHandlers = {
         }),
       );
     }),
+  integration_senders: (params, { services }) =>
+    guarded(() => services.notifications.senders.forConnection(params.id)),
   notify_channels: async (_params, { services }) =>
     guarded(async () => {
       const connections = await services.integrations.connections.list();

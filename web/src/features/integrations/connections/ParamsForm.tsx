@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ConnectionView } from '../../../shared/api/types.ts';
+import type { ConnectionView, IntegrationSenderView } from '../../../shared/api/types.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { ParamField, paramsChange, type Param } from './ParamField.tsx';
 
@@ -10,6 +10,7 @@ export function ParamsForm({
   connection,
   params,
   onEdit,
+  loadSenders,
 }: {
   connection: ConnectionView;
   params: readonly Param[];
@@ -17,6 +18,8 @@ export function ParamsForm({
     id: string,
     change: { set: Record<string, string>; unset: string[] },
   ) => Promise<boolean>;
+  /** Reads the recent senders of a connection; absent: no hints. */
+  loadSenders?: (id: string) => Promise<IntegrationSenderView[]>;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -37,6 +40,7 @@ export function ParamsForm({
             key={param.name}
             kind={connection.kind}
             param={param}
+            loadSenders={loadSenders === undefined ? undefined : () => loadSenders(connection.id)}
             value={draft[param.name] ?? connection.params[param.name] ?? ''}
             onChange={(value) => setDraft({ ...draft, [param.name]: value })}
           />

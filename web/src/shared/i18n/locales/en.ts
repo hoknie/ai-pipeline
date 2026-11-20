@@ -177,7 +177,7 @@ export const en = {
           },
           allowed_users: {
             label: 'Who may answer',
-            hint: 'Telegram user ids separated by commas; empty means everyone in the chat. Each person can see their id by sending the bot /id.',
+            hint: 'Telegram user ids; without them nobody can answer from the chat. Each person can see their id by sending the bot /id.',
           },
           language: {
             label: 'Bot message language',
@@ -204,7 +204,7 @@ export const en = {
           },
           allowed_users: {
             label: 'Who may answer',
-            hint: 'Slack user ids separated by commas; empty means everyone in the channel. In Slack open the profile and copy the member ID (U…).',
+            hint: 'Slack user ids; without them nobody can answer from the channel. Pick a person who pressed a button lately or copy the member ID (U…) from the profile.',
           },
           language: {
             label: 'Bot message language',
@@ -264,6 +264,18 @@ export const en = {
     },
     params: {
       save: 'Save parameters',
+    },
+    users: {
+      add: 'Add a user id',
+      remove: 'Remove {{user}}',
+      invalid: 'Not a valid id',
+      suggestions: 'Recently wrote to the bot',
+      refresh: 'Refresh',
+      emptyTelegram:
+        'Nobody has written lately. Ask the person to send the bot /id in the chat: they will show up here.',
+      emptySlack:
+        'Nobody has pressed a button lately. Ask the person to press a button under a question of the app in the channel: they will show up here.',
+      warning: 'No user is allowed: answers from the chat are refused to everyone.',
     },
     subscriptions: {
       title: 'Subscriptions',

@@ -38,7 +38,11 @@ afterEach(async () => {
 
 function channel(
   params: Record<string, string> = {},
-  secrets: { bot?: string | null; app?: string | null } = {},
+  secrets: {
+    bot?: string | null;
+    app?: string | null;
+    seen?: (person: { user: string; label: string | null }) => void;
+  } = {},
 ): ChatChannelPort {
   const factory = slackChannelFactory({ base: slack.base, proxy: () => null, timing: TIMING });
   const tokens: Record<string, string | null> = {
@@ -52,6 +56,7 @@ function channel(
       kind: 'slack',
       params: { channel_id: CHANNEL, allowed_users: USER, ...params },
     },
+    ...(secrets.seen === undefined ? {} : { seen: secrets.seen }),
     secret: (slot) => Promise.resolve(tokens[slot] ?? null),
     cursor: { get: () => null, set: () => undefined },
   });
@@ -351,6 +356,43 @@ describe('slack channel: presses', () => {
   });
 });
 
+describe('slack channel: people seen', () => {
+  it('reports a user who pressed a button without rights and one who replied', async () => {
+    const found: { user: string; label: string | null }[] = [];
+    const { statuses, seen } = listen(
+      channel({}, { seen: (person) => found.push(person) }),
+      () => ({ kind: 'forbidden' }),
+    );
+    await until(() => listening(statuses), 'listening');
+    slack.press({ channel: CHANNEL, user: STRANGER, message: '1.1', actionId: `${KEY}:o:1:1` });
+    await until(() => slack.ephemerals.length === 1, 'ephemeral');
+    slack.reply({ channel: CHANNEL, user: USER, thread: '1700.5', text: 'yes' });
+    await until(() => seen.length === 2, 'reply');
+    expect(found).toEqual([
+      { user: STRANGER, label: null },
+      { user: USER, label: null },
+    ]);
+  });
+
+  it('survives a report that throws', async () => {
+    const { statuses, seen } = listen(
+      channel(
+        {},
+        {
+          seen: () => {
+            throw new Error('boom');
+          },
+        },
+      ),
+      () => ({ kind: 'forbidden' }),
+    );
+    await until(() => listening(statuses), 'listening');
+    slack.press({ channel: CHANNEL, user: STRANGER, message: '1.1', actionId: `${KEY}:o:1:1` });
+    await until(() => slack.ephemerals.length === 1, 'ephemeral');
+    expect(seen).toHaveLength(1);
+  });
+});
+
 describe('slack channel: replies in a thread', () => {
   it('takes the text of a reply in the thread of the question, with its lines', async () => {
     const { seen, statuses } = listen(channel(), () => ({ kind: 'sent' }));
@@ -424,6 +466,7 @@ describe('slack channel: the factory', () => {
     expect(factory.allows(params, 'C0999999999', USER)).toBe(false);
     expect(factory.allows(params, CHANNEL, STRANGER)).toBe(false);
     expect(factory.allows({ allowed_users: USER }, CHANNEL, USER)).toBe(false);
+    expect(factory.allows({ channel_id: CHANNEL }, CHANNEL, USER)).toBe(false);
     expect(factory.missingForSubscription({ allowed_users: USER })).toBe('channel_id');
     expect(factory.missingForSubscription(params)).toBeNull();
     expect(factory.language({ language: 'ru' })).toBe('ru');

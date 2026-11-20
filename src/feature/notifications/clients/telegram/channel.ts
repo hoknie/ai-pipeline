@@ -21,8 +21,10 @@ import { allowedUsers, TELEGRAM_KIND } from './kind.ts';
 import { renderMessage } from './render.ts';
 import {
   isCommand,
+  isPerson,
   isIdCommand,
   parseUpdates,
+  personOf,
   shortKeyOfPrompt,
   type TelegramUpdate,
 } from './updates.ts';
@@ -199,6 +201,7 @@ export class TelegramChannel implements ChatChannelPort {
         await this.quiet('answerCallbackQuery', { callback_query_id: callback.id });
         return;
       }
+      this.see(callback.from);
       const result = await handler.handle({
         type: 'action',
         event,
@@ -226,6 +229,7 @@ export class TelegramChannel implements ChatChannelPort {
     const message = update.message;
     if (message?.text === undefined) return;
     if (isIdCommand(message.text)) {
+      this.see(message.from);
       await this.quiet('sendMessage', {
         chat_id: message.chat.id,
         text: t.who(String(message.chat.id), String(message.from?.id ?? '')),
@@ -235,6 +239,7 @@ export class TelegramChannel implements ChatChannelPort {
     if (isCommand(message.text) || message.from === undefined) return;
     const replied = message.reply_to_message;
     if (replied === undefined) return;
+    this.see(message.from);
     const input: InboundInput = {
       type: 'text',
       event,
@@ -251,6 +256,16 @@ export class TelegramChannel implements ChatChannelPort {
         text: answer,
         reply_to_message_id: message.message_id,
       });
+    }
+  }
+
+  /** Tells the core who is writing; a failure of that never stops the handling of the update. */
+  private see(from: Parameters<typeof isPerson>[0]): void {
+    if (!isPerson(from)) return;
+    try {
+      this.options.seen?.(personOf(from));
+    } catch {
+      // the list of recent senders is a convenience
     }
   }
 

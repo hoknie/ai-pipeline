@@ -20,6 +20,8 @@ export interface ParamSpec {
   validate?: (value: string) => boolean;
   /** The parameter is the identity of something outside; it never changes after the connection is made. */
   immutable?: boolean;
+  /** The parameter lists the ids of people; a panel offers the recent senders of the connection for it. */
+  userList?: true;
 }
 
 /** A secret a kind keeps in the secret store. */

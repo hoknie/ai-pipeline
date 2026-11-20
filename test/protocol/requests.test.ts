@@ -91,6 +91,7 @@ const SAMPLES: Record<Method, unknown> = {
   integration_remove: { id: 'c1' },
   integration_link: { id: 'main', repository: '/repo', path: 'acme/backend/api' },
   integration_links: {},
+  integration_senders: { id: 'c1' },
   notify_list: {},
   notify_add: { connection: 'c1', repository: '/repo', events: ['question'] },
   notify_edit: { id: 'n1', events: ['failed'] },
@@ -222,9 +223,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 151 methods, each in the request schema once', () => {
+  it('has 152 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(151);
+    expect(methods).toHaveLength(152);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

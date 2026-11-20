@@ -932,7 +932,13 @@ export function integrationsOverview(
         title: 'Telegram bot',
         params: [
           { name: 'chat_id', required: false, maxLength: 20 },
-          { name: 'allowed_users', required: true, maxLength: 400 },
+          {
+            name: 'allowed_users',
+            required: false,
+            maxLength: 400,
+            pattern: '[1-9][0-9]{0,17}(,[1-9][0-9]{0,17})*',
+            userList: true,
+          },
           { name: 'language', required: false, maxLength: 2, values: ['en', 'ru'] },
         ],
         secrets: [{ slot: 'bot_token', required: true }],
@@ -1172,6 +1178,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     integrationCheck: vi.fn(async () => integrationsOverview().connections[0]!),
     integrationEdit: vi.fn(async () => integrationsOverview().connections[0]!),
     integrationLinks: vi.fn(async () => []),
+    integrationSenders: vi.fn(async () => []),
     integrationLink: vi.fn(async (id: string, repository: string) =>
       projectLinkView(id, repository),
     ),

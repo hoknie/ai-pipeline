@@ -24,6 +24,7 @@ aip integration secret remove <id> <slot>
 - `check` reaches the other system with the connection and prints `ok, 14 tools` or `failed: <code>`; `aip integration list` shows the time and the result of the last check, which survives a restart. Only an enabled connection with its secrets is checked, and only a kind that has a check (`service-registry`). Results carry a fixed code, never a response text or a secret.
 - A secret is read from stdin only (up to 16 KiB); there is no `--value`, so it never lands in the shell history or in `ps`. Errors never repeat the input.
 - Removing a secret of an enabled connection disables it first. `remove` deletes the connection and its secrets; repeat it if it was cut short.
+- `allowed_users` of `telegram` and `slack` is optional: a connection without it works, but nobody can answer from the chat, and the card in the panel says so. The panel fills the list from people who wrote to the bot lately (kept in the daemon's memory, 7 days, up to 20 per connection).
 - A project that has a connection cannot be removed from the daemon; moving a project keeps its connections.
 - Secret commands exist only in the CLI: they are not MCP tools and not in the web panel. The panel (settings → "Shared" → "Integrations") makes, enables, disables, checks and removes connections and edits their non-secret parameters; for a missing secret the card shows the command above with a button to copy it.
 

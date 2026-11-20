@@ -19,6 +19,7 @@ import { NotificationDispatcher } from './dispatcher.ts';
 import { ChannelFactories } from './factories.ts';
 import { NotificationInbound } from './inbound.ts';
 import { JournalService } from './journal.ts';
+import { NotificationSenders, RecentSenders } from './senders/index.ts';
 import { isChatConnection, SubscriptionService } from './subscriptions.ts';
 import { FailureStreaks, WebhookService } from './webhooks/index.ts';
 
@@ -30,6 +31,8 @@ export interface NotificationsServices {
   channels: NotificationChannels;
   factories: ChannelFactories;
   webhooks: WebhookService;
+  /** Who wrote to the chats lately: what a panel suggests for the list of users. */
+  senders: NotificationSenders;
 }
 
 export interface NotificationsDependencies {
@@ -74,6 +77,16 @@ function webhookIdsOf(
       .map((one) => one.id);
 }
 
+/** The journal of the deliveries of the subscriptions of chats. */
+function journalOf(
+  deliveries: DeliveryRepository,
+  rows: SubscriptionRepository,
+  integrations: IntegrationsServices,
+  factories: ChannelFactories,
+): JournalService {
+  return new JournalService(deliveries, webhookIdsOf(rows, integrations, factories));
+}
+
 /** The tables the notifications own, one repository each. */
 function repositoriesOf(database: Database) {
   return {
@@ -94,6 +107,7 @@ export function createNotificationsServices(
   const { subscriptionRows, deliveries, outcomes, answers, cursors, attempts } =
     repositoriesOf(database);
   const factories = new ChannelFactories(dependencies.kinds);
+  const recent = new RecentSenders();
   // The pieces need each other: the late names are read only once everything is built.
   const late: Late = {};
   const subscriptions = new SubscriptionService({
@@ -119,6 +133,7 @@ export function createNotificationsServices(
       return late.inbound.handle(id, input);
     },
     publish,
+    senders: recent,
     settle: (id, change) => late.webhooks?.changed(id, change),
     log,
     now,
@@ -156,14 +171,12 @@ export function createNotificationsServices(
   Object.assign(late, { webhooks, dispatcher, inbound });
   return {
     subscriptions,
-    journal: new JournalService(
-      deliveries,
-      webhookIdsOf(subscriptionRows, integrations, factories),
-    ),
+    journal: journalOf(deliveries, subscriptionRows, integrations, factories),
     dispatcher,
     inbound,
     channels,
     factories,
     webhooks,
+    senders: new NotificationSenders({ integrations, recent, now }),
   };
 }

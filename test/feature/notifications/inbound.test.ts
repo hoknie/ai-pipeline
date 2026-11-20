@@ -229,6 +229,25 @@ describe('who may answer', () => {
     expect(answers()).toEqual([]);
   });
 
+  it('refuses everyone when the connection allows no user', async () => {
+    const h = harness();
+    current = h;
+    const connection = await chatConnection(h.base, { params: { chat_id: '-100' } });
+    await h.notifications.subscriptions.add({ connection, repository: 'app' });
+    await h.save(asking(ONE));
+    const [sent] = h.channels.of(connection).sent;
+    const result = await h.notifications.inbound.handle(connection, {
+      type: 'action',
+      event: 'none-1',
+      chat: '-100',
+      user: '111',
+      shortKey: sent!.shortKey,
+      action: 'o:1:1',
+    });
+    expect(result).toEqual({ kind: 'forbidden' });
+    expect(h.applied).toHaveLength(0);
+  });
+
   it('checks the user before it reads the delivery: a wrong key from a stranger is forbidden, not closed', async () => {
     const { h, connection } = await setup(ONE);
     const result = await h.notifications.inbound.handle(connection, {

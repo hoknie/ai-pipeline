@@ -100,6 +100,13 @@ export function integrationsRoutes({ call }: RouteKit): Route[] {
           ...(query.get('query') ? { query: query.get('query')!.slice(0, 200) } : {}),
         }),
     },
+    {
+      // Who wrote to the chat of a connection lately: the hints of the list of users.
+      method: 'GET',
+      pattern: /^\/api\/integrations\/senders$/,
+      handle: async (_match, _body, _repository, query) =>
+        call('integration_senders', parseBody(connectionId, { id: query.get('id') ?? undefined })),
+    },
     ...connectionRoutes(call),
     {
       method: 'POST',

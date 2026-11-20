@@ -2,6 +2,7 @@ import type {
   ChannelStateView,
   ConnectionView,
   DeliveryView,
+  IntegrationSenderView,
   IntegrationTypeView,
   RegistrySkillView,
   ProjectLinkView,
@@ -58,6 +59,8 @@ export interface IntegrationsApi {
   integrationCheck(id: string): Promise<ConnectionView>;
   /** The links of a project of a service registry (every project without a repository). */
   integrationLinks(repository?: string): Promise<ProjectLinkView[]>;
+  /** Who wrote to the chat of a connection lately and is not allowed yet; empty for other kinds. */
+  integrationSenders(id: string): Promise<IntegrationSenderView[]>;
   /** Links a project to a registry project, matches it again or clears the link. */
   integrationLink(id: string, repository: string, action: LinkAction): Promise<ProjectLinkView>;
   subscriptionAdd(subscription: NewSubscription): Promise<SubscriptionView>;
@@ -95,6 +98,7 @@ export function integrationsApi(
       call(
         `/api/integrations/links${repository === undefined ? '' : `?repository=${encodeURIComponent(repository)}`}`,
       ),
+    integrationSenders: (id) => call(`/api/integrations/senders?id=${enc(id)}`),
     integrationLink: (id, repository, action) =>
       post('/api/integrations/link', { id, repository, ...action }),
     subscriptionAdd: (subscription) =>

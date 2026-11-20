@@ -32,6 +32,13 @@ export interface ProjectLinkView {
   url: string | null;
 }
 
+/** A person who wrote to the chat of a connection lately, as `integration_senders` lists them. */
+export interface IntegrationSenderView {
+  user: string;
+  label: string | null;
+  at: number;
+}
+
 /** The answer of `integration_remove`: the connection and its secrets are gone. */
 export interface IntegrationRemoved {
   removed: string;
@@ -74,6 +81,7 @@ export const integrationsRequests = [
   z.object({ method: z.literal('integration_remove'), params: z.object({ id: connectionId }) }),
   z.object({ method: z.literal('integration_enable'), params: z.object({ id: connectionId }) }),
   z.object({ method: z.literal('integration_disable'), params: z.object({ id: connectionId }) }),
+  z.object({ method: z.literal('integration_senders'), params: z.object({ id: connectionId }) }),
   z.object({ method: z.literal('integration_check'), params: z.object({ id: connectionId }) }),
   z.object({
     method: z.literal('integration_skills'),

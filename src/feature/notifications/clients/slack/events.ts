@@ -9,7 +9,11 @@ const clicked = z.object({
 
 const interactive = z.object({
   type: z.literal('block_actions'),
-  user: z.object({ id: z.string() }),
+  user: z.object({
+    id: z.string(),
+    username: z.string().optional(),
+    name: z.string().optional(),
+  }),
   team: z.object({ id: z.string() }).optional(),
   channel: z.object({ id: z.string() }).optional(),
   container: z.object({ channel_id: z.string().optional() }).optional(),
@@ -50,6 +54,8 @@ export type SlackEnvelope =
       team: string | null;
       channel: string;
       user: string;
+      /** The display name of the user when Slack sends one. */
+      label: string | null;
       /** The message with the button: its `ts`, and the thread it belongs to. */
       message: { ts: string; thread: string } | null;
       actionId: string;
@@ -97,6 +103,7 @@ export function parseEnvelope(raw: string): SlackEnvelope | null {
       team: team?.id ?? null,
       channel: where,
       user: user.id,
+      label: user.username ?? user.name ?? null,
       message: sent === undefined ? null : { ts: sent.ts, thread: sent.thread_ts ?? sent.ts },
       actionId: action.action_id,
       actionTs: action.action_ts ?? null,

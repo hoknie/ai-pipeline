@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allowedUsers,
   slackAdapter,
+  slackDescriptor,
 } from '../../../src/feature/notifications/clients/slack/kind.ts';
 import { builtInAdapters } from '../../../src/app/notifications/index.ts';
 import { fixture } from '../integrations/helpers.ts';
@@ -72,7 +73,19 @@ describe('slack kind', () => {
       f.services.connections.add({ kind: 'slack', name: 'team', global: true, params });
     await expect(add({ ...PARAMS, webhook: 'x' })).rejects.toThrow();
     await expect(add({ allowed_users: PARAMS.allowed_users })).rejects.toThrow(/channel_id/);
-    await expect(add({ channel_id: PARAMS.channel_id })).rejects.toThrow(/allowed_users/);
+  });
+
+  it('makes a connection without a list of users, and refuses an empty one by name', async () => {
+    const f = fixture({ adapters: [slackAdapter()] });
+    const add = (params: Record<string, string>) =>
+      f.services.connections.add({ kind: 'slack', name: 'team', global: true, params });
+    const made = await add({ channel_id: PARAMS.channel_id });
+    expect(made.params).toEqual({ channel_id: PARAMS.channel_id });
+    await expect(add({ ...PARAMS, allowed_users: '' })).rejects.toThrow(/allowed_users/);
+    expect(slackDescriptor.params.find((one) => one.name === 'allowed_users')).toMatchObject({
+      required: false,
+      userList: true,
+    });
   });
 
   it('never shows a secret in the answers and does not take one as a parameter', async () => {

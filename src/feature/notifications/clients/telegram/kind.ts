@@ -12,7 +12,8 @@ export const telegramDescriptor: AdapterDescriptor = {
     // Positive user ids, separated by commas: the only people whose answers are accepted.
     {
       name: 'allowed_users',
-      required: true,
+      required: false,
+      userList: true,
       maxLength: 400,
       pattern: '[1-9][0-9]{0,17}(,[1-9][0-9]{0,17})*',
     },
