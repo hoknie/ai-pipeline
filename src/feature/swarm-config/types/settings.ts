@@ -1,3 +1,4 @@
+import { type AccessRole } from './access/index.ts';
 import { type Action, legacyScript, type StagePoints } from './action.ts';
 import { type RuntimeChain } from './chain.ts';
 import { type Pipeline, type Split, type Step } from './pipeline.ts';
@@ -321,6 +322,8 @@ export interface ServerSettings {
   auditRetention: string;
   /** `Name <email>` added as a co-author to the commits of a delivery; `null`: none. */
   commitTrailer: string | null;
+  /** The role (`admin`, `developer`, `viewer`) of a user without the attribute `role`; `null`: none. */
+  defaultRole: AccessRole | null;
 }
 
 /** The OpenID Connect provider of `server.sso.oidc`. */
@@ -383,5 +386,6 @@ export function defaultServer(): ServerSettings {
     sso: { oidc: null, saml: null },
     auditRetention: '365d',
     commitTrailer: null,
+    defaultRole: null,
   };
 }

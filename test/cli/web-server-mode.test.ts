@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { request } from '../../src/presentation/ipc/client/index.ts';
 import { remoteRequest } from '../../src/presentation/ipc/client/remote.ts';
 import { startWebServer, type WebServer } from '../../src/presentation/web/index.ts';
-import { harness, type Harness } from '../daemon/harness.ts';
+import { harness, settle, startRun, type Harness } from '../daemon/harness.ts';
+import { openLive } from '../fixtures/live.ts';
 import { FAKE_CLIENT_ID, FAKE_CLIENT_SECRET, FakeOidcProvider } from '../fakes/oidc-provider.ts';
 
 let current: Harness | null = null;
@@ -62,6 +63,7 @@ async function start(extra = ''): Promise<Harness> {
     `server:
   enabled: true
   public_url: "${base}"
+  default_role: developer
   sso:
     oidc:
       issuer: "${provider.issuer}"
@@ -279,5 +281,79 @@ describe('the audit journal of the sign-ins of the panel', () => {
     expect(failed?.details.address).toBe('127.0.0.1');
     const login = events.find((event) => event.action === 'auth.login');
     expect(login?.details).toMatchObject({ method: 'oidc', email: 'alice@corp.com' });
+  });
+});
+
+describe('access in the panel', () => {
+  const BOB = { sub: '43', email: 'bob@corp.com', email_verified: true, name: 'Bob' };
+
+  it('keeps the events and the answers of a project from a user who cannot read it', async () => {
+    await start();
+    const directory = join(String(current!.environment.XDG_CONFIG_HOME), 'aip');
+    writeFileSync(
+      join(directory, 'access.yaml'),
+      `rules:
+  - id: outsiders-see-nothing
+    effect: deny
+    actions: ['*']
+    subject: { groups: [outsiders] }
+`,
+    );
+    await current!.call('repository_add', { path: current!.repo });
+    const alice = cookieOf(await browse({ ...ALICE, groups: ['dev'] }))!;
+    const bob = cookieOf(await browse({ ...BOB, groups: ['outsiders'] }))!;
+    const aliceLive = await openLive(base, { cookie: alice, origin: base });
+    const bobLive = await openLive(base, { cookie: bob, origin: base });
+    current!.script({ code: [{ waitFor: current!.gate('hold') }] });
+    const run = await startRun(current!, {
+      repository: current!.repo,
+      pipeline: 'feature',
+      task: 'work',
+    });
+    try {
+      await aliceLive.message('the run', (m) => m.event === 'run');
+      await settle(current!);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(aliceLive.text).toContain(run.runId);
+      expect(bobLive.text).not.toContain(run.runId);
+      expect(bobLive.text).not.toContain(current!.repo);
+      const snapshot = bobLive.messages.find((m) => m.event === 'snapshot');
+      expect(snapshot).toMatchObject({ runs: [], queues: [], repositories: [] });
+      const headers = { origin: base };
+      const own = await send('GET', `/api/runs/${run.runId}`, { cookie: alice, ...headers });
+      expect(own.status).toBe(200);
+      const hidden = await send('GET', `/api/runs/${run.runId}`, { cookie: bob, ...headers });
+      expect(hidden.status).toBe(404);
+      const me = await send('GET', '/api/access/me', { cookie: bob, ...headers });
+      expect(JSON.parse(me.body)).toMatchObject({ actions: [], repositories: [] });
+      const mine = await send('GET', '/api/access/me', { cookie: alice, ...headers });
+      expect(JSON.parse(mine.body).actions).toContain('run.cancel');
+    } finally {
+      aliceLive.close();
+      bobLive.close();
+      current!.open('hold');
+    }
+  });
+
+  it('lists directories for whoever the policies let add a project', async () => {
+    await start();
+    const directory = join(String(current!.environment.XDG_CONFIG_HOME), 'aip');
+    writeFileSync(
+      join(directory, 'access.yaml'),
+      `rules:
+  - id: ops-add-projects
+    effect: allow
+    actions: [project.add]
+    subject: { groups: [ops] }
+`,
+    );
+    const ops = cookieOf(await browse({ ...ALICE, groups: ['ops'] }))!;
+    const dev = cookieOf(await browse({ ...BOB, groups: ['dev'] }))!;
+    const headers = { origin: base };
+    const allowed = await send('GET', '/api/directories', { cookie: ops, ...headers });
+    expect(allowed.status).toBe(200);
+    const refused = await send('GET', '/api/directories', { cookie: dev, ...headers });
+    expect(refused.status).toBe(403);
+    expect(JSON.parse(refused.body).code).toBe('access.denied');
   });
 });

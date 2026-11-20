@@ -11,6 +11,7 @@ import {
 } from '../validate-context.ts';
 import { checkSaml } from './server-saml.ts';
 import { type FieldError } from '../../types/errors.ts';
+import { ACCESS_ROLES, isAccessRole } from '../../types/access/index.ts';
 import {
   DEFAULT_OIDC_SCOPES,
   defaultServer,
@@ -29,6 +30,7 @@ const SERVER_KEYS = [
   'sso',
   'audit_retention',
   'commit_trailer',
+  'default_role',
 ];
 
 const SSO_KEYS = ['oidc', 'saml'];
@@ -236,6 +238,12 @@ function checkField(
     const value = readString(ctx, field, path)?.trim() ?? null;
     if (value !== null && !TRAILER.test(value)) addError(ctx, path, 'must be `Name <email>`');
     else if (value !== null) server.commitTrailer = value;
+  }
+  if (key === 'default_role') {
+    const value = readString(ctx, field, path);
+    if (value !== null && !isAccessRole(value)) {
+      addError(ctx, path, `must be one of ${ACCESS_ROLES.join(', ')}`);
+    } else if (value !== null) server.defaultRole = value;
   }
 }
 

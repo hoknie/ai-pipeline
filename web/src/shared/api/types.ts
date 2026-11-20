@@ -281,3 +281,15 @@ export interface SystemView {
 }
 
 export type { StatsBucket, StatsBucketRequest } from './statsApi.ts';
+
+/** What the signed in user may do in a project; the answer of `GET /api/access/me`. */
+export interface AccessMe {
+  actor: 'local' | 'system' | 'user';
+  userId: string | null;
+  repository: string | null;
+  actions: string[];
+  /** The actions allowed only for a resource the user is the author of. */
+  conditional: string[];
+  /** The paths of the projects the user reads; `null`: all of them. */
+  repositories: string[] | null;
+}

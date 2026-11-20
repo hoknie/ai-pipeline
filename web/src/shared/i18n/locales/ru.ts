@@ -336,6 +336,9 @@ export const ru: Dictionary = {
       outcomes: { ok: 'успешно', denied: 'отказ', failed: 'сбой' },
     },
   },
+  access: {
+    noRight: 'Нет прав на это действие: {{action}}',
+  },
   language: {
     label: 'Язык: {{language}}',
     system: 'Как в браузере',

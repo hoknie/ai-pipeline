@@ -1,4 +1,5 @@
 import { INCIDENT_KINDS } from '../../../feature/runs/types/index.ts';
+import { accessRequests } from './access/access.ts';
 import { agentsRequests } from './agents.ts';
 import { artifactsRequests } from './artifacts.ts';
 import { configRequests } from './config.ts';
@@ -32,6 +33,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   ...panelRequests,
   ...identityRequests,
   ...auditRequests,
+  ...accessRequests,
 ]);
 
 export type Request = z.infer<typeof requestSchema>;

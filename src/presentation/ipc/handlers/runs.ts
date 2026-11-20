@@ -4,6 +4,7 @@ import {
   type RunRequests,
 } from '../../../feature/runs/services/index.ts';
 
+import { visible } from './access/visible.ts';
 import type { HandlerTable, IpcContext } from './types.ts';
 
 /** Applies an event to the run and answers with its view. */
@@ -17,15 +18,18 @@ async function event(
 
 /** The runs: their status and what a person or a specialist does with them. */
 export const runHandlers = {
-  status: async (params, { services, snapshots }) => {
+  status: async (params, context) => {
+    const { services, snapshots } = context;
     const now = services.now();
     if (params.runId) return snapshots.run(services.runs.states.get(params.runId), now);
-    return snapshots.recentRuns(now);
+    return visible(context, snapshots.recentRuns(now), (run) => run.repository);
   },
-  finished_runs: async (params, { services, snapshots }) => {
+  finished_runs: async (params, context) => {
+    const { services, snapshots } = context;
     const now = services.now();
     const page = services.runs.states.page(params.limit, params.before, params.repository);
-    return { runs: page.runs.map((state) => snapshots.run(state, now)), next: page.next };
+    const runs = visible(context, page.runs, (state) => state.run.repository);
+    return { runs: runs.map((state) => snapshots.run(state, now)), next: page.next };
   },
   cancel: (params, context) =>
     event(context, params.runId, { kind: 'cancel', group: params.group ?? null }),

@@ -11,6 +11,7 @@ import { Button } from '../button.tsx';
 import { Card } from '../../layout/card.tsx';
 
 import { EnvEditor } from './EnvEditor.tsx';
+import { SaveButtons, useWriteAccess } from './save/SaveButtons.tsx';
 import { PoolsField } from './PoolsField.tsx';
 import type { PoolDraft } from './poolsDraft.ts';
 import { INHERIT, SettingField, savedValue } from './SettingField.tsx';
@@ -280,6 +281,7 @@ export function SettingsForm({
   useAttachmentStorage(group, attachmentStorage, onAttachmentStorage);
   const runtime = selectedRuntime(byPath, draft, scope);
   const { dirty, busy } = draft;
+  const write = useWriteAccess(api, scope);
   const reload = () => {
     draft.discard();
     void onSaved();
@@ -292,7 +294,7 @@ export function SettingsForm({
         className="flex flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (dirty && !busy) void draft.save();
+          if (dirty && !busy && write.allowed) void draft.save();
         }}
       >
         <div className="@container">
@@ -309,14 +311,7 @@ export function SettingsForm({
           </div>
         </div>
         <FormAlerts draft={draft} onReload={reload} />
-        <div className="flex gap-2">
-          <Button type="submit" disabled={!dirty || busy} loading={busy}>
-            {t('settingsPage.save')}
-          </Button>
-          <Button type="button" variant="outline" disabled={!dirty || busy} onClick={draft.discard}>
-            {t('settingsPage.discard')}
-          </Button>
-        </div>
+        <SaveButtons draft={draft} write={write} />
       </form>
     </ModelCatalogProvider>
   );

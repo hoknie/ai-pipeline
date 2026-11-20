@@ -48,6 +48,9 @@ export const readingMethods: readonly Method[] = [
   'auth_saml_begin',
   'auth_saml_metadata',
   'cli_login_begin',
+  'access_check',
+  'access_me',
+  'access_actions',
 ];
 
 /** The methods of the workers of specialists and observers: they act by a report token, not as a user. */

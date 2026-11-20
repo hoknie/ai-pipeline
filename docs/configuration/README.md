@@ -12,6 +12,7 @@ The configuration is an `aip/` directory with settings, specialists and pipeline
 - [configuration/attachments.md](attachments.md): the `attachments` section: local or S3 task attachment storage;
 - [configuration/stats.md](stats.md): the `stats` section: the usage journal and its report.
 - [configuration/server.md](server.md): the `server` section: one shared daemon for several people.
+- [configuration/access.md](access.md): who may do what in server mode: roles and `access.yaml`.
 
 Every file can also be edited in the [web panel](../web/settings.md).
 

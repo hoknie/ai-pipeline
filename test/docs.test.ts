@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import { parse as parseYaml } from 'yaml';
 
 import {
   configFromFiles,
@@ -20,6 +21,8 @@ import {
   loadRuntimeSettings,
   loadWebSettings,
 } from '../src/feature/swarm-config/services/index.ts';
+import { actionNames, similarActions } from '../src/feature/access/types/index.ts';
+import { validateAccessPolicy } from '../src/feature/swarm-config/services/index.ts';
 import { findSpecialist, findPipeline } from '../src/feature/swarm-config/types/index.ts';
 
 const root = join(import.meta.dirname, '..');
@@ -253,6 +256,26 @@ describe('documentation examples', () => {
       trustEmail: false,
       allowedDomains: ['corp.com'],
     });
+  });
+
+  it('the examples of docs/configuration/access.md are valid', () => {
+    const blocks = yamlBlocks('docs/configuration/access.md');
+    const policies = blocks.filter((block) => block.includes('rules:'));
+    expect(policies.length).toBeGreaterThanOrEqual(4);
+    const catalog = { names: actionNames(), similar: (name: string) => similarActions(name) };
+    for (const block of policies) {
+      const file = parseYaml(block);
+      expect(validateAccessPolicy(file, catalog).errors, block).toEqual([]);
+    }
+    const settings = blocks.find((block) => block.startsWith('server:')) ?? '';
+    expect(settings).not.toBe('');
+    const root = mkdtempSync(join(tmpdir(), 'aip-docs-access-'));
+    mkdirSync(join(root, 'xdg', 'aip'), { recursive: true });
+    writeFileSync(join(root, 'xdg', 'aip', 'settings.yaml'), settings);
+    const server = loadServerSettings(
+      configPaths(join(root, 'repo'), join(root, 'xdg'), undefined),
+    );
+    expect(server).toMatchObject({ enabled: true, defaultRole: 'developer' });
   });
 
   it('the web example of docs/configuration/README.md is valid in the global settings', () => {

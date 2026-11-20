@@ -1,37 +1,48 @@
 import { catalogView } from '../views/index.ts';
 
-import type { HandlerTable } from './types.ts';
+import { visible } from './access/visible.ts';
+
+import type { HandlerTable, IpcContext } from './types.ts';
+
+/** The registry as the actor sees it: the projects it reads. */
+const listed = (context: IpcContext) =>
+  visible(context, context.snapshots.repositories(), (view) => view.path);
 
 /** The registry of repositories and the tag catalogs. */
 export const repositoryHandlers = {
-  repositories: async (_params, { snapshots }) => snapshots.repositories(),
-  repository_match: async (params, { services }) => {
-    const project = await services.projects.matchRemotes(params.remotes);
+  repositories: async (_params, context) => listed(context),
+  repository_match: async (params, { services, actor }) => {
+    const found = await services.projects.matchRemotes(params.remotes);
+    // a project the actor cannot read is not there for the actor
+    const project =
+      found && services.access.can(actor, 'project.read', { repository: found.path })
+        ? found
+        : null;
     return {
       project: project
         ? { path: project.path, slug: project.slug ?? null, name: project.name }
         : null,
     };
   },
-  repository_add: ({ path, ...attributes }, { services, snapshots }) =>
-    services.runs.engine.serial(async () => {
-      await services.projects.add(path, attributes);
-      return snapshots.repositories();
+  repository_add: ({ path, ...attributes }, context) =>
+    context.services.runs.engine.serial(async () => {
+      await context.services.projects.add(path, attributes);
+      return listed(context);
     }),
-  repository_update: ({ path, ...changes }, { services, snapshots }) =>
-    services.runs.engine.serial(async () => {
-      await services.compose.repositoryEdit.update(path, changes);
-      return snapshots.repositories();
+  repository_update: ({ path, ...changes }, context) =>
+    context.services.runs.engine.serial(async () => {
+      await context.services.compose.repositoryEdit.update(path, changes);
+      return listed(context);
     }),
-  repository_move: (params, { services, snapshots }) =>
-    services.runs.engine.serial(async () => {
-      await services.compose.repositoryMove.move(params.path, params.to);
-      return snapshots.repositories();
+  repository_move: (params, context) =>
+    context.services.runs.engine.serial(async () => {
+      await context.services.compose.repositoryMove.move(params.path, params.to);
+      return listed(context);
     }),
-  repository_remove: (params, { services, snapshots }) =>
-    services.runs.engine.serial(async () => {
-      await services.compose.repositoryRemoval.remove(params.path);
-      return snapshots.repositories();
+  repository_remove: (params, context) =>
+    context.services.runs.engine.serial(async () => {
+      await context.services.compose.repositoryRemoval.remove(params.path);
+      return listed(context);
     }),
   tags: async (params, { services }) =>
     catalogView(await services.tags.catalogFor(params.repository)),

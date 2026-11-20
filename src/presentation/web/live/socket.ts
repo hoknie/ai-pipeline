@@ -23,7 +23,7 @@ export interface LiveOptions {
   /** The checks of a request of the API; throws the error the request would get. */
   identify(incoming: IncomingMessage): Promise<ConnectionIdentity>;
   /** Adds a connection to the events of the daemon; returns the function that removes it. */
-  join(send: (text: string) => void): () => void;
+  join(send: (text: string) => void, actor?: string): () => void;
   topics: Topics;
   pingMs?: number;
   recheckMs?: number;
@@ -50,7 +50,7 @@ function serve(ws: WebSocket, identity: ConnectionIdentity, options: LiveOptions
     actor: identity.actor,
     send: (message) => sendText(JSON.stringify(message)),
   };
-  const leave = options.join(sendText);
+  const leave = options.join(sendText, identity.actor);
   let alive = true;
   ws.on('pong', () => {
     alive = true;

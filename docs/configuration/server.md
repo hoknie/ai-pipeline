@@ -14,6 +14,7 @@ server:
   token_max_ttl: 90d
   audit_retention: 365d
   commit_trailer: aip <aip@example.com>
+  default_role: developer
 ```
 
 | Field | Default | Meaning |
@@ -26,6 +27,7 @@ server:
 | `token_max_ttl` | `90d` | The longest lifetime of a personal token, `<n>d` |
 | `audit_retention` | `365d` | How long the [audit journal](#audit-journal) keeps an entry, `<n>d` |
 | `commit_trailer` | none | `Name <email>` added to the message of a delivery commit as `Co-Authored-By`, see [authors](#authors-and-commits) |
+| `default_role` | none | `admin`, `developer` or `viewer`: the role of a user without the attribute `role`, see [access.md](access.md) |
 | `sso` | none | Sign-in through a corporate provider: see [sso.md](sso.md) (OpenID Connect) and [sso-saml.md](sso-saml.md) (SAML 2.0) |
 
 The section is set in the shared `settings.yaml` only; in a project `aip/settings.yaml` it is a validation error (`swarm.server`). In server mode `web.auth: none` and `web.autostart: false` are validation errors. A change takes effect after the daemon restarts.
@@ -115,6 +117,6 @@ A path on your machine is matched to a server project by the `git remote` of tha
 
 ## Limits
 
-- Only administrators change the shared settings, add or move projects, import specialists, clear statistics and read the audit journal.
+- What a user may do is decided by the role and the rules of `access.yaml`: see [access.md](access.md). Without a role and without `default_role` a user can do nothing but manage their own tokens; the administrators have `role: admin`.
 - A user delivers a result only with `delivery.mode: branch`; with `worktree` or `commit` the server answers `access.denied`, because the working tree on the server is shared.
-- `shutdown` and the daemon and panel controls are not available over the network.
+- `shutdown` and the daemon and panel controls are not available over the network without the `daemon.control` right.

@@ -320,6 +320,9 @@ export const zh: Dictionary = {
       outcomes: { ok: '成功', denied: '拒绝', failed: '失败' },
     },
   },
+  access: {
+    noRight: '没有权限执行此操作：{{action}}',
+  },
   language: {
     label: '语言：{{language}}',
     system: '跟随浏览器',

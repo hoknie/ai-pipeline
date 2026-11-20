@@ -1,3 +1,4 @@
+export * from './access/index.ts';
 export * from './action.ts';
 export * from './chain.ts';
 export * from './duration.ts';

@@ -42,7 +42,7 @@ async function start(
   mkdirSync(directory, { recursive: true });
   writeFileSync(
     join(directory, 'settings.yaml'),
-    `server: { enabled: true, public_url: "${PUBLIC}" }\n`,
+    `server: { enabled: true, public_url: "${PUBLIC}", default_role: developer }\n`,
   );
   web = await startWebServer({
     socket: current.socket,
@@ -287,7 +287,7 @@ describe('remote transport', () => {
     const url = `http://127.0.0.1:${port}`;
     writeFileSync(
       join(directory, 'settings.yaml'),
-      `server: { enabled: true, public_url: "${url}" }\n`,
+      `server: { enabled: true, public_url: "${url}", default_role: developer }\n`,
     );
     web = await startWebServer({
       socket: current.socket,

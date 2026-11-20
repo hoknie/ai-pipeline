@@ -1,3 +1,4 @@
+export * from './access/index.ts';
 export * from './agents.ts';
 export * from './artifacts.ts';
 export * from './config.ts';

@@ -58,6 +58,7 @@ export class StatsReportService {
       ...(query.until === undefined ? {} : { until: query.until }),
       ...(repository === undefined ? {} : { repository }),
       exclude,
+      ...(query.only === undefined ? {} : { only: query.only }),
     };
     const attempts = reads.attempts(scope);
     const tasks = reads.tasks(scope);
@@ -79,7 +80,7 @@ export class StatsReportService {
       return config === null ? null : (findPipeline(config, key)?.name ?? null);
     });
     const end = query.until ?? now();
-    const first = query.since ?? reads.firstFinished(exclude);
+    const first = query.since ?? reads.firstFinished(exclude, query.only);
     const start = first === null ? null : Math.max(first, end - MAX_SERIES_DAYS * DAY_MS);
     const bucket = resolveBucket(start, end, query.bucket);
     const report: StatsReport = {

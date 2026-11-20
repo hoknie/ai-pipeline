@@ -1,6 +1,7 @@
 import { rejected } from '../../../platform/errors/index.ts';
 import type { PingResult } from '../contract/index.ts';
 
+import { visible } from './access/visible.ts';
 import type { HandlerTable } from './types.ts';
 
 const NO_PANEL = 'this daemon serves no web panel';
@@ -42,6 +43,12 @@ export const systemHandlers = {
   web_start: (params, { panel }) =>
     panel ? panel.start(params) : Promise.reject(rejected(NO_PANEL)),
   web_stop: (_params, { panel }) => (panel ? panel.stop() : Promise.reject(rejected(NO_PANEL))),
-  processes: (_params, { services }) => services.processes.list(),
+  processes: async (_params, context) => {
+    const view = await context.services.processes.list();
+    return {
+      ...view,
+      processes: visible(context, view.processes, (item) => item.owner.repository),
+    };
+  },
   process_kill: (params, { services }) => services.processes.kill(params.pid),
 } satisfies Partial<HandlerTable>;

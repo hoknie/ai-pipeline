@@ -264,8 +264,21 @@ export function createApplication(options: ApplicationOptions): Application {
   const lower = createLower(context);
   const { runs, processes } = createRuns(context, lower);
   const upper = createUpper(context, lower, runs);
-  const { identity, audit, actorOfRequest } = createActors({ ...context, config: lower.config });
-  const services: DaemonServices = { now, ...lower, runs, processes, ...upper, identity, audit };
+  const { identity, audit, access, actorOfRequest } = createActors({
+    ...context,
+    config: lower.config,
+    registry: lower.registry,
+  });
+  const services: DaemonServices = {
+    now,
+    ...lower,
+    runs,
+    processes,
+    ...upper,
+    identity,
+    audit,
+    access,
+  };
   const snapshots = new Snapshots(services);
   const publisher = new Publisher(services, snapshots);
   wire(ports, services, publisher);

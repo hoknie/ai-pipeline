@@ -4,7 +4,7 @@ import {
   type ObserversResult,
   type ObserversView,
 } from './observerTypes.ts';
-import type { BackgroundProcessesView, RepositoryView, SystemView } from './types.ts';
+import type { AccessMe, BackgroundProcessesView, RepositoryView, SystemView } from './types.ts';
 import { ApiError, call, enc, json, post, withRepository } from './http.ts';
 
 /** The view in an answer; an answer that is not one is a failure. */
@@ -76,6 +76,8 @@ export interface SystemApi {
   processes(): Promise<BackgroundProcessesView>;
   /** Terminates a background process and its children; the daemon refuses any other PID. */
   killProcess(pid: number): Promise<unknown>;
+  /** What the user may do in a project (`null`: the shared level). */
+  accessMe(repository: string | null): Promise<AccessMe>;
   /** State of the daemon and of the panel itself. */
   system(): Promise<SystemView>;
   /** Restarts the panel; the answer comes before it goes down. */
@@ -110,6 +112,8 @@ export function systemApi(): SystemApi {
       call(path === undefined ? '/api/directories' : `/api/directories?path=${enc(path)}`),
     processes: () => call('/api/processes'),
     killProcess: (pid) => post(`/api/processes/${pid}/kill`),
+    accessMe: (repository) =>
+      call(repository === null ? '/api/access/me' : `/api/access/me?repository=${enc(repository)}`),
     system: () => call('/api/system'),
     restartWeb: async () => void (await post('/api/system/web/restart')),
     restartDaemon: async (force) =>

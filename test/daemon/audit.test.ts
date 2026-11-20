@@ -20,7 +20,8 @@ afterEach(async () => {
   current = null;
 });
 
-const SERVER = 'server: { enabled: true, public_url: "https://aip.example.com" }\n';
+const SERVER =
+  'server: { enabled: true, public_url: "https://aip.example.com", default_role: developer }\n';
 
 async function start(serverMode: boolean, extra = ''): Promise<Harness> {
   current = await harness();

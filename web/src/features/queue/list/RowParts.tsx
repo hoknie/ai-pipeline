@@ -67,12 +67,15 @@ export function RowAction({
   hint,
   pressed,
   className,
+  disabled,
   onClick,
   children,
 }: {
   label: string;
   hint?: string | undefined;
   pressed?: boolean;
+  /** The user has no right to do it: the button is off and the hint says why. */
+  disabled?: boolean;
   className?: string;
   onClick: () => void;
   children: React.ReactNode;
@@ -87,6 +90,7 @@ export function RowAction({
           aria-label={label}
           aria-description={hint}
           aria-pressed={pressed}
+          disabled={disabled}
           onClick={onClick}
         >
           {children}

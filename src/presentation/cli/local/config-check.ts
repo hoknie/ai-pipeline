@@ -8,8 +8,10 @@ import {
 } from '../../../feature/swarm-config/types/index.ts';
 import {
   configPathsFromEnvironment,
+  loadAccessPolicy,
   loadConfigSources,
 } from '../../../feature/swarm-config/services/index.ts';
+import { actionNames, similarActions } from '../../../feature/access/types/index.ts';
 import { repositoryRoot } from '../../../platform/git/index.ts';
 import { findExecutable } from '../../../platform/process/index.ts';
 import { agentExecutable, providerStates } from '../../../app/maintenance.ts';
@@ -230,11 +232,10 @@ export async function checkConfig(
   let legacy: string[] = [];
   try {
     const repository = await repositoryRoot(directory);
-    ({
-      config,
-      files,
-      legacy = [],
-    } = loadConfigSources(configPathsFromEnvironment(repository, environment)));
+    const paths = configPathsFromEnvironment(repository, environment);
+    ({ config, files, legacy = [] } = loadConfigSources(paths));
+    // the access policies of the server mode: a file with a mistake is a failed check
+    loadAccessPolicy(paths, { names: actionNames(), similar: (name) => similarActions(name) });
   } catch (error) {
     io.stderr(`${error instanceof ConfigLoadError ? error.message : (error as Error).message}\n`);
     return 1;

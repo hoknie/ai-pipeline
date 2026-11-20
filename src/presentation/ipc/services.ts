@@ -1,4 +1,5 @@
 import type { ProvidersService } from '../../feature/agents/services/index.ts';
+import type { AccessService } from '../../feature/access/services/index.ts';
 import type { AuditLog } from '../../feature/audit/services/index.ts';
 import type { ArtifactService } from '../../feature/artifacts/services/index.ts';
 import type { AttachmentService } from '../../feature/attachments/services/index.ts';
@@ -47,4 +48,5 @@ export interface DaemonServices {
   compose: ComposeServices;
   identity: IdentityServices;
   audit: AuditLog;
+  access: AccessService;
 }

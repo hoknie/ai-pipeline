@@ -58,6 +58,7 @@ export function createLifecycle(
         runs.engine.armWake();
       });
       auditPruner.start();
+      warnAboutUsersWithoutRole(services, log);
     },
     async stop() {
       auditPruner.stop();
@@ -113,4 +114,20 @@ export function createAuditPruner(
       timer = null;
     },
   };
+}
+
+/** In server mode, says which users will be refused everything: no role and no `server.default_role`. */
+export function warnAboutUsersWithoutRole(
+  services: Pick<DaemonServices, 'access' | 'config'>,
+  log: (message: string) => void,
+): void {
+  const settings = services.config.serverSettings();
+  if (typeof settings === 'string' || !settings.enabled) return;
+  const users = services.access.usersWithoutRole();
+  if (users.length === 0) return;
+  log(
+    `access: ${users.length} active user(s) have no \`role\` and server.default_role is not set, so they are refused every action: ${users
+      .map((user) => user.email)
+      .join(', ')}`,
+  );
 }

@@ -30,6 +30,8 @@ function HumanOnly({ ctx }: { ctx: GroupCtx }) {
         <Button
           size="sm"
           loading={busy}
+          disabled={!ctx.access.can('run.answer', ctx.run?.author?.id)}
+          title={ctx.access.hint('run.answer', ctx.run?.author?.id)}
           onClick={() =>
             void act(
               () => api.answer(runId, row.slug, 'Принято'),
@@ -50,25 +52,36 @@ function Questions({ ctx }: { ctx: GroupCtx }) {
   if (row.status !== 'needs_human') return null;
   const send = (answer: string, done?: () => void) =>
     void act(() => api.answer(runId, row.slug, answer), done);
-  return row.questions && row.questions.length > 0 ? (
-    <QuestionsForm
-      questions={row.questions}
-      draftKey={draftKey}
-      drafts={drafts}
-      busy={busy}
-      onDraft={onDraft}
-      onClearDrafts={ctx.onClearDrafts}
-      onSubmit={send}
-    />
-  ) : (
-    <QuestionCard
-      title={ctx.title}
-      question={row.question}
-      draft={drafts[draftKey] ?? ''}
-      busy={busy}
-      onDraft={(text) => onDraft(draftKey, text)}
-      onSubmit={send}
-    />
+  const allowed = ctx.access.can('run.answer', ctx.run?.author?.id);
+  const off = busy || !allowed;
+  return (
+    <>
+      {allowed ? null : (
+        <Alert variant="warn" data-testid="answer-denied">
+          {ctx.access.hint('run.answer', ctx.run?.author?.id)}
+        </Alert>
+      )}
+      {row.questions && row.questions.length > 0 ? (
+        <QuestionsForm
+          questions={row.questions}
+          draftKey={draftKey}
+          drafts={drafts}
+          busy={off}
+          onDraft={onDraft}
+          onClearDrafts={ctx.onClearDrafts}
+          onSubmit={send}
+        />
+      ) : (
+        <QuestionCard
+          title={ctx.title}
+          question={row.question}
+          draft={drafts[draftKey] ?? ''}
+          busy={off}
+          onDraft={(text) => onDraft(draftKey, text)}
+          onSubmit={send}
+        />
+      )}
+    </>
   );
 }
 

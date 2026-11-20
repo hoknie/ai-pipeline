@@ -326,6 +326,9 @@ export const en = {
       outcomes: { ok: 'ok', denied: 'denied', failed: 'failed' },
     },
   },
+  access: {
+    noRight: 'You do not have permission for this: {{action}}',
+  },
   language: {
     label: 'Language: {{language}}',
     system: 'As in the browser',

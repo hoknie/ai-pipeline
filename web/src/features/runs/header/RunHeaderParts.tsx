@@ -101,7 +101,8 @@ export function RunButtons({
       ) : run.finished && !delivery.deliverable ? null : (
         <Button
           loading={delivery.applying}
-          disabled={!delivery.deliverable}
+          disabled={!delivery.deliverable || !delivery.deliverAllowed}
+          title={delivery.deliverHint}
           onClick={() => void delivery.apply(false)}
         >
           {t('runs.header.deliver')}
@@ -185,13 +186,15 @@ export function MoreMenu({
           </>
         ) : null}
         <DropdownMenuItem
-          disabled={!delivery.deliverable}
+          disabled={!delivery.deliverable || !delivery.deliverAllowed}
+          title={delivery.deliverHint}
           onSelect={() => delivery.setForcing(true)}
         >
           {t('runs.header.forceDeliver')}
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={!delivery.deliverable}
+          disabled={!delivery.deliverable || !delivery.deliverAllowed}
+          title={delivery.deliverHint}
           onSelect={() => void delivery.markDelivered()}
         >
           {t('runs.header.markDelivered')}

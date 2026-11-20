@@ -49,6 +49,7 @@ describe('server settings', () => {
       sso: { oidc: null, saml: null },
       auditRetention: '365d',
       commitTrailer: null,
+      defaultRole: null,
     });
   });
 
@@ -66,6 +67,7 @@ describe('server settings', () => {
       tokenMaxTtl: '90d',
       auditRetention: '365d',
       commitTrailer: null,
+      defaultRole: null,
     });
   });
 

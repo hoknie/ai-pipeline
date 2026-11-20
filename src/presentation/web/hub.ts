@@ -4,6 +4,24 @@ import { subscribe } from '../ipc/client/index.ts';
 import { streamEventSchema, type DaemonCheck } from '../ipc/contract/index.ts';
 
 import { RECHECK_MS } from './options.ts';
+import { eventFor, type Allowed } from './visible.ts';
+
+/** How long the readable projects of a subscriber are kept before they are asked for again. */
+export const ACCESS_CACHE_MS = 10_000;
+
+/** The paths of the projects a user reads; `null`: all of them. */
+export type ReadableProjects = (actor: string) => Promise<string[] | null>;
+
+/** One connection that gets the events: a live socket or an event stream. */
+interface Subscriber {
+  write(text: string): void;
+  /** The user of server mode; undefined for the local panel, which sees everything. */
+  actor: string | undefined;
+  /** The projects it reads; `undefined` until they are known. */
+  allowed: Allowed | undefined;
+  loadedAt: number;
+  loading: Promise<void> | null;
+}
 
 /** What the subscriptions of the panel react to: a run changed, a log grew. */
 export type HubSignal =
@@ -24,9 +42,10 @@ export class Hub {
   private ready = false;
   private stopped = false;
   private readonly abort = new AbortController();
-  private readonly clients = new Set<ServerResponse>();
-  /** The live connections of the panel: each takes a message as text. */
-  private readonly sinks = new Set<(text: string) => void>();
+  private readonly subscribers = new Set<Subscriber>();
+  /** The event streams to close when the hub stops. */
+  private readonly ends = new Set<{ response: ServerResponse; done: () => void }>();
+  private readonly readable: ReadableProjects | undefined;
   private readonly onSignal: (signal: HubSignal) => void;
   private readonly ensure: () => Promise<DaemonCheck>;
   /** Build mismatch with the daemon, as the panel shows it; null when the builds match. */
@@ -38,7 +57,9 @@ export class Hub {
     socket: string,
     ensure: () => Promise<DaemonCheck>,
     onSignal: (signal: HubSignal) => void = () => undefined,
+    readable?: ReadableProjects,
   ) {
+    this.readable = readable;
     this.socket = socket;
     this.ensure = ensure;
     this.onSignal = onSignal;
@@ -162,24 +183,76 @@ export class Hub {
     };
   }
 
+  /** Asks which projects the subscriber reads; no answer yet means none, a later failure keeps the last. */
+  private refresh(subscriber: Subscriber): Promise<void> {
+    const { actor } = subscriber;
+    if (actor === undefined || this.readable === undefined) {
+      subscriber.allowed = null;
+      return Promise.resolve();
+    }
+    subscriber.loading ??= this.readable(actor)
+      .then(
+        (paths) => {
+          subscriber.allowed = paths === null ? null : new Set(paths);
+        },
+        () => {
+          subscriber.allowed ??= new Set();
+        },
+      )
+      .finally(() => {
+        subscriber.loadedAt = Date.now();
+        subscriber.loading = null;
+      });
+    return subscriber.loading;
+  }
+
+  /** Sends an event to a subscriber, without what belongs to the projects it does not read. */
+  private deliver(subscriber: Subscriber, event: unknown, text: string): void {
+    const { allowed } = subscriber;
+    if (allowed === undefined) return; // its snapshot follows as soon as its projects are known
+    if (subscriber.actor !== undefined && Date.now() - subscriber.loadedAt > ACCESS_CACHE_MS) {
+      void this.refresh(subscriber);
+    }
+    if (allowed === null) return subscriber.write(text);
+    const visible = eventFor(event as Record<string, unknown>, allowed);
+    if (visible !== null) subscriber.write(JSON.stringify(visible));
+  }
+
   private broadcast(event: unknown): void {
     const text = JSON.stringify(event);
-    const frame = `data: ${text}\n\n`;
-    for (const client of this.clients) client.write(frame);
-    for (const send of this.sinks) send(text);
+    for (const subscriber of this.subscribers) this.deliver(subscriber, event, text);
+  }
+
+  /** The snapshot and the last processes: what a new connection gets first. */
+  private greet(subscriber: Subscriber): void {
+    if (!this.ready) return;
+    const snapshot = this.snapshot();
+    this.deliver(subscriber, snapshot, JSON.stringify(snapshot));
+    if (this.processes) {
+      const processes = { ...this.processes, seq: this.seq };
+      this.deliver(subscriber, processes, JSON.stringify(processes));
+    }
+  }
+
+  private add(write: (text: string) => void, actor: string | undefined): () => void {
+    const subscriber: Subscriber = {
+      write,
+      actor,
+      allowed: undefined,
+      loadedAt: 0,
+      loading: null,
+    };
+    this.subscribers.add(subscriber);
+    void this.refresh(subscriber).then(() => this.greet(subscriber));
+    return () => this.subscribers.delete(subscriber);
   }
 
   /** A live connection: the snapshot and the last processes now, then every event. */
-  join(send: (text: string) => void): () => void {
-    this.sinks.add(send);
-    if (this.ready) {
-      send(JSON.stringify(this.snapshot()));
-      if (this.processes) send(JSON.stringify({ ...this.processes, seq: this.seq }));
-    }
-    return () => this.sinks.delete(send);
+  join(send: (text: string) => void, actor?: string): () => void {
+    return this.add(send, actor);
   }
 
-  attach(incoming: IncomingMessage, response: ServerResponse): void {
+  attach(incoming: IncomingMessage, response: ServerResponse, actor?: string): void {
     response.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-store',
@@ -187,25 +260,28 @@ export class Hub {
       'x-accel-buffering': 'no',
     });
     response.write('retry: 2000\n\n');
-    this.clients.add(response);
-    if (this.ready) {
-      response.write(`data: ${JSON.stringify(this.snapshot())}\n\n`);
-      if (this.processes) {
-        response.write(`data: ${JSON.stringify({ ...this.processes, seq: this.seq })}\n\n`);
-      }
-    }
+    const leave = this.add((text) => response.write(`data: ${text}\n\n`), actor);
     const beat = setInterval(() => response.write(': ping\n\n'), 15_000);
-    incoming.on('close', () => {
-      clearInterval(beat);
-      this.clients.delete(response);
-    });
+    const end = {
+      response,
+      done: (): void => {
+        clearInterval(beat);
+        leave();
+        this.ends.delete(end);
+      },
+    };
+    incoming.on('close', end.done);
+    this.ends.add(end);
   }
 
   stop(): void {
     this.stopped = true;
     clearInterval(this.recheck);
     this.abort.abort();
-    for (const client of this.clients) client.end();
-    this.clients.clear();
+    for (const { response, done } of this.ends) {
+      done();
+      response.end();
+    }
+    this.ends.clear();
   }
 }

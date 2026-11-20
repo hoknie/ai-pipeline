@@ -8,6 +8,8 @@ import { authorOf } from '../../../../feature/identity/types/index.ts';
 import type { Request } from '../../contract/index.ts';
 import type { AuditInfo, AuditRow } from './audit-helpers.ts';
 import { auditActions } from './audit-table.ts';
+import { ACCESS_DENIED } from '../access/guard.ts';
+import { actionOf } from '../access/method-actions.ts';
 import type { IpcContext } from '../types.ts';
 
 type Params = Record<string, unknown>;
@@ -90,7 +92,8 @@ export async function audited(
   run: () => Promise<unknown>,
 ): Promise<unknown> {
   const row = auditActions[request.method];
-  if (!row || context.actor.kind === 'local') return run();
+  if (context.actor.kind === 'local') return run();
+  if (!row) return refusals(request, context, run);
   let result: unknown;
   try {
     result = await run();
@@ -100,4 +103,21 @@ export async function audited(
   }
   record(request, row, context, { ok: true, result });
   return result;
+}
+
+/** A method that only reads is not journaled, but a refusal of the rights is: who asked for what. */
+async function refusals(
+  request: Request,
+  context: IpcContext,
+  run: () => Promise<unknown>,
+): Promise<unknown> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof AppError && error.responseCode === ACCESS_DENIED) {
+      const action = actionOf(request.method, request.params as Params);
+      record(request, { action: action ?? request.method }, context, { ok: false, error });
+    }
+    throw error;
+  }
 }

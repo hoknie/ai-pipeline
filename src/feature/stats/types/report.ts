@@ -10,6 +10,8 @@ export interface StatsQuery {
   until?: number;
   repository?: string;
   bucket?: StatsBucketRequest;
+  /** Roots of the projects the report may cover; absent: all. */
+  only?: readonly string[];
 }
 
 export interface Totals {

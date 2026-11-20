@@ -1,3 +1,4 @@
+export * from './access/index.ts';
 export { canonicalPipeline, parseYaml, readLevel } from '../repositories/config-files.ts';
 export { assembleLevel, mergeOrigins, resolveLevels } from './assemble.ts';
 export { configPaths, configPathsFromEnvironment } from './discover.ts';

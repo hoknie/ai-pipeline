@@ -2,6 +2,7 @@ import type { Command } from 'commander';
 
 import type { Style } from '../../../format/index.ts';
 import type { CliIo } from '../../io.ts';
+import { registerAccess } from './access.ts';
 import { registerAdmin } from './admin.ts';
 import { registerAudit } from './audit.ts';
 import { registerLogin } from './login.ts';
@@ -11,4 +12,5 @@ export function registerServer(program: Command, io: CliIo, style: Style): void 
   registerLogin(program, io, style);
   registerAdmin(program, io, style);
   registerAudit(program, io, style);
+  registerAccess(program, io, style);
 }

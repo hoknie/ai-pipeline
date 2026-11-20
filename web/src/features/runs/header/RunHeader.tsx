@@ -27,6 +27,7 @@ import {
 import { ApplyDialog } from './ApplyDialog.tsx';
 import { useRunProviderSwitch } from './provider/index.ts';
 import { useRunVariantSwitch } from './variant/index.ts';
+import { useAccess } from '../../../shared/lib/access/useAccess.ts';
 import { RunLinks, type RunLinkChoices } from '../links/RunLinks.tsx';
 
 function RunInfo({
@@ -106,7 +107,8 @@ export function RunHeader({
   const observer = useRunObserver(run, api);
   const tags = useRunTags(run, api);
   const retry = useRetryFailed(run, api, onError);
-  const delivery = useRunDelivery(run, api, onError, onDeliver);
+  const access = useAccess(api, run.repository);
+  const delivery = useRunDelivery(run, api, onError, onDeliver, access);
   const [linksOpen, setLinksOpen] = useState(false);
   const variantSwitch = useRunVariantSwitch(run, api);
   const providerSwitch = useRunProviderSwitch(run, api);

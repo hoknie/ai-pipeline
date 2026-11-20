@@ -128,6 +128,7 @@ observers   → queue, runs, repos, swarm-config
 stats       → runs, repos, swarm-config
 integrations → repos
 identity    → swarm-config
+access      → identity, swarm-config, repos
 compose     → observers, queue, runs, tags, repos, integrations
 ```
 
@@ -147,6 +148,7 @@ compose     → observers, queue, runs, tags, repos, integrations
 | `stats`        | журнал использования агентов (токены, время) и отчёт по нему                                           |
 | `integrations` | подключения к внешним системам: реестр, секреты через порт хранилища, вход событий с проверкой и дедупликацией |
 | `identity`     | пользователи режима сервера, сессии панели, личные токены, ссылки входа и вход из CLI                  |
+| `access`       | права в режиме сервера (ABAC): каталог действий, пресеты ролей, чистый вычислитель решений, `AccessService` |
 | `compose`      | сценарии нескольких фич: удаление, правка и переезд проекта реестра                                    |
 
 Почему правила доставки и ремонта, которые меняют состояние запуска, лежат в `runs/machine`, а не в

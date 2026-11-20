@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, normalize } from 'node:path';
 
 import { checkDaemon, request } from '../ipc/client/index.ts';
-import type { Method, ParamsOf } from '../ipc/contract/index.ts';
+import type { DaemonCheck, Method, ParamsOf } from '../ipc/contract/index.ts';
 
 import { assertLocalHost, assertServerHost, assertToken, connectionIdentity } from './access.ts';
 import { requestContext } from './auth/context.ts';
@@ -31,6 +31,7 @@ import { mcpServerRoutes } from './routes/catalog/mcp-servers.ts';
 import { settingsRoutes } from './routes/settings.ts';
 import { observerHistoryRoutes } from './routes/observers/history.ts';
 import { specialistsRoutes } from './routes/specialists.ts';
+import { accessRoutes } from './routes/access/access.ts';
 import { auditRoutes } from './routes/audit/audit.ts';
 import { statsRoutes } from './routes/stats/stats.ts';
 import { sweepUploads, UPLOAD_SWEEP_MS, uploadRoute } from './uploads.ts';
@@ -83,6 +84,7 @@ function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
       processesRoutes,
       statsRoutes,
       auditRoutes,
+      accessRoutes,
     ].flatMap((routes) => routes(kit)),
   };
 }
@@ -135,7 +137,7 @@ async function handleApi(
   assertToken(incoming, d.token);
   if (d.gate !== null && url.pathname === '/api/ipc/events') {
     if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
-    d.hub.attach(incoming, response);
+    d.hub.attach(incoming, response, requestContext.getStore()?.actor);
     return;
   }
   for (const route of d.raw) {
@@ -196,8 +198,12 @@ async function handleServerMode(
   }
   if (!url.pathname.startsWith('/api/')) throw panel('not_found', 'not found');
   if (user === null) throw panel('unauthorized', 'sign in or send a personal token');
-  if (url.pathname === '/api/directories' && !user.admin) {
-    throw panel('forbidden', 'directories are listed for administrators only', 'access.denied');
+  if (url.pathname === '/api/directories' && !(await mayAddProjects(d, user))) {
+    throw panel(
+      'forbidden',
+      'directories are listed for those who may add projects',
+      'access.denied',
+    );
   }
   await requestContext.run({ actor: user.id }, async () => {
     if (url.pathname === '/api/ipc') {
@@ -206,6 +212,29 @@ async function handleServerMode(
     }
     return handleApi(d, incoming, response, url);
   });
+}
+
+/** The path picker serves whoever may add a project: in server mode the policies say, else the role. */
+async function mayAddProjects(d: Dispatch, user: { id: string; admin: boolean }): Promise<boolean> {
+  if (d.kit.options.server === undefined) return user.admin;
+  const me = (await request(d.kit.options.socket, 'access_me', {}, undefined, user.id)) as {
+    actions: string[];
+  };
+  return me.actions.includes('project.add');
+}
+
+/** The hub of the events; in server mode every subscriber gets only the projects it reads. */
+function createHub(options: WebOptions, ensureDaemon: () => Promise<DaemonCheck>, topics: Topics) {
+  const readable =
+    options.server === undefined
+      ? undefined
+      : async (actor: string) =>
+          (
+            (await request(options.socket, 'access_me', {}, undefined, actor)) as {
+              repositories: string[] | null;
+            }
+          ).repositories;
+  return new Hub(options.socket, ensureDaemon, (signal) => topics.signal(signal), readable);
 }
 
 export async function startWebServer(options: WebOptions): Promise<WebServer> {
@@ -217,7 +246,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
   if (!serverMode) assertLoopbackHost(host);
   const ensureDaemon = options.ensureDaemon ?? (() => checkDaemon(options.socket));
   const topics = new Topics(topicReader(options.socket, options));
-  const hub = new Hub(options.socket, ensureDaemon, (signal) => topics.signal(signal));
+  const hub = createHub(options, ensureDaemon, topics);
   let port = options.port ?? 0;
   const kit: RouteKit = {
     call: <M extends Method>(method: M, params: ParamsOf<M>) =>
@@ -249,7 +278,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
   });
   const stopLive = serveLive(server, {
     identify: (incoming) => connectionIdentity({ token, gate: dispatch.gate, port }, incoming),
-    join: (send) => hub.join(send),
+    join: (send, actor) => hub.join(send, actor),
     topics,
     ...options.live,
   });

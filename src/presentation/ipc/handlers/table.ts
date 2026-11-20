@@ -3,7 +3,8 @@ import type { Method, Request } from '../contract/index.ts';
 import { auditHandlers, audited } from './audit/index.ts';
 import { configHandlers } from './config.ts';
 import { groupHandlers } from './groups.ts';
-import { guard, identityHandlers } from './identity/index.ts';
+import { accessHandlers, guard } from './access/index.ts';
+import { identityHandlers } from './identity/index.ts';
 import { integrationHandlers } from './integrations.ts';
 import { observerHandlers } from './observers.ts';
 import { providerHandlers } from './providers.ts';
@@ -28,6 +29,7 @@ export const handlers: HandlerTable = {
   ...statsHandlers,
   ...identityHandlers,
   ...auditHandlers,
+  ...accessHandlers,
 };
 
 /** Answers a request with the handler of its method; in server mode the journal records the calls that change something. */

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { adminMethods, guard } from '../../src/presentation/ipc/handlers/identity/index.ts';
+import { createAccessServices } from '../../src/feature/access/services/index.ts';
+import { ConfigService } from '../../src/feature/swarm-config/services/index.ts';
+import { guard, methodActions } from '../../src/presentation/ipc/handlers/access/index.ts';
 import { requestSchema, type Request } from '../../src/presentation/ipc/contract/index.ts';
 import type { Actor } from '../../src/feature/identity/types/index.ts';
 import type { IpcContext } from '../../src/presentation/ipc/handlers/types.ts';
@@ -8,18 +10,40 @@ import type { IpcContext } from '../../src/presentation/ipc/handlers/types.ts';
 const developer: Actor = {
   kind: 'user',
   user: { id: 'u1', email: 'bob@example.com', name: 'bob' },
-  attributes: { role: ['dev'] },
+  attributes: { role: ['developer'] },
 };
 const admin: Actor = { ...developer, attributes: { role: ['admin'] } };
+
+const access = createAccessServices({
+  config: new ConfigService({ environment: { XDG_CONFIG_HOME: '/nonexistent-aip-config' } }),
+  registry: { entries: () => [], entry: () => undefined } as never,
+  users: { list: () => [] },
+  now: () => 0,
+  log: () => undefined,
+}).access;
 
 function context(actor: Actor, mode = 'branch'): IpcContext {
   return {
     actor,
     services: {
+      access,
+      registry: { entries: () => [], entry: () => undefined },
+      tags: { of: () => [] },
+      queue: { store: { findItem: () => undefined } },
       runs: {
         states: {
           lookup: (id: string) =>
-            id === 'r1' ? { run: { config: { delivery: { mode } } } } : undefined,
+            id === 'r1'
+              ? {
+                  run: {
+                    repository: '/x',
+                    author: null,
+                    pipeline: 'feature',
+                    tags: [],
+                    config: { delivery: { mode } },
+                  },
+                }
+              : undefined,
         },
       },
     },
@@ -65,20 +89,37 @@ describe('guard', () => {
       const parsed = requestSchema.safeParse({ method, params });
       expect(parsed.success, `${method} params`).toBe(true);
       if (!parsed.success) continue;
-      expect(() => guard(parsed.data, context(developer)), method).toThrow(
-        /needs an administrator/,
-      );
+      expect(() => guard(parsed.data, context(developer)), method).toThrow(/access denied/);
       expect(() => guard(parsed.data, context(admin)), method).not.toThrow();
       expect(() => guard(parsed.data, context({ kind: 'system' })), method).not.toThrow();
       expect(() => guard(parsed.data, context({ kind: 'local' })), method).not.toThrow();
     }
   });
 
-  it('keeps every listed method in the contract', () => {
-    const known = new Set(
-      requestSchema.options.map((option) => option.shape.method.value as string),
-    );
-    for (const method of Object.keys(adminMethods)) expect(known.has(method), method).toBe(true);
+  it('names the action of every method of the contract, and no other method', () => {
+    const known = requestSchema.options.map((option) => option.shape.method.value as string);
+    expect(Object.keys(methodActions).sort()).toEqual([...known].sort());
+  });
+
+  it('answers a refusal with the code access.denied and the action', () => {
+    const call = parse('repository_move', { path: '/x', to: '/y' });
+    try {
+      guard(call, context(developer));
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toMatchObject({ kind: 'forbidden', responseCode: 'access.denied' });
+      expect((error as Error).message).toContain('project.update');
+    }
+  });
+
+  it('refuses a viewer every call that changes something', () => {
+    const viewer: Actor = { ...developer, attributes: { role: ['viewer'] } };
+    for (const [method, params] of ADMIN_CALLS) {
+      const parsed = requestSchema.parse({ method, params });
+      expect(() => guard(parsed, context(viewer)), method).toThrow(/access denied/);
+    }
+    expect(() => guard(parse('whoami', {}), context(viewer))).not.toThrow();
+    expect(() => guard(parse('tokens_list', {}), context(viewer))).not.toThrow();
   });
 
   it('lets a user write the project level of the settings', () => {

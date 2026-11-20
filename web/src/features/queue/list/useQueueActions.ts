@@ -148,5 +148,5 @@ export function useQueueActions(
       throw failure;
     }
   };
-  return { started, pending, remove, runNow, setPostponed, edit };
+  return { started, pending, remove, runNow, setPostponed, edit, apiOf: scope.apiOf };
 }

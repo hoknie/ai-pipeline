@@ -3,6 +3,8 @@ import type { IpcContext } from '../presentation/ipc/handlers/types.ts';
 import type { DaemonServices } from '../presentation/ipc/services.ts';
 import type { Snapshots } from '../presentation/ipc/snapshots.ts';
 import type { ApplicationOptions } from './application.ts';
+import { createAccessServices } from '../feature/access/services/index.ts';
+import type { RegistryService } from '../feature/repos/services/index.ts';
 import { createAuditServices } from '../feature/audit/services/index.ts';
 import { createIdentityServices } from '../feature/identity/services/index.ts';
 import { actorOf, type Actor } from '../feature/identity/types/index.ts';
@@ -17,6 +19,7 @@ import type { Database } from '../platform/sqlite/index.ts';
 interface ActorOptions {
   database: Database;
   config: ConfigService;
+  registry: RegistryService;
   now: () => number;
   environment: NodeJS.ProcessEnv;
   options: { log?: ((message: string) => void) | undefined; stateDirectory: string };
@@ -25,7 +28,14 @@ interface ActorOptions {
 const stderr = (message: string): void => console.error(`[aip] ${message}`);
 
 /** The identity services, the audit journal and the actor of a request: `local` without server mode, else a user or `system`. */
-export function createActors({ database, config, now, environment, options }: ActorOptions) {
+export function createActors({
+  database,
+  config,
+  registry,
+  now,
+  environment,
+  options,
+}: ActorOptions) {
   const serverSettings = () => {
     const settings = config.serverSettings();
     return typeof settings === 'string' ? defaultServer() : settings;
@@ -73,7 +83,14 @@ export function createActors({ database, config, now, environment, options }: Ac
   };
   // who did what: the journal of the actions of the users
   const audit = createAuditServices({ database }).log;
-  return { identity, audit, actorOfRequest };
+  const { access } = createAccessServices({
+    config,
+    registry,
+    users: identity.users,
+    now,
+    log: options.log ?? stderr,
+  });
+  return { identity, audit, access, actorOfRequest };
 }
 
 /** What every handler of the daemon works with, except the actor of the request. */

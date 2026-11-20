@@ -6,6 +6,7 @@ import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import { useTags } from '../../../shared/lib/catalog/tags.tsx';
 import type { RunView, TagView } from '../../../shared/api/types.ts';
+import type { Access } from '../../../shared/lib/access/useAccess.ts';
 import { autoDeliveryCancellable, canDeliver } from './delivery.ts';
 
 type OnError = (message: string) => void;
@@ -145,6 +146,7 @@ export function useRunDelivery(
   api: Api,
   onError: OnError,
   onDeliver: ((force: boolean) => Promise<unknown>) | undefined,
+  access?: Access,
 ) {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -195,6 +197,10 @@ export function useRunDelivery(
     apply,
     markDelivered,
     deliverable: canDeliver(run),
+    /** The user may deliver this run; the buttons are off with the hint when not. */
+    deliverAllowed: access?.can('run.apply', run.author?.id) ?? true,
+    /** The hint of the delivery buttons when the user may not deliver this run. */
+    deliverHint: access?.hint('run.apply', run.author?.id),
     cancellingAuto,
     cancelAuto,
     autoCancellable: autoDeliveryCancellable(run),

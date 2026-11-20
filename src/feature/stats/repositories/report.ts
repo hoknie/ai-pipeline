@@ -13,6 +13,8 @@ export interface Scope {
   repository?: string;
   /** Roots of the projects left out of every read. */
   exclude: readonly string[];
+  /** Only these projects are read; absent: every project. */
+  only?: readonly string[];
 }
 
 const CHUNK = 400;
@@ -35,6 +37,12 @@ function where(scope: Scope): { sql: string; values: (string | number)[] } {
   if (scope.exclude.length > 0) {
     clauses.push(`repository NOT IN (${scope.exclude.map(() => '?').join(', ')})`);
     values.push(...scope.exclude);
+  }
+  if (scope.only !== undefined) {
+    clauses.push(
+      scope.only.length === 0 ? '0' : `repository IN (${scope.only.map(() => '?').join(', ')})`,
+    );
+    values.push(...scope.only);
   }
   return { sql: clauses.length === 0 ? '' : ` WHERE ${clauses.join(' AND ')}`, values };
 }
@@ -123,8 +131,8 @@ export class StatsReportRepository {
   }
 
   /** The earliest moment an attempt or a task of the journal ended; null for an empty journal. */
-  firstFinished(exclude: readonly string[]): number | null {
-    const { sql, values } = where({ exclude });
+  firstFinished(exclude: readonly string[], only?: readonly string[]): number | null {
+    const { sql, values } = where({ exclude, ...(only === undefined ? {} : { only }) });
     const row = this.database
       .prepare(
         `SELECT MIN(first) AS first FROM (

@@ -168,6 +168,7 @@ function repositoryFree(pathname: string, search: URLSearchParams): boolean {
     pathname === '/api/observers/history' ||
     pathname === '/api/stats' ||
     pathname === '/api/audit' ||
+    pathname === '/api/access/me' ||
     own
   );
 }

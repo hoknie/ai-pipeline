@@ -1,5 +1,6 @@
 import { authorOf, createdBySystemOf } from '../../../feature/identity/types/index.ts';
 import { directoryName } from '../../../feature/repos/types/index.ts';
+import { visible } from './access/visible.ts';
 import type { HandlerTable, IpcContext } from './types.ts';
 
 /** Runs `work` in the queue of the daemon, as every request of the queue does. */
@@ -9,6 +10,23 @@ function serial<T>(context: IpcContext, work: () => Promise<T>): Promise<T> {
     context.services.queue.scope.sync();
     return work();
   });
+}
+
+/** The answer of a queue request; the global queue keeps only the projects the actor reads. */
+function queueAnswer(
+  context: IpcContext,
+  queue: Parameters<IpcContext['snapshots']['queueAnswer']>[0],
+) {
+  const answer = context.snapshots.queueAnswer(queue);
+  if (answer.scope !== 'global') return answer;
+  const keep = <T extends { repository: string }>(list: T[]): T[] =>
+    visible(context, list, (entry) => entry.repository);
+  return {
+    ...answer,
+    items: keep(answer.items),
+    runs: keep(answer.runs),
+    skipped: keep(answer.skipped),
+  };
 }
 
 /** The links of a task; an item that became a run shares them with its run. */
@@ -27,13 +45,11 @@ export const queueHandlers = {
         author: authorOf(context.actor),
         createdBySystem: createdBySystemOf(context.actor),
       });
-      return { ...queued, queue: context.snapshots.queueAnswer(queued.queue) };
+      return { ...queued, queue: queueAnswer(context, queued.queue) };
     }),
   queue: (params, context) =>
     serial(context, async () =>
-      context.snapshots.queueAnswer(
-        await context.services.queue.control.queueOf(params.repository),
-      ),
+      queueAnswer(context, await context.services.queue.control.queueOf(params.repository)),
     ),
   queues: (_params, context) =>
     serial(context, async () => {
@@ -45,12 +61,13 @@ export const queueHandlers = {
           path: entry.path,
           label: (entry.name ?? directoryName(entry.path)).toLowerCase(),
         }));
-      labelled.sort(
+      const readable = visible(context, labelled, (entry) => entry.path);
+      readable.sort(
         (left, right) =>
           (left.label < right.label ? -1 : left.label > right.label ? 1 : 0) ||
           (left.path < right.path ? -1 : left.path > right.path ? 1 : 0),
       );
-      return labelled.map((entry) => context.snapshots.queue(queue.store.of(entry.path)));
+      return readable.map((entry) => context.snapshots.queue(queue.store.of(entry.path)));
     }),
   queue_add: (params, context) =>
     serial(context, async () => {
@@ -59,7 +76,7 @@ export const queueHandlers = {
         author: authorOf(context.actor),
         createdBySystem: createdBySystemOf(context.actor),
       });
-      return { ...context.snapshots.queueAnswer(queue), item };
+      return { ...queueAnswer(context, queue), item };
     }),
   queue_add_projects: (params, context) =>
     serial(context, () => {
@@ -73,39 +90,39 @@ export const queueHandlers = {
     }),
   queue_edit: (params, context) =>
     serial(context, async () =>
-      context.snapshots.queueAnswer(await context.services.queue.edit.edit(params)),
+      queueAnswer(context, await context.services.queue.edit.edit(params)),
     ),
   queue_remove: (params, context) =>
     serial(context, async () =>
-      context.snapshots.queueAnswer(await context.services.queue.items.remove(params)),
+      queueAnswer(context, await context.services.queue.items.remove(params)),
     ),
   queue_start: (params, context) =>
     serial(context, async () =>
-      context.snapshots.queueAnswer(await context.services.queue.control.start(params)),
+      queueAnswer(context, await context.services.queue.control.start(params)),
     ),
   queue_pause: (params, context) =>
     serial(context, async () =>
-      context.snapshots.queueAnswer(await context.services.queue.control.pause(params)),
+      queueAnswer(context, await context.services.queue.control.pause(params)),
     ),
   queue_settings: (params, context) =>
     serial(context, async () =>
-      context.snapshots.queueAnswer(await context.services.queue.control.settings(params)),
+      queueAnswer(context, await context.services.queue.control.settings(params)),
     ),
   queue_run_now: (params, context) =>
     serial(context, () => context.services.queue.control.runNow(params)),
   queue_return: async (params, context) => {
     const { queue, item } = await context.services.queue.control.returnRun(params);
-    return { ...context.snapshots.queueAnswer(queue), item };
+    return { ...queueAnswer(context, queue), item };
   },
   run_pause: async (params, context) => {
     const { queue, item } = await context.services.queue.control.pauseRun(params);
-    return { ...context.snapshots.queueAnswer(queue), item };
+    return { ...queueAnswer(context, queue), item };
   },
   queue_dismiss: async (params, context) =>
-    context.snapshots.queueAnswer(await context.services.queue.control.dismiss(params)),
+    queueAnswer(context, await context.services.queue.control.dismiss(params)),
   worker_queue_add: async (params, context) => {
     const { queue, item } = await context.services.queue.items.workerAdd(params);
-    return { ...context.snapshots.queueAnswer(queue), item };
+    return { ...queueAnswer(context, queue), item };
   },
   task_link: (params, context) =>
     serial(context, async () => {

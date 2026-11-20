@@ -47,7 +47,7 @@ async function serverMode(): Promise<Server> {
   mkdirSync(directory, { recursive: true });
   writeFileSync(
     join(directory, 'settings.yaml'),
-    `server: { enabled: true, public_url: "${url}" }\n`,
+    `server: { enabled: true, public_url: "${url}", default_role: developer }\n`,
   );
   web = await startWebServer({
     socket: box.socket,

@@ -125,6 +125,8 @@ function Actions({ ctx }: { ctx: GroupCtx }) {
           variant="destructive"
           size="sm"
           loading={busy}
+          disabled={!ctx.access.can('run.cancel', run?.author?.id)}
+          title={ctx.access.hint('run.cancel', run?.author?.id)}
           onClick={() => void ctx.cancelGroup()}
         >
           {t('runs.group.cancel')}

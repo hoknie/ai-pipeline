@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useAccess } from '../../../../shared/lib/access/useAccess.ts';
 import { useFollowEnd } from '../../../../shared/lib/browser/useFollowEnd.ts';
 
 import { capabilities } from './capabilities.ts';
@@ -39,6 +40,7 @@ export function useGroupCtx(props: GroupScreenProps, section: HTMLElement | null
   });
   const title = 'kind' in row && row.kind !== 'action' ? t(`runs.system.${row.kind}`) : row.title;
   const commands = useGroupCommands({ api, runId, row, run, title, act });
+  const access = useAccess(api, run?.repository ?? null);
   const watch = useFollowEnd(section);
   const stopWatch = watch.stop;
   useEffect(() => {
@@ -56,6 +58,7 @@ export function useGroupCtx(props: GroupScreenProps, section: HTMLElement | null
     act,
     caps,
     delivering,
+    access,
     title,
     tabs,
     watch,

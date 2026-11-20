@@ -337,6 +337,9 @@ export const es: Dictionary = {
       outcomes: { ok: 'correcto', denied: 'denegado', failed: 'con error' },
     },
   },
+  access: {
+    noRight: 'No tienes permiso para esto: {{action}}',
+  },
   language: {
     label: 'Idioma: {{language}}',
     system: 'Como el navegador',
