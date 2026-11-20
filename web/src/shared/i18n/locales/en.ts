@@ -112,11 +112,8 @@ export const en = {
     enabled: 'enabled',
     disabled: 'disabled',
     connections: {
-      title: 'Connections',
-      empty: 'No connections yet. Create one with the form above.',
       add: {
         title: 'New connection',
-        kind: 'Kind',
         name: 'Name',
         scope: 'Where',
         create: 'Create connection',
@@ -151,10 +148,28 @@ export const en = {
         connection_disabled: 'The connection is disabled',
       },
     },
+    catalog: {
+      title: 'Catalog',
+      back: '← Catalog',
+      connect: 'Connect',
+      open: 'Open',
+      none: 'No connections',
+      count_one: '{{count}} connection, {{enabled}} enabled',
+      count_other: '{{count}} connections, {{enabled}} enabled',
+      empty: 'No connections of this kind yet. Create one with the form above.',
+      setupTitle: 'How to set up',
+    },
     kinds: {
       telegram: {
         title: 'Telegram',
         description: 'A Telegram bot that sends notifications and takes answers.',
+        setup: {
+          1: 'Create a bot with @BotFather and copy its token.',
+          2: 'Create a connection with the form below.',
+          3: 'Set the token with the CLI command shown on the card of the connection.',
+          4: 'Add the bot to the chat and send it /id to see the chat and user ids.',
+          5: 'Fill in the chat and the users who may answer, then enable the connection.',
+        },
         params: {
           chat_id: {
             label: 'Chat',
@@ -176,6 +191,12 @@ export const en = {
       slack: {
         title: 'Slack',
         description: 'A Slack app that sends notifications and takes answers.',
+        setup: {
+          1: 'Create a Slack app with Socket Mode on.',
+          2: 'Copy the bot token (xoxb…) and the app token (xapp…).',
+          3: 'Create a connection with the form below and set both tokens with the CLI commands shown on its card.',
+          4: 'Invite the bot to the channel and enable the connection.',
+        },
         params: {
           channel_id: {
             label: 'Channel',
@@ -204,6 +225,11 @@ export const en = {
       'service-registry': {
         title: 'Service registry',
         description: 'A service registry that gives projects their skills.',
+        setup: {
+          1: 'Create a connection with the address of the registry.',
+          2: 'Set the access token with the CLI command shown on the card.',
+          3: 'Press «Check» to make sure the registry answers.',
+        },
         params: {
           url: { label: 'Address', hint: 'The address of the registry, http(s)://host:port.' },
         },
@@ -212,9 +238,6 @@ export const en = {
       webhook: { title: 'Webhook' },
     },
     registry: {
-      title: 'Service registry',
-      empty:
-        'No service registry connections yet. Create one with the form above, then set its token with the CLI.',
       links: {
         title: 'Projects',
         empty: 'No projects are linked yet.',
@@ -2004,8 +2027,7 @@ export const en = {
     },
     integrationTabs: {
       label: 'Integrations tabs',
-      connections: 'Connections',
-      registry: 'Service registry',
+      catalog: 'Catalog',
       notifications: 'Notifications',
       webhooks: 'Webhooks',
     },

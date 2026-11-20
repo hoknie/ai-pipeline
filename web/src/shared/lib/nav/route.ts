@@ -88,10 +88,25 @@ function settingsRoute(
         ? observerTabOf(third)
         : group === 'agents' && third !== null
           ? agentTabOf(third)
-          : scope === 'global' && group === 'integrations' && third !== null
-            ? integrationTabOf(third)
-            : null;
+          : null;
+  if (scope === 'global' && group === 'integrations' && third !== null) {
+    return { view: 'settings', run: group, group: scope, ...integrationPlace(third, rest[0]) };
+  }
   return { view: 'settings', run: group, group: scope, step, tab: null };
+}
+
+/** The kind of a page of the catalog «Integrations» is one address part of letters, digits and dashes. */
+const KIND_PART = /^[a-z0-9-]+$/;
+
+/**
+ * The tab of the group «Integrations» and the kind of its catalog page. The former `registry` tab
+ * is the page of the service registry; the former `connections` tab is the catalog.
+ */
+function integrationPlace(third: string, kind: string | null | undefined) {
+  if (third === 'registry') return { step: 'catalog', tab: 'service-registry' };
+  const step = integrationTabOf(third);
+  const page = step === 'catalog' && kind != null && KIND_PART.test(kind) ? kind : null;
+  return { step, tab: page };
 }
 
 /** Sections of the pipeline list other than the pipelines. */
@@ -248,6 +263,13 @@ function swarmHash(scope: string, route: Route): string {
   return `#settings/${scope}/swarm/${tab}${section}${entry}${variant}${preset}`;
 }
 
+/** The part of the address after `integrations`: `notifications`, `webhooks`, `catalog/<kind>`; null for the catalog. */
+function integrationSlug(route: Route): string | null {
+  const tab = integrationTabOf(route.step);
+  if (tab !== 'catalog') return tab;
+  return route.tab !== null && KIND_PART.test(route.tab) ? `catalog/${route.tab}` : null;
+}
+
 function formatBase(route: Route): string {
   const enc = encodeURIComponent;
   if (route.view === 'queue') return route.run === 'new' ? '#queue/new' : '#queue';
@@ -279,10 +301,10 @@ function formatBase(route: Route): string {
           ? observerTabOf(route.step)
           : group === 'agents' && agentTabOf(route.step) !== 'general'
             ? agentTabOf(route.step)
-            : group === 'integrations' && integrationTabOf(route.step) !== 'connections'
-              ? integrationTabOf(route.step)
+            : group === 'integrations' && scope === 'global'
+              ? integrationSlug(route)
               : null;
-    return `#settings/${scope}/${group}${slug === null ? '' : `/${enc(slug)}`}`;
+    return `#settings/${scope}/${group}${slug === null ? '' : `/${slug.split('/').map(enc).join('/')}`}`;
   }
   if (route.view === 'pipelines') {
     if (!route.run) return '#pipelines';

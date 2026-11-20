@@ -28,6 +28,8 @@ export interface SettingsPageProps {
   onOpenGroup: (target: { runId: string; slug: string }, step: string | null) => void;
   /** The open tab of the group «Agents» (`general` or `mcp`) or «Integrations»; null for the first. */
   agentTab: string | null;
+  /** The kind whose page of the catalog «Integrations» is open; null for the catalog itself. */
+  integrationKind: string | null;
   /** The open tab of the group «Observers»; null for the first. */
   observerTab: string | null;
   onSelectObserverTab: (tab: ObserverTab) => void;

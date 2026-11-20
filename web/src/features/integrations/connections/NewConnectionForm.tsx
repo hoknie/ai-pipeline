@@ -6,24 +6,8 @@ import type { IntegrationTypeView, RepositoryView } from '../../../shared/api/ty
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
-import { kindTitle } from '../kindLabels.ts';
 import { SelectField } from '../SelectField.tsx';
 import { ParamField } from './ParamField.tsx';
-
-/**
- * The kinds the form offers: those without a command of their own (`createdBy`), minus the ones
- * that have a tab of their own. `only` fixes the kind of the form of such a tab.
- */
-export function creatableKinds(
-  types: readonly IntegrationTypeView[],
-  only: string | null,
-): IntegrationTypeView[] {
-  if (only !== null) return types.filter((type) => type.kind === only);
-  return types.filter(
-    (type) =>
-      type.createdBy === undefined && type.kind !== 'webhook' && type.kind !== 'service-registry',
-  );
-}
 
 /** The parameters that were filled in, trimmed. */
 const trimmed = (params: Record<string, string>): Record<string, string> =>
@@ -106,30 +90,24 @@ function NameAndScope({
 }
 
 /**
- * The form of a new connection: kind, name, where it works and the non-secret parameters of the
- * kind. The secret is not asked for: the card of the new connection shows the command that sets it.
+ * The form of a new connection of one kind: name, where it works and the non-secret parameters of
+ * the kind. The secret is not asked for: the card of the new connection shows the command that sets it.
  * The draft is state of this form, so a reload of the list or a refusal does not clear it.
  */
 export function NewConnectionForm({
-  types,
+  type,
   registry,
-  only = null,
   onCreate,
 }: {
-  types: readonly IntegrationTypeView[];
+  type: IntegrationTypeView;
   registry: readonly RepositoryView[];
-  only?: string | null;
   /** Makes the connection; true when it went through (the form is cleared then). */
   onCreate: (connection: NewConnection) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
-  const kinds = creatableKinds(types, only);
-  const [kind, setKind] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [repository, setRepository] = useState('');
   const [params, setParams] = useState<Record<string, string>>({});
-  const type = kinds.find((one) => one.kind === kind) ?? kinds[0];
-  if (type === undefined) return null;
   const prefix = `new-${type.kind}`;
 
   const submit = (event: FormEvent) => {
@@ -155,23 +133,6 @@ export function NewConnectionForm({
     >
       <h3 className="text-sm font-semibold">{t('integrations.connections.add.title')}</h3>
       <div className="flex flex-wrap gap-3">
-        {only === null ? (
-          <SelectField
-            id={`${prefix}-kind`}
-            label={t('integrations.connections.add.kind')}
-            value={type.kind}
-            onChange={(next) => {
-              setKind(next);
-              setParams({});
-            }}
-          >
-            {kinds.map((one) => (
-              <option key={one.kind} value={one.kind}>
-                {kindTitle(t, one.kind, one.title)}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
         <NameAndScope
           prefix={prefix}
           name={name}

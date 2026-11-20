@@ -23,16 +23,18 @@ const registry = [repositoryView('/work/app', { color: 'blue' })];
 
 const leave = () => async () => undefined;
 
-function mount(api: ReturnType<typeof fakeApi>, tab: IntegrationTab) {
-  return render(<IntegrationsGroup api={api} registry={registry} tab={tab} leave={leave} />);
+function mount(api: ReturnType<typeof fakeApi>, tab: IntegrationTab, kind: string | null = null) {
+  return render(
+    <IntegrationsGroup api={api} registry={registry} tab={tab} kind={kind} leave={leave} />,
+  );
 }
 
 async function open(
   overrides: Parameters<typeof fakeApi>[0] = {},
-  tab: IntegrationTab = 'connections',
+  tab: IntegrationTab = 'catalog',
 ) {
   const api = fakeApi(overrides);
-  mount(api, tab);
+  mount(api, tab, tab === 'catalog' ? 'telegram' : null);
   await screen.findByTestId(tab === 'notifications' ? 'subscription-n1' : 'connection-c1');
   return api;
 }
@@ -94,7 +96,8 @@ describe('the page of integrations', () => {
       ],
     };
     overview.types = [{ ...overview.types[0]!, kind: 'slack', title: 'Slack app' }];
-    await open({ integrations: vi.fn(async () => overview) });
+    mount(fakeApi({ integrations: vi.fn(async () => overview) }), 'catalog', 'slack');
+    await screen.findByTestId('connection-c1');
     const card = screen.getByTestId('connection-c1');
     expect(within(card).getByText('App token (Socket Mode)')).toBeTruthy();
     expect(within(card).getAllByText('app_token')[0]!.tagName).toBe('CODE');
@@ -222,8 +225,8 @@ describe('the page of integrations', () => {
     const empty = fakeApi({
       integrations: vi.fn(async () => integrationsOverview({ connections: [], subscriptions: [] })),
     });
-    mount(empty, 'connections');
-    expect(await screen.findByText(/No connections yet/)).toBeTruthy();
+    mount(empty, 'catalog', 'telegram');
+    expect(await screen.findByText(/No connections of this kind yet/)).toBeTruthy();
     expect(screen.getByRole('form', { name: 'New connection' })).toBeTruthy();
     cleanup();
     const broken = fakeApi({
@@ -231,7 +234,7 @@ describe('the page of integrations', () => {
         throw new ApiError(500, 'daemon is down');
       }),
     });
-    mount(broken, 'connections');
+    mount(broken, 'catalog');
     expect(await screen.findByText(/daemon is down/)).toBeTruthy();
   });
 });
@@ -268,15 +271,29 @@ describe('the address of the group', () => {
     expect(formatRoute(parseRoute('#settings/global/integrations/webhooks'))).toBe(
       '#settings/global/integrations/webhooks',
     );
-    expect(formatRoute(parseRoute('#settings/global/integrations/registry'))).toBe(
-      '#settings/global/integrations/registry',
-    );
     expect(formatRoute(parseRoute('#settings/global/integrations/connections'))).toBe(
       '#settings/global/integrations',
     );
     expect(formatRoute(parseRoute('#settings/global/integrations/nope'))).toBe(
       '#settings/global/integrations',
     );
+  });
+
+  it('puts the kind of a catalog page in the fourth part, and replaces the old registry tab', () => {
+    expect(parseRoute('#settings/global/integrations/catalog/telegram')).toMatchObject({
+      step: 'catalog',
+      tab: 'telegram',
+    });
+    expect(formatRoute(parseRoute('#settings/global/integrations/catalog/telegram'))).toBe(
+      '#settings/global/integrations/catalog/telegram',
+    );
+    expect(formatRoute(parseRoute('#settings/global/integrations/registry'))).toBe(
+      '#settings/global/integrations/catalog/service-registry',
+    );
+    expect(formatRoute(parseRoute('#settings/global/integrations/catalog'))).toBe(
+      '#settings/global/integrations',
+    );
+    expect(parseRoute('#settings/global/integrations/catalog/No%20Way').tab).toBeNull();
   });
 
   it('has no project tab: that address leads to the shared one', () => {
@@ -288,19 +305,13 @@ describe('the address of the group', () => {
 
 describe('the tabs of the group', () => {
   it('are addresses, and the open one is selected', async () => {
-    await open({}, 'connections');
+    await open({}, 'catalog');
     const tabs = within(screen.getByRole('tablist', { name: 'Integrations tabs' })).getAllByRole(
       'tab',
     );
-    expect(tabs.map((tab) => tab.textContent)).toEqual([
-      'Connections',
-      'Service registry',
-      'Notifications',
-      'Webhooks',
-    ]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Catalog', 'Notifications', 'Webhooks']);
     expect(tabs.map((tab) => tab.getAttribute('href'))).toEqual([
       '#settings/global/integrations',
-      '#settings/global/integrations/registry',
       '#settings/global/integrations/notifications',
       '#settings/global/integrations/webhooks',
     ]);
@@ -322,7 +333,7 @@ describe('a new connection', () => {
     });
     const api = await open({ integrations: vi.fn(async () => overview) });
     const form = screen.getByRole('form', { name: 'New connection' });
-    expect(within(form).queryByRole('option', { name: 'Outgoing webhook' })).toBeNull();
+    expect(within(form).queryByLabelText('Kind')).toBeNull();
     expect(form.querySelector('input[type="password"]')).toBeNull();
     expect(within(form).queryByLabelText(/bot_token/)).toBeNull();
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'main' } });
@@ -430,7 +441,7 @@ describe('the actions of a connection', () => {
   });
 });
 
-describe('the tab «Service registry»', () => {
+describe('the page «Service registry»', () => {
   const svcr = (patch: Record<string, unknown> = {}) => {
     const overview = integrationsOverview();
     overview.types.push({
@@ -458,7 +469,7 @@ describe('the tab «Service registry»', () => {
     overrides: Parameters<typeof fakeApi>[0] = {},
   ) => {
     const api = fakeApi({ integrations: vi.fn(async () => overview), ...overrides });
-    mount(api, 'registry');
+    mount(api, 'catalog', 'service-registry');
     await screen.findByTestId('connection-r1');
     return api;
   };
@@ -571,7 +582,92 @@ describe('the tab «Service registry»', () => {
   });
 
   it('says so when the registry has no connection', async () => {
-    mount(fakeApi(), 'registry');
-    expect(await screen.findByText(/No service registry connections yet/)).toBeTruthy();
+    const overview = svcr();
+    overview.connections = [];
+    mount(fakeApi({ integrations: vi.fn(async () => overview) }), 'catalog', 'service-registry');
+    expect(await screen.findByText(/No connections of this kind yet/)).toBeTruthy();
+    expect(screen.queryByTestId('registry-links')).toBeNull();
+  });
+});
+
+describe('the catalog', () => {
+  const withKinds = () => {
+    const overview = integrationsOverview();
+    const telegram = overview.types[0]!;
+    overview.types = [
+      telegram,
+      { ...telegram, kind: 'slack', title: 'Slack' },
+      { ...telegram, kind: 'service-registry', title: 'Service registry' },
+      { ...telegram, kind: 'webhook', title: 'Webhook', createdBy: 'aip webhook add' },
+    ];
+    return overview;
+  };
+
+  it('has a card to connect for each kind without a connection, and none for the webhook', async () => {
+    const overview = withKinds();
+    overview.connections = [];
+    mount(fakeApi({ integrations: vi.fn(async () => overview) }), 'catalog');
+    await screen.findByTestId('kind-card-telegram');
+    const cards = screen.getAllByTestId(/^kind-card-/);
+    expect(cards.map((card) => card.getAttribute('data-testid'))).toEqual([
+      'kind-card-telegram',
+      'kind-card-slack',
+      'kind-card-service-registry',
+    ]);
+    for (const card of cards) expect(within(card).getByText('Connect')).toBeTruthy();
+    expect(screen.queryByRole('form', { name: 'New connection' })).toBeNull();
+    expect(cards[0]!.getAttribute('href')).toBe('#settings/global/integrations/catalog/telegram');
+  });
+
+  it('counts the connections of a kind and the enabled ones, and offers to open the page', async () => {
+    const overview = withKinds();
+    overview.connections = [
+      { ...overview.connections[0]!, id: 'a', name: 'one', enabled: true },
+      { ...overview.connections[0]!, id: 'b', name: 'two', enabled: false },
+    ];
+    mount(fakeApi({ integrations: vi.fn(async () => overview) }), 'catalog');
+    const card = await screen.findByTestId('kind-card-telegram');
+    expect(within(card).getByText('2 connections, 1 enabled')).toBeTruthy();
+    expect(within(card).getByText('Open')).toBeTruthy();
+    expect(within(screen.getByTestId('kind-card-slack')).getByText('Connect')).toBeTruthy();
+  });
+
+  it('shows the page of Telegram with the steps, without the kind field and with its connections only', async () => {
+    const overview = withKinds();
+    overview.connections.push({
+      ...overview.connections[0]!,
+      id: 's1',
+      kind: 'slack',
+      name: 'slackish',
+    });
+    mount(fakeApi({ integrations: vi.fn(async () => overview) }), 'catalog', 'telegram');
+    await screen.findByTestId('connection-c1');
+    expect(screen.queryByTestId('connection-s1')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Telegram' })).toBeTruthy();
+    expect(screen.getByText(/Create a bot with @BotFather/)).toBeTruthy();
+    const form = screen.getByRole('form', { name: 'New connection' });
+    expect(within(form).queryByLabelText('Kind')).toBeNull();
+    expect(screen.getByRole('link', { name: '← Catalog' }).getAttribute('href')).toBe(
+      '#settings/global/integrations',
+    );
+  });
+
+  it('shows a kind the panel has no texts for with its own title and no steps', async () => {
+    const overview = integrationsOverview();
+    overview.types = [{ ...overview.types[0]!, kind: 'matrix', title: 'Matrix room' }];
+    overview.connections = [];
+    mount(fakeApi({ integrations: vi.fn(async () => overview) }), 'catalog', 'matrix');
+    expect(await screen.findByRole('heading', { name: 'Matrix room' })).toBeTruthy();
+    expect(screen.queryByText('How to set up')).toBeNull();
+  });
+
+  it('replaces the address of an unknown kind by the catalog without a new history entry', async () => {
+    window.location.hash = '#settings/global/integrations/catalog/nope';
+    const length = window.history.length;
+    mount(fakeApi(), 'catalog', 'nope');
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/integrations'));
+    expect(window.history.length).toBe(length);
+    expect(await screen.findByTestId('kind-card-telegram')).toBeTruthy();
+    window.location.hash = '';
   });
 });

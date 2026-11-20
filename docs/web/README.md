@@ -8,7 +8,7 @@ The web panel is a page in your browser. In it you follow runs, answer specialis
 | "Queue" | Add, order and run tasks | [web/queue.md](queue.md) |
 | "Swarm" | One window with the tabs "Providers", "Roles", "Chains", "Specialists" and "Pipeline" | [web/swarm.md](swarm.md) |
 | "Statistics" | Tokens and time by day, project, specialist and model | [web/stats.md](stats.md) |
-| Settings → "Shared" → "Integrations" (`Ctrl+I`) | Tabs: connections (Telegram, Slack: make, switch, remove), Service registry (check, project links), notifications (subscriptions, journal of sending), webhooks | [usage/notifications.md](../usage/notifications.md) |
+| Settings → "Shared" → "Integrations" (`Ctrl+I`) | Tabs: catalog (a card and a page for each kind: Telegram, Slack, Service registry; make, switch, remove connections, check and project links of a registry), notifications (subscriptions, journal of sending), webhooks | [usage/notifications.md](../usage/notifications.md) |
 | "Settings" | Edit `settings.yaml` and the shared swarm; the system state | [web/settings.md](settings.md) |
 
 The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. The panel talks to the daemon through its [HTTP API](http-api.md).

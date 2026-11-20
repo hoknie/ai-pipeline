@@ -43,7 +43,7 @@ aip integration enable <id>
 aip integration check <id>        # ok, 14 tools
 ```
 
-The tab "Service registry" of the same group covers it in the panel: it makes the connection (kind fixed, `url` as a field), shows the state of the token, checks the connection ("ok, 14 tools" or the code, with the time) and lists the projects with their links to the registry. The token is set with the command above; a link is edited in the settings of the project.
+The page "Service registry" of the catalog (group Integrations of the shared settings) covers it in the panel: it makes the connection, shows the token state, checks it ("ok, 14 tools" or the code) and lists the project links. The token is set with the command above; a link is edited in the settings of the project.
 
 Give the specialists the registry as a server of the [catalog](specialists.md#mcp-servers) that goes through the connection:
 

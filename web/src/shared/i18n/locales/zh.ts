@@ -102,11 +102,8 @@ export const zh: Dictionary = {
     enabled: '已启用',
     disabled: '已停用',
     connections: {
-      title: '连接',
-      empty: '还没有连接。请使用上面的表单创建。',
       add: {
         title: '新建连接',
-        kind: '类型',
         name: '名称',
         scope: '范围',
         create: '创建连接',
@@ -139,10 +136,28 @@ export const zh: Dictionary = {
         connection_disabled: '连接已停用',
       },
     },
+    catalog: {
+      title: '目录',
+      back: '← 目录',
+      connect: '连接',
+      open: '打开',
+      none: '没有连接',
+      count_one: '{{count}} 个连接，已启用 {{enabled}} 个',
+      count_other: '{{count}} 个连接，已启用 {{enabled}} 个',
+      empty: '此类型还没有连接。请使用上方的表单创建。',
+      setupTitle: '如何设置',
+    },
     kinds: {
       telegram: {
         title: 'Telegram',
         description: '发送通知并接收回复的 Telegram 机器人。',
+        setup: {
+          1: '通过 @BotFather 创建机器人并复制其令牌。',
+          2: '使用下方的表单创建连接。',
+          3: '用连接卡片上显示的 CLI 命令设置令牌。',
+          4: '把机器人加入聊天并发送 /id，查看聊天和用户的 id。',
+          5: '填写聊天和可以回复的用户，然后启用连接。',
+        },
         params: {
           chat_id: {
             label: '聊天',
@@ -164,6 +179,12 @@ export const zh: Dictionary = {
       slack: {
         title: 'Slack',
         description: '发送通知并接收回复的 Slack 应用。',
+        setup: {
+          1: '创建启用了 Socket Mode 的 Slack 应用。',
+          2: '复制机器人令牌（xoxb…）和应用令牌（xapp…）。',
+          3: '使用下方的表单创建连接，并用其卡片上的 CLI 命令设置两个令牌。',
+          4: '邀请机器人加入频道并启用连接。',
+        },
         params: {
           channel_id: {
             label: '频道',
@@ -192,14 +213,17 @@ export const zh: Dictionary = {
       'service-registry': {
         title: 'Service registry',
         description: '为项目提供技能的 service registry。',
+        setup: {
+          1: '使用注册表的地址创建连接。',
+          2: '用卡片上显示的 CLI 命令设置访问令牌。',
+          3: '点击“检查”确认注册表有响应。',
+        },
         params: { url: { label: '地址', hint: '注册表地址，http(s)://主机:端口。' } },
         secrets: { token: { label: '访问令牌' } },
       },
       webhook: { title: 'Webhook' },
     },
     registry: {
-      title: 'Service registry',
-      empty: '还没有 service registry 连接。请用上面的表单创建，然后用 CLI 设置令牌。',
       links: {
         title: '项目',
         empty: '还没有关联的项目。',
@@ -1953,8 +1977,7 @@ export const zh: Dictionary = {
     },
     integrationTabs: {
       label: '集成标签页',
-      connections: '连接',
-      registry: 'Service registry',
+      catalog: '目录',
       notifications: '通知',
       webhooks: 'Webhook',
     },

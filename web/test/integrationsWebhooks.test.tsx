@@ -23,6 +23,7 @@ async function open(overrides: Parameters<typeof fakeApi>[0] = {}) {
       api={api}
       registry={registry}
       tab="webhooks"
+      kind={null}
       leave={() => async () => undefined}
     />,
   );
@@ -82,7 +83,8 @@ describe('the webhooks of the page of integrations', () => {
       <IntegrationsGroup
         api={api}
         registry={registry}
-        tab="connections"
+        tab="catalog"
+        kind="telegram"
         leave={() => async () => undefined}
       />,
     );

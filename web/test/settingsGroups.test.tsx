@@ -46,9 +46,12 @@ describe('groups of settings', () => {
       scope: 'global',
       group: 'integrations',
     });
-    expect(integrationTabOf('registry')).toBe('registry');
-    expect(integrationTabOf('x')).toBe('connections');
-    expect(integrationTabOf(null)).toBe('connections');
+    expect(integrationTabOf('catalog')).toBe('catalog');
+    expect(integrationTabOf('webhooks')).toBe('webhooks');
+    expect(integrationTabOf('connections')).toBe('catalog');
+    expect(integrationTabOf('registry')).toBe('catalog');
+    expect(integrationTabOf('x')).toBe('catalog');
+    expect(integrationTabOf(null)).toBe('catalog');
   });
 
   it('puts every field to the enlarged group of its section', () => {

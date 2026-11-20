@@ -114,11 +114,8 @@ export const es: Dictionary = {
     enabled: 'activada',
     disabled: 'desactivada',
     connections: {
-      title: 'Conexiones',
-      empty: 'Aún no hay conexiones. Cree una con el formulario de arriba.',
       add: {
         title: 'Nueva conexión',
-        kind: 'Tipo',
         name: 'Nombre',
         scope: 'Dónde',
         create: 'Crear conexión',
@@ -153,10 +150,29 @@ export const es: Dictionary = {
         connection_disabled: 'La conexión está desactivada',
       },
     },
+    catalog: {
+      title: 'Catálogo',
+      back: '← Catálogo',
+      connect: 'Conectar',
+      open: 'Abrir',
+      none: 'Sin conexiones',
+      count_one: '{{count}} conexión, {{enabled}} activada',
+      count_many: '{{count}} conexiones, {{enabled}} activadas',
+      count_other: '{{count}} conexiones, {{enabled}} activadas',
+      empty: 'Aún no hay conexiones de este tipo. Crea una con el formulario de arriba.',
+      setupTitle: 'Cómo configurarlo',
+    },
     kinds: {
       telegram: {
         title: 'Telegram',
         description: 'Un bot de Telegram que envía avisos y recibe respuestas.',
+        setup: {
+          1: 'Crea un bot con @BotFather y copia su token.',
+          2: 'Crea una conexión con el formulario de abajo.',
+          3: 'Define el token con el comando de la CLI que muestra la tarjeta de la conexión.',
+          4: 'Añade el bot al chat y envíale /id para ver los id del chat y de los usuarios.',
+          5: 'Rellena el chat y los usuarios que pueden responder, y activa la conexión.',
+        },
         params: {
           chat_id: {
             label: 'Chat',
@@ -178,6 +194,12 @@ export const es: Dictionary = {
       slack: {
         title: 'Slack',
         description: 'Una aplicación de Slack que envía avisos y recibe respuestas.',
+        setup: {
+          1: 'Crea una app de Slack con Socket Mode activado.',
+          2: 'Copia el token del bot (xoxb…) y el token de la app (xapp…).',
+          3: 'Crea una conexión con el formulario de abajo y define ambos tokens con los comandos de la CLI de su tarjeta.',
+          4: 'Invita al bot al canal y activa la conexión.',
+        },
         params: {
           channel_id: {
             label: 'Canal',
@@ -206,6 +228,11 @@ export const es: Dictionary = {
       'service-registry': {
         title: 'Service registry',
         description: 'Un service registry que da habilidades a los proyectos.',
+        setup: {
+          1: 'Crea una conexión con la dirección del registro.',
+          2: 'Define el token de acceso con el comando de la CLI que muestra la tarjeta.',
+          3: 'Pulsa «Comprobar» para verificar que el registro responde.',
+        },
         params: {
           url: { label: 'Dirección', hint: 'La dirección del registro, http(s)://host:puerto.' },
         },
@@ -214,9 +241,6 @@ export const es: Dictionary = {
       webhook: { title: 'Webhook' },
     },
     registry: {
-      title: 'Service registry',
-      empty:
-        'Aún no hay conexiones al service registry. Cree una con el formulario de arriba y luego establezca su token con la CLI.',
       links: {
         title: 'Proyectos',
         empty: 'Aún no hay proyectos vinculados.',
@@ -2041,8 +2065,7 @@ export const es: Dictionary = {
     },
     integrationTabs: {
       label: 'Pestañas de Integraciones',
-      connections: 'Conexiones',
-      registry: 'Service registry',
+      catalog: 'Catálogo',
       notifications: 'Notificaciones',
       webhooks: 'Webhooks',
     },

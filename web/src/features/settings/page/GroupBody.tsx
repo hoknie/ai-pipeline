@@ -183,6 +183,7 @@ export function GroupBody({ props, settings }: BodyProps) {
         api={api}
         registry={props.registry}
         tab={integrationTabOf(props.agentTab)}
+        kind={props.integrationKind}
         leave={settings.leave}
       />
     );

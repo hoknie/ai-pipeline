@@ -88,12 +88,15 @@ export function agentTabOf(part: string | null): AgentTab {
 }
 
 /** The tabs of the group «Integrations»; the third part of its address. */
-export const INTEGRATION_TABS = ['connections', 'registry', 'notifications', 'webhooks'] as const;
+export const INTEGRATION_TABS = ['catalog', 'notifications', 'webhooks'] as const;
 export type IntegrationTab = (typeof INTEGRATION_TABS)[number];
 
-/** The tab of the group «Integrations» for the part of an address; an unknown one is the first. */
+/**
+ * The tab of the group «Integrations» for the part of an address; an unknown one, and the former
+ * `connections`, is the catalog.
+ */
 export function integrationTabOf(part: string | null): IntegrationTab {
-  return INTEGRATION_TABS.find((tab) => tab === part) ?? 'connections';
+  return INTEGRATION_TABS.find((tab) => tab === part) ?? 'catalog';
 }
 
 const isScope = (key: string | null): key is SettingsScope =>

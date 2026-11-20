@@ -215,6 +215,7 @@ export function SettingsRoute(props: {
         runtime={common.route.step}
         onSelectRuntime={select('runtimes')}
         agentTab={common.route.step}
+        integrationKind={common.route.tab}
         observerTab={common.route.step}
         onSelectObserverTab={select('observers')}
         dirty={common.dirty}
