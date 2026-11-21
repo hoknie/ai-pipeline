@@ -16,6 +16,7 @@ export interface Delivery {
 export type DispatchOutcome =
   | { status: 'applied'; connectionId: string; result: OperationResult }
   | { status: 'duplicate'; connectionId: string; result: OperationResult }
+  | { status: 'ignored'; connectionId: string; reason: string }
   | { status: 'unknown_outcome'; connectionId: string };
 
 export interface InboundLimits {

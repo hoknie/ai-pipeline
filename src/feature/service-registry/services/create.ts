@@ -8,6 +8,7 @@ import type { RegistryTransportPort } from '../ports/index.ts';
 import { LinkRepository } from '../repositories/index.ts';
 
 import { serviceRegistryAdapter } from './adapter.ts';
+import { registryVerifier } from './events.ts';
 import { RegistryCalls } from './calls.ts';
 import { Forwarder } from './forwarder.ts';
 import { RegistryLinks } from './links.ts';
@@ -47,8 +48,12 @@ export interface ServiceRegistryServices {
 export function createServiceRegistryServices(
   dependencies: ServiceRegistryDependencies,
 ): ServiceRegistryServices {
+  const links = new LinkRepository(dependencies.database);
   return {
-    adapter: serviceRegistryAdapter(dependencies),
+    adapter: serviceRegistryAdapter(
+      dependencies,
+      registryVerifier({ links, access: () => dependencies.integrations().access }),
+    ),
     forwarder: new Forwarder(dependencies),
     skills: new SkillService({
       transport: dependencies.transport,
@@ -58,7 +63,7 @@ export function createServiceRegistryServices(
       now: dependencies.now,
     }),
     links: new RegistryLinks({
-      links: new LinkRepository(dependencies.database),
+      links,
       origins: dependencies.projects,
       repositories: dependencies.repositories,
       integrations: dependencies.integrations,

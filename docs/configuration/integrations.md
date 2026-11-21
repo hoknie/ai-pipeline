@@ -36,6 +36,8 @@ The kind `service-registry` connects `aip` to a service registry: a server that 
 |---|---|
 | parameter `url` | `https://registry.example.com`: a host with an optional port, no credentials, path, query or fragment |
 | secret `token` | the token of the registry (`svcp_…`) |
+| secret `webhook_secret` | optional: the signing secret of the [events](#events-of-the-registry) the registry sends (`whsec_…`) |
+| parameters `on_deployment_drift`, `on_link_check_failed`, `on_repo_sync_failed` | optional: the pipeline that a task of such an event runs |
 
 ```
 aip integration add service-registry main --global --param url=https://registry.example.com
@@ -103,6 +105,39 @@ A specialist without such a server gets nothing about the registry. The path is 
 
 The settings of a project in the panel show the same: the status, the path with its source and a link to the project in the registry, a field for the path (checked with the registry; a refusal is shown at the field), «Match again» and «Reset».
 
+### Events of the registry
+
+The registry can tell `aip` about a problem, and `aip` puts a task for it into the queue of the linked project. Events are [Standard Webhooks](https://www.standardwebhooks.com/): the registry posts them to the panel.
+
+```
+POST <panel address>/hooks/service-registry/<connection id>
+```
+
+```
+aip integration secret set <id> webhook_secret --stdin < whsec.txt
+aip integration edit <id> --param on_deployment_drift=investigate
+```
+
+Subscribe the registry to `deployment.drift`, `link.check_failed` and `repo_sync.failed`, with the same secret.
+
+- **Panel.** The address works while the panel runs: always in server mode, otherwise only while `aip web` runs. It needs no token or login; the signature is the proof. In the local mode the registry must reach `127.0.0.1:<port>` through a tunnel or a reverse proxy that keeps that `Host`, or you use the server mode.
+- **Signature.** The `webhook-signature` must be the HMAC-SHA256 of `webhook-id`, `webhook-timestamp` and the raw body under the `webhook_secret`, and the time must be within 5 minutes. A delivery that fails any check, or has no secret to be checked with, gets `401` and nothing else.
+- **Project.** The event names a project of the registry (`data.node.path`). The task goes to the project linked to that path through this connection; none, or several, means no task.
+- **Rule.** `on_deployment_drift`, `on_link_check_failed` and `on_repo_sync_failed` name a pipeline. An event whose parameter is not set creates no task. The recovery events (`deployment.drift_resolved`, `link.check_recovered`, `repo_sync.recovered`) never create a task.
+- **Task.** Its title is `Registry: <event> — <path>`; the text holds the event, the project, a link to it in the registry and the known fields of the event.
+- **Repeats.** A `webhook-id` is handled once, also after a restart. A task with the pipeline and text of one that still waits in the queue is not added again.
+
+| Answer | Meaning |
+|---|---|
+| `200 {"status":"applied","item":…}` | the task is in the queue (`"duplicate":true`: the same task already waits) |
+| `200 {"status":"ignored","reason":…}` | checked, no task: `no_rule`, `recovery`, `unsupported`, `malformed`, `no_link`, `ambiguous_link` |
+| `200 {"status":"duplicate"}` | this `webhook-id` was handled before |
+| `202 {"status":"unknown_outcome"}` | the queue did not answer in time; do not repeat |
+| `401`, `413`, `422` | not authenticated, body above 1 MiB, the queue refused (for example, no such pipeline); the registry may repeat the delivery |
+| `503` | the daemon or the secret storage is unavailable; the registry repeats the delivery |
+
+The daemon logs one line for each delivery: the connection, the type and path of the event, and the result, without the body or the signature.
+
 ## Where secrets are kept
 
 | Backend | When | Notes |
@@ -136,10 +171,10 @@ Values are encrypted with an authenticated cipher and written atomically. A wron
 
 ## Entry and exit points of adapters
 
-A future adapter for a concrete system follows this template; none is built in yet.
+An adapter for a concrete system follows this template; the first one that receives events is the [service registry](#events-of-the-registry).
 
 - **Input**: the adapter hands raw bytes and metadata to the daemon with the id of a verifier registered at startup. The daemon checks the size and the deadline before decoding, verifies the signature or token on the raw body, checks that the connection is enabled, has its secrets and belongs to the project in question, and allows only a fixed list of operations.
-- **Idempotency**: every event is claimed durably by `(connection, external event id)`, so a repeat after a restart changes nothing.
+- **Idempotency**: every event is claimed durably by `(connection, external event id)`, so a repeat after a restart changes nothing. An event that was verified but asks for nothing (no rule, a recovery) claims its id too and is answered as `ignored`.
 - **Operations** go through the same services and state machine as the CLI; an adapter never touches the tables of other features.
 - **Output**: a bounded call with its own timeout and idempotency key; the result is a safe message without secrets, and waiting for the network never blocks the run queue.
-- **Network**: a built-in adapter opens a listener or an outgoing connection only when a specific change adds it.
+- **Network**: a built-in adapter opens a listener or an outgoing connection only when a specific change adds it. Events of the service registry use a route of the panel, not a listener of the daemon.

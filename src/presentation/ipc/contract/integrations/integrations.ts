@@ -44,6 +44,25 @@ export interface IntegrationRemoved {
   removed: string;
 }
 
+/** The answer of `integration_inbound`: static words only, never a part of the event or an error text. */
+export interface InboundAnswer {
+  status:
+    | 'applied'
+    | 'duplicate'
+    | 'ignored'
+    | 'unknown_outcome'
+    | 'unauthenticated'
+    | 'too_large'
+    | 'operation_denied'
+    | 'unavailable';
+  reason?: string;
+  item?: string;
+  duplicate?: true;
+}
+
+/** The longest body of an event the daemon takes, as base64 of 1 MiB. */
+export const INBOUND_BODY_BASE64_LIMIT = 1_398_104;
+
 const connectionId = z.string().min(1).max(64);
 const slot = z.string().regex(SLOT_PATTERN);
 const parameters = z.record(z.string().min(1).max(64), z.string().max(1000));
@@ -123,6 +142,20 @@ export const integrationsRequests = [
           [params.path, params.auto, params.clear].filter((one) => one !== undefined).length === 1,
         { message: 'pass exactly one of path, auto and clear' },
       ),
+  }),
+  z.object({
+    /** An event of a service registry: the panel hands over raw bytes, the daemon checks them. */
+    method: z.literal('integration_inbound'),
+    params: z.object({
+      kind: z.literal('service-registry'),
+      connectionId,
+      body: z.string().max(INBOUND_BODY_BASE64_LIMIT),
+      headers: z.strictObject({
+        'webhook-id': z.string().max(4096).optional(),
+        'webhook-timestamp': z.string().max(4096).optional(),
+        'webhook-signature': z.string().max(4096).optional(),
+      }),
+    }),
   }),
   z.object({
     method: z.literal('integration_links'),

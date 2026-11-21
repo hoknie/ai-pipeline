@@ -56,6 +56,8 @@ export const settingsMethods = {
   webhook_remove: onShared('integration.write'),
   webhook_test: onShared('integration.write'),
   webhook_redeliver: onShared('integration.write'),
+  // the event proves itself by the signature of the connection, not by a user
+  integration_inbound: open,
   integration_links: onShared('integration.read'),
   integration_link: onShared('integration.write'),
   integration_enable: onShared('integration.write'),

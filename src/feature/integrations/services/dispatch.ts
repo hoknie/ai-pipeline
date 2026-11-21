@@ -1,21 +1,25 @@
 import { isAppError } from '../../../platform/errors/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
-import type { IntegrationOperationsPort, VerifiedToken, VerifyContext } from '../ports/index.ts';
+import type { IntegrationOperationsPort, VerifyContext } from '../ports/index.ts';
 import type { DeliveryRepository } from '../repositories/index.ts';
 import {
   DEFAULT_INBOUND_LIMITS,
   EVENT_ID_PATTERN,
-  isOperation,
   refusal,
   type AcceptedEvent,
   type Connection,
   type DispatchOutcome,
+  type EventMeta,
   type InboundLimits,
 } from '../types/index.ts';
 
 import type { AdapterCatalog } from './catalog.ts';
 import type { ConnectionAccess } from './access.ts';
+import { isIgnored, ProofIssuer, type VerifiedEvent } from './proof.ts';
 import type { SecretService } from './secrets.ts';
+
+/** What the adapters of other features need to write a verifier. */
+export type { InboundVerifierPort, VerifiedToken, VerifyContext } from '../ports/index.ts';
 
 export interface InboundDependencies {
   catalog: AdapterCatalog;
@@ -36,12 +40,8 @@ export interface InboundRequest {
   connectionId: string;
   body: Uint8Array;
   headers: Readonly<Record<string, string>>;
-}
-
-interface Grant {
-  connectionId: string;
-  event: AcceptedEvent | null;
-  used: boolean;
+  /** Called with the labels of the event once the verifier accepted it, whatever comes next. */
+  onVerified?: (meta: EventMeta) => void;
 }
 
 function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
@@ -61,7 +61,7 @@ export class InboundService {
   private readonly dependencies: InboundDependencies;
   private readonly limits: InboundLimits;
   /** The proofs issued to verifiers: a forged structure is not in here. */
-  private readonly grants = new WeakMap<object, Grant>();
+  private readonly proofs = new ProofIssuer();
 
   constructor(dependencies: InboundDependencies) {
     this.dependencies = dependencies;
@@ -71,7 +71,9 @@ export class InboundService {
   async receive(request: InboundRequest): Promise<DispatchOutcome> {
     if (request.body.byteLength > this.limits.maxBodyBytes) throw refusal('too_large');
     const event = await this.verified(request);
+    if (event.meta !== undefined) request.onVerified?.(event.meta);
     const connection = this.recheck(request.connectionId);
+    if (isIgnored(event)) return this.dispatchIgnored(connection, event);
     const adapter = this.dependencies.catalog.adapter(connection.kind);
     if (!adapter.descriptor.operations.includes(event.operation.type)) {
       throw refusal('operation_denied');
@@ -100,7 +102,7 @@ export class InboundService {
   }
 
   /** Runs the trusted verifier on the raw bytes and returns what it accepted. */
-  private async verified(request: InboundRequest): Promise<AcceptedEvent> {
+  private async verified(request: InboundRequest): Promise<VerifiedEvent> {
     const { catalog, secrets, now } = this.dependencies;
     const verifier = catalog.has(request.verifier)
       ? catalog.adapter(request.verifier).verifier
@@ -108,34 +110,27 @@ export class InboundService {
     if (verifier === undefined) throw refusal('unauthenticated');
     const connection = this.recheck(request.connectionId);
     if (connection.kind !== request.verifier) throw refusal('unauthenticated');
-    const grant: Grant = { connectionId: connection.id, event: null, used: false };
+    const session = this.proofs.open();
     const context: VerifyContext = {
       connectionId: connection.id,
       body: request.body,
       headers: request.headers,
       receivedAt: now(),
       secrets: { read: (slot) => secrets.read(connection.id, slot) },
-      accept: (event) => {
-        if (!EVENT_ID_PATTERN.test(event.externalEventId) || !isOperation(event.operation)) {
-          throw refusal('unauthenticated');
-        }
-        const token: VerifiedToken = Object.freeze({ brand: 'verified' as const });
-        grant.event = event;
-        this.grants.set(token, grant);
-        return token;
-      },
+      ...session.issuers,
     };
-    let token: VerifiedToken | null;
+    let token: Awaited<ReturnType<typeof verifier.verify>>;
     try {
       token = await withDeadline(verifier.verify(context), this.limits.deadlineMs);
     } catch (error) {
-      if (isAppError(error) && error.code === 'integrations.timeout') throw error;
+      if (
+        isAppError(error) &&
+        (error.code === 'integrations.timeout' || error.code === 'integrations.backend_unavailable')
+      )
+        throw error;
       throw refusal('unauthenticated');
     }
-    const issued = token === null ? undefined : this.grants.get(token);
-    if (issued !== grant || grant.used || grant.event === null) throw refusal('unauthenticated');
-    grant.used = true;
-    return grant.event;
+    return session.redeem(token);
   }
 
   /** The state of the connection as it is now: enabled, ready, nothing pending, secrets in place. */
@@ -172,6 +167,33 @@ export class InboundService {
     return named;
   }
 
+  /** Claims the id of a checked event that asks for nothing; the first delivery is `ignored`. */
+  private dispatchIgnored(
+    connection: Connection,
+    event: Extract<VerifiedEvent, { ignored: string }>,
+  ): DispatchOutcome {
+    const { deliveries, now } = this.dependencies;
+    const id = event.externalEventId;
+    if (!deliveries.claim(connection.id, id, now())) {
+      return this.repeated(connection, id);
+    }
+    deliveries.markApplied(connection.id, id, { ignored: event.ignored }, now());
+    return { status: 'ignored', connectionId: connection.id, reason: event.ignored };
+  }
+
+  /** The answer for an id that was claimed before. */
+  private repeated(connection: Connection, id: string): DispatchOutcome {
+    const known = this.dependencies.deliveries.find(connection.id, id);
+    if (known?.state === 'applied') {
+      return {
+        status: 'duplicate',
+        connectionId: connection.id,
+        result: known.result ?? {},
+      };
+    }
+    return { status: 'unknown_outcome', connectionId: connection.id };
+  }
+
   /** Claims the event id and performs the operation; a repeat never performs it again. */
   private async dispatch(
     connection: Connection,
@@ -180,13 +202,7 @@ export class InboundService {
   ): Promise<DispatchOutcome> {
     const { deliveries, operations, now } = this.dependencies;
     const id = event.externalEventId;
-    if (!deliveries.claim(connection.id, id, now())) {
-      const known = deliveries.find(connection.id, id);
-      if (known?.state === 'applied') {
-        return { status: 'duplicate', connectionId: connection.id, result: known.result ?? {} };
-      }
-      return { status: 'unknown_outcome', connectionId: connection.id };
-    }
+    if (!deliveries.claim(connection.id, id, now())) return this.repeated(connection, id);
     try {
       const result = await withDeadline(
         operations.perform(project, event.operation),

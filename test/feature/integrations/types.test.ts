@@ -83,6 +83,12 @@ describe('connection types', () => {
     expect(isOperation({ type: 'run_shell', command: 'rm -rf /' })).toBe(false);
     expect(isOperation({ type: 'queue_task', pipeline: '', task: 'x' })).toBe(false);
     expect(isOperation(null)).toBe(false);
+    expect(
+      isOperation({ type: 'queue_task', pipeline: 'feature', task: 'x', skipDuplicate: true }),
+    ).toBe(true);
+    expect(
+      isOperation({ type: 'queue_task', pipeline: 'feature', task: 'x', skipDuplicate: 'yes' }),
+    ).toBe(false);
   });
 
   it('reads the code of a refusal back', () => {

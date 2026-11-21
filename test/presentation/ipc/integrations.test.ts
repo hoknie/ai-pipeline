@@ -4,10 +4,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { appError, rejected } from '../../../src/platform/errors/index.ts';
-import { refusal } from '../../../src/feature/integrations/types/index.ts';
+import type { InboundRequest } from '../../../src/feature/integrations/services/index.ts';
+import { refusal, type DispatchOutcome } from '../../../src/feature/integrations/types/index.ts';
 import {
   MAX_REQUEST_BYTES,
   parseRequest,
+  remoteDenied,
   requestSchema,
 } from '../../../src/presentation/ipc/contract/index.ts';
 import { actionOf } from '../../../src/presentation/ipc/handlers/access/method-actions.ts';
@@ -69,6 +71,7 @@ describe('integration requests', () => {
       'integration_disable',
       'integration_edit',
       'integration_enable',
+      'integration_inbound',
       'integration_link',
       'integration_links',
       'integration_list',
@@ -208,10 +211,133 @@ describe('where the methods are not offered', () => {
           // the panel manages connections and their non-secret parameters; secrets stay with the CLI
           expect(text, file).not.toMatch(/integration_secret_(set|remove)/);
           expect(text, file).toContain('integration_senders');
+        } else if (file.endsWith(join('web', 'hooks.ts'))) {
+          // the route of the events of registries carries one method and no other
+          expect(text, file).not.toMatch(/integration_(?!inbound)/);
         } else {
           expect(text, file).not.toMatch(/integration_/);
         }
       }
+    }
+  });
+});
+
+describe('integration_inbound', () => {
+  const valid = {
+    kind: 'service-registry',
+    connectionId: 'c1',
+    body: Buffer.from('{}').toString('base64'),
+    headers: { 'webhook-id': 'm1', 'webhook-timestamp': '1', 'webhook-signature': 'v1,AA==' },
+  };
+
+  it('takes the three headers of the scheme and a body up to 1 MiB, nothing more', () => {
+    expect(parse('integration_inbound', valid)).toMatchObject({
+      request: { method: 'integration_inbound' },
+    });
+    for (const params of [
+      { ...valid, headers: { ...valid.headers, authorization: 'Bearer x' } },
+      { ...valid, headers: { 'webhook-id': 'x'.repeat(4097) } },
+      { ...valid, body: 'A'.repeat(1_398_105) },
+      { ...valid, kind: 'example' },
+      { ...valid, connectionId: '' },
+    ]) {
+      expect(parse('integration_inbound', params)).toMatchObject({ code: 'invalid_params' });
+    }
+    expect(parse('integration_inbound', { ...valid, body: 'A'.repeat(1_398_104) })).toMatchObject({
+      request: { method: 'integration_inbound' },
+    });
+  });
+
+  it('is refused to the remote transport and needs no user', () => {
+    expect(remoteDenied).toContain('integration_inbound');
+    expect(actionOf('integration_inbound', valid)).toBeNull();
+  });
+
+  const run = async (receive: (request: InboundRequest) => Promise<DispatchOutcome>) => {
+    const lines: string[] = [];
+    const received: InboundRequest[] = [];
+    const answer = await handle(
+      { method: 'integration_inbound', params: valid } as never,
+      {
+        actor: { kind: 'system' },
+        log: (line: string) => lines.push(line),
+        services: {
+          integrations: {
+            inbound: {
+              receive: (request: InboundRequest) => {
+                received.push(request);
+                return receive(request);
+              },
+            },
+          },
+        },
+      } as unknown as IpcContext,
+    );
+    return { answer, lines, received };
+  };
+
+  it('decodes the body, calls the gate and answers in static words with one log line', async () => {
+    const { answer, lines, received } = await run((request) => {
+      request.onVerified?.({ type: 'deployment.drift', path: 'acme/api' });
+      return Promise.resolve({
+        status: 'applied',
+        connectionId: 'c1',
+        result: { queued: true, item: 'q7' },
+      });
+    });
+    expect(answer).toEqual({ status: 'applied', item: 'q7' });
+    expect(received[0]).toMatchObject({ verifier: 'service-registry', connectionId: 'c1' });
+    expect(Buffer.from(received[0]!.body).toString()).toBe('{}');
+    expect(lines).toEqual([
+      'integration event: connection=c1 type=deployment.drift path=acme/api outcome=applied',
+    ]);
+    expect(lines.join('\n')).not.toContain('v1,AA==');
+  });
+
+  it('reports a skipped repeat, an ignored event and an unknown outcome', async () => {
+    const skipped = await run(() =>
+      Promise.resolve({
+        status: 'applied',
+        connectionId: 'c1',
+        result: { queued: false, duplicate: true },
+      }),
+    );
+    expect(skipped.answer).toEqual({ status: 'applied', duplicate: true });
+    const ignored = await run((request) => {
+      request.onVerified?.({ type: 'repo_sync.recovered', path: 'acme/api' });
+      return Promise.resolve({ status: 'ignored', connectionId: 'c1', reason: 'recovery' });
+    });
+    expect(ignored.answer).toEqual({ status: 'ignored', reason: 'recovery' });
+    expect(ignored.lines[0]).toContain('outcome=ignored recovery');
+    const again = await run(() =>
+      Promise.resolve({ status: 'duplicate', connectionId: 'c1', result: { item: 'q1' } }),
+    );
+    expect(again.answer).toEqual({ status: 'duplicate' });
+    const unknown = await run(() =>
+      Promise.resolve({ status: 'unknown_outcome', connectionId: 'c1' }),
+    );
+    expect(unknown.answer).toEqual({ status: 'unknown_outcome' });
+  });
+
+  it('gives one answer for every kind of failed authentication and keeps the rest apart', async () => {
+    const answers = [];
+    for (const code of ['unauthenticated', 'disabled', 'not_found'] as const) {
+      answers.push((await run(() => Promise.reject(refusal(code)))).answer);
+    }
+    expect(new Set(answers.map((one) => JSON.stringify(one)))).toEqual(
+      new Set([JSON.stringify({ status: 'unauthenticated' })]),
+    );
+    const cases: [unknown, string][] = [
+      [refusal('too_large'), 'too_large'],
+      [refusal('operation_denied'), 'operation_denied'],
+      [refusal('timeout'), 'unavailable'],
+      [refusal('backend_unavailable'), 'unavailable'],
+      [new Error(`boom ${SENTINEL}`), 'unavailable'],
+    ];
+    for (const [thrown, status] of cases) {
+      const { answer, lines } = await run(() => Promise.reject(thrown));
+      expect(answer).toEqual({ status });
+      expect(lines.join()).not.toContain(SENTINEL);
     }
   });
 });

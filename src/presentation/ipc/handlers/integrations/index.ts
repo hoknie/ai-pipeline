@@ -3,3 +3,4 @@ export * from './notifications.ts';
 export * from './remote.ts';
 export * from './webhooks.ts';
 export * from './skills.ts';
+export * from './inbound.ts';

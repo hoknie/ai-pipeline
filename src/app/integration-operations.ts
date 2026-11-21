@@ -1,4 +1,5 @@
-import { rejected } from '../platform/errors/index.ts';
+import { isAppError, rejected } from '../platform/errors/index.ts';
+import { DUPLICATE_TASK_CODE } from '../feature/queue/types/index.ts';
 import type { IntegrationOperationsPort } from '../feature/integrations/ports/index.ts';
 import type { OperationResult } from '../feature/integrations/types/index.ts';
 import type { DaemonServices } from '../presentation/ipc/services.ts';
@@ -16,14 +17,27 @@ export function integrationOperations(services: DaemonServices): IntegrationOper
       if (operation.type === 'queue_task') {
         return runs.engine.serial<OperationResult>(async () => {
           queue.scope.sync();
-          const { item } = await queue.items.add({
-            repository: project,
-            pipeline: operation.pipeline,
-            task: operation.task,
-            ...(operation.title === undefined ? {} : { title: operation.title }),
-          });
-          const queued: OperationResult = { queued: true, item };
-          return queued;
+          try {
+            const { item } = await queue.items.add({
+              repository: project,
+              pipeline: operation.pipeline,
+              task: operation.task,
+              createdBySystem: true,
+              ...(operation.title === undefined ? {} : { title: operation.title }),
+            });
+            const queued: OperationResult = { queued: true, item };
+            return queued;
+          } catch (error) {
+            if (
+              operation.skipDuplicate === true &&
+              isAppError(error) &&
+              error.code === DUPLICATE_TASK_CODE
+            ) {
+              const skipped: OperationResult = { queued: false, duplicate: true };
+              return skipped;
+            }
+            throw error;
+          }
         });
       }
       if (runs.states.get(operation.runId).run.repository !== project) {

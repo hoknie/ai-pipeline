@@ -48,6 +48,26 @@ describe('links repository', () => {
     expect(repository.all('/work/lib')).toEqual([]);
   });
 
+  it('finds the linked projects of a connection by the path in the registry', async () => {
+    const { repository, one, two } = await setup();
+    repository.put(link({ connectionId: one }));
+    expect(repository.byPath(one, 'acme/backend/api').map((found) => found.project)).toEqual([
+      '/work/app',
+    ]);
+    repository.put(link({ connectionId: one, project: '/work/lib' }));
+    expect(repository.byPath(one, 'acme/backend/api').map((found) => found.project)).toEqual([
+      '/work/app',
+      '/work/lib',
+    ]);
+    expect(repository.byPath(two, 'acme/backend/api')).toEqual([]);
+    expect(repository.byPath(one, 'acme/other')).toEqual([]);
+    repository.put(
+      link({ connectionId: two, registryPath: null, source: null, status: 'no_match' }),
+    );
+    repository.put(link({ connectionId: two, project: '/work/lib', status: 'disabled' }));
+    expect(repository.byPath(two, 'acme/backend/api')).toEqual([]);
+  });
+
   it('survives a restart of the database', async () => {
     const { f, repository, one } = await setup();
     repository.put(link({ connectionId: one }));

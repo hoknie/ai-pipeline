@@ -1,3 +1,4 @@
+import type { InboundVerifierPort } from '../../integrations/services/index.ts';
 import type { CheckResult, RegistryCheckRequest, RegistryTransportPort } from '../ports/index.ts';
 import {
   RegistryFailure,
@@ -65,9 +66,13 @@ async function checkRegistry(
 }
 
 /** The adapter of the integrations for the kind: the descriptor and the connection check. */
-export function serviceRegistryAdapter(dependencies: AdapterDependencies) {
+export function serviceRegistryAdapter(
+  dependencies: AdapterDependencies,
+  verifier?: InboundVerifierPort,
+) {
   return {
     descriptor: serviceRegistryDescriptor,
+    ...(verifier === undefined ? {} : { verifier }),
     check: {
       check: (request: RegistryCheckRequest): Promise<CheckResult> =>
         checkRegistry(request, dependencies),

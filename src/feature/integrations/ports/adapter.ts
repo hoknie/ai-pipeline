@@ -2,6 +2,7 @@ import type {
   AcceptedEvent,
   AdapterDescriptor,
   CheckResult,
+  EventMeta,
   OperationResult,
 } from '../types/index.ts';
 
@@ -21,6 +22,8 @@ export interface VerifyContext {
   readonly secrets: SecretReader;
   /** Issues the proof for an event whose signature or token was checked on `body`. */
   accept(event: AcceptedEvent): VerifiedToken;
+  /** Issues the proof for an event that was checked but asks for nothing; the reason is static. */
+  ignore(externalEventId: string, reason: string, meta?: EventMeta): VerifiedToken;
 }
 
 /** Checks a signature or a token on the raw bytes; registered in the composition root only. */

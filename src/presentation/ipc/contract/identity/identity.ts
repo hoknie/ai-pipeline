@@ -111,6 +111,7 @@ export const remoteDenied: readonly string[] = [
   'worker_queue_edit',
   'worker_queue_remove',
   'mcp_remote_forward',
+  'integration_inbound',
   'subscribe',
   'auth_resolve',
   'auth_link_login',

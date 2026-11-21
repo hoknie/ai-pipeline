@@ -250,6 +250,24 @@ describe('inbound events through the services of the queue and the runs', () => 
     );
   });
 
+  it('skips a task that already waits when asked to, and refuses it otherwise', async () => {
+    const h = await start({ adapters: [tokenAdapter()], secretStore: new MemoryStore() });
+    const id = await connected(h);
+    const task = { type: 'queue_task', pipeline: 'feature', task: 'same problem' };
+    const skipping = { ...task, skipDuplicate: true };
+    expect((await services(h).inbound.receive(event(id, skipping, 'tok', 'e1'))).status).toBe(
+      'applied',
+    );
+    const again = await services(h).inbound.receive(event(id, skipping, 'tok', 'e2'));
+    expect(again).toMatchObject({ status: 'applied', result: { queued: false, duplicate: true } });
+    await expect(services(h).inbound.receive(event(id, task, 'tok', 'e3'))).rejects.toThrow(
+      /not allowed/,
+    );
+    const queue = (await h.call('queue', { repository: h.repo })) as QueueView;
+    expect(queue.items.map((item) => item.task)).toEqual(['same problem']);
+    expect(queue.items[0]?.createdBySystem).toBe(true);
+  });
+
   it('cancels a run through its machine and refuses a run that does not exist, without a false success', async () => {
     const h = await start({ adapters: [tokenAdapter()], secretStore: new MemoryStore() });
     const id = await connected(h);

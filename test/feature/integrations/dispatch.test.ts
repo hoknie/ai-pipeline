@@ -301,6 +301,78 @@ describe('inbound gate', () => {
   });
 });
 
+/** A verifier that only checks the event and asks for nothing: the id comes from the body. */
+function ignoring(reason = 'no_rule'): InboundVerifierPort {
+  return {
+    verify: (context) =>
+      Promise.resolve(
+        context.ignore(new TextDecoder().decode(context.body), reason, {
+          type: 'x.y',
+          path: `a/${'p'.repeat(200)}\n`,
+        }),
+      ),
+  };
+}
+
+describe('a verified event that asks for nothing', () => {
+  const request = (id: string, connectionId: string): InboundRequest => ({
+    verifier: 'example',
+    connectionId,
+    body: new TextEncoder().encode(id),
+    headers: {},
+  });
+
+  it('is ignored without the domain, claims its id and is a duplicate the second time', async () => {
+    const f = fixture({ adapters: [exampleAdapter({ verifier: ignoring() })] });
+    const id = await setup(f);
+    const seen: unknown[] = [];
+    const first = await f.services.inbound.receive({
+      ...request('e1', id),
+      onVerified: (meta) => seen.push(meta),
+    });
+    expect(first).toEqual({ status: 'ignored', connectionId: id, reason: 'no_rule' });
+    expect(f.performed).toEqual([]);
+    const again = await f.restart().inbound.receive(request('e1', id));
+    expect(again).toEqual({
+      status: 'duplicate',
+      connectionId: id,
+      result: { ignored: 'no_rule' },
+    });
+    expect(seen).toEqual([{ type: 'x.y', path: `a/${'p'.repeat(126)}` }]);
+  });
+
+  it('needs neither an allowed operation nor a project, but still a live connection', async () => {
+    const none = { ...EXAMPLE, operations: [] as const };
+    const f = fixture({ adapters: [{ descriptor: none, verifier: ignoring() }] });
+    const id = await setup(f);
+    f.services.connections.disable(id);
+    await expect(f.services.inbound.receive(request('e1', id))).rejects.toThrow(/disabled/);
+    await f.services.connections.enable(id);
+    expect((await f.services.inbound.receive(request('e1', id))).status).toBe('ignored');
+  });
+
+  it('refuses a reason that is not a static word and a proof of another delivery', async () => {
+    const f = fixture({ adapters: [exampleAdapter({ verifier: ignoring('has space') })] });
+    const id = await setup(f);
+    await expect(f.services.inbound.receive(request('e1', id))).rejects.toThrow(
+      /authentication failed/,
+    );
+    let kept: VerifiedToken | null = null;
+    const replaying: InboundVerifierPort = {
+      async verify(context) {
+        kept ??= context.ignore('e2', 'recovery');
+        return kept;
+      },
+    };
+    const g = fixture({ adapters: [exampleAdapter({ verifier: replaying })] });
+    const other = await setup(g);
+    await g.services.inbound.receive(request('x', other));
+    await expect(g.services.inbound.receive(request('x', other))).rejects.toThrow(
+      /authentication failed/,
+    );
+  });
+});
+
 describe('outbound operations', () => {
   it('runs only through an enabled connection that serves the project and reports a failure as one', async () => {
     const outbound = {

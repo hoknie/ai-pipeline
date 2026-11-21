@@ -9,6 +9,7 @@ import {
   integrationHandlers,
   notificationHandlers,
   remoteHandlers,
+  inboundHandlers,
   webhookHandlers,
   skillHandlers,
 } from './integrations/index.ts';
@@ -29,6 +30,7 @@ export const handlers: HandlerTable = {
   ...skillHandlers,
   ...notificationHandlers,
   ...remoteHandlers,
+  ...inboundHandlers,
   ...webhookHandlers,
   ...observerHandlers,
   ...configHandlers,

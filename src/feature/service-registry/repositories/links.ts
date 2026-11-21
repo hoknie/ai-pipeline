@@ -36,6 +36,18 @@ export class LinkRepository {
     return row === undefined ? undefined : toLink(row);
   }
 
+  /** The linked projects of a connection whose path in the registry is `path`. */
+  byPath(connectionId: string, path: string): ProjectLink[] {
+    const rows = this.database
+      .prepare(
+        `SELECT * FROM service_registry_links
+         WHERE connection_id = ? AND registry_path = ? AND status = 'linked'
+         ORDER BY project_path`,
+      )
+      .all(connectionId, path) as unknown as Row[];
+    return rows.map(toLink);
+  }
+
   /** Every row of a project, or every row. */
   all(project?: string): ProjectLink[] {
     const rows = (project === undefined

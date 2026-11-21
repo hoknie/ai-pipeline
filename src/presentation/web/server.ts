@@ -11,6 +11,7 @@ import { assertLocalHost, assertServerHost, assertToken, connectionIdentity } fr
 import { requestContext } from './auth/context.ts';
 import { authRoute, createGate, ipcRoute, type ServerGate } from './auth/routes.ts';
 import { TOKEN_HINT, configError, panel, renderPanelError } from './errors.ts';
+import { hookRoute, isHookPath } from './hooks.ts';
 import { Hub } from './hub.ts';
 import { topicReader } from './live/read.ts';
 import { serveLive } from './live/socket.ts';
@@ -44,21 +45,9 @@ import type { RawRoute, Route, RouteKit } from './routes/types.ts';
 export type { WebOptions, WebServer, SystemHooks } from './options.ts';
 export { DEFAULT_ASSETS, RECHECK_MS } from './options.ts';
 
-export function assertLoopbackHost(host: string): void {
-  if (!['127.0.0.1', 'localhost', '::1'].includes(host))
-    throw configError('the web panel only listens on loopback: use 127.0.0.1, localhost or ::1');
-}
+import { assertLoopbackHost } from './token.ts';
 
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
-
-/** The fixed access token from `AIP_WEB_TOKEN`, or undefined when the variable is not set. */
-export function webTokenFromEnv(env: NodeJS.ProcessEnv): string | undefined {
-  const value = env.AIP_WEB_TOKEN;
-  if (value === undefined || value === '') return undefined;
-  if (!TOKEN_PATTERN.test(value))
-    throw configError('AIP_WEB_TOKEN must be 16-128 characters of A-Z, a-z, 0-9, - and _');
-  return value;
-}
+export { assertLoopbackHost, webTokenFromEnv } from './token.ts';
 
 /** The routes of the panel in the order they are tried: the raw ones, then the JSON table. */
 function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
@@ -160,6 +149,7 @@ async function handle(
   if (d.gate !== null) return handleServerMode(d, d.gate, incoming, response);
   assertLocalHost(incoming, port);
   const url = new URL(incoming.url ?? '/', `http://${incoming.headers.host}`);
+  if (isHookPath(url.pathname)) return hookRoute(d.kit.options.socket, incoming, response);
   const verb = incoming.method ?? 'GET';
   const isPage = url.pathname === '/' || url.pathname === '/index.html';
   const isAsset = url.pathname.startsWith('/assets/');
@@ -184,7 +174,10 @@ async function handleServerMode(
   // the ACS is posted by the browser from the site of the provider, so its `Origin` is the provider's;
   // the signature, the stored request and the replay check protect it instead
   const acs = url.pathname === '/auth/saml/acs' && incoming.method === 'POST';
-  assertServerHost(incoming, gate, url.pathname === '/auth/cli/token', acs);
+  // an event of a registry carries no `Origin` of a browser: its signature protects it instead
+  const hook = isHookPath(url.pathname);
+  assertServerHost(incoming, gate, url.pathname === '/auth/cli/token', acs || hook);
+  if (hook) return hookRoute(d.kit.options.socket, incoming, response);
   if (await authRoute(gate, incoming, response, url)) return;
   const verb = incoming.method ?? 'GET';
   if (url.pathname.startsWith('/assets/')) {
