@@ -180,6 +180,8 @@ export function SettingsRoute(props: {
   onRemoveProject: (path: string) => Promise<boolean>;
   onOpenProject: (path: string, target: 'settings' | 'queue') => void;
   queue: QueueView | null;
+  /** The queue is global: there is no queue of a project to edit. */
+  globalQueue?: boolean;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
 }) {

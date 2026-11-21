@@ -41,6 +41,12 @@ type BodyProps = { props: SettingsPageProps; settings: SettingsConfig };
 function QueueBody({ props, settings }: BodyProps) {
   const { t } = useTranslation();
   const { queue, repository } = props;
+  if (!queue && props.globalQueue) {
+    // the global queue has no queue of a project: only the note, not an endless loading
+    return (
+      <p className="max-w-xl text-sm text-muted-foreground">{t('queue.settings.globalNote')}</p>
+    );
+  }
   if (!queue) {
     return (
       <div role="status" aria-label={t('queue.loading')}>

@@ -58,6 +58,8 @@ export interface SettingsPageProps {
   repositories: string[];
   onSelectRepository: (path: string) => void;
   queue: QueueView | null;
+  /** The queue is global: there is no queue of a project to edit. */
+  globalQueue?: boolean;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
   /** Whether a form has unsaved changes; leaving then asks first. */

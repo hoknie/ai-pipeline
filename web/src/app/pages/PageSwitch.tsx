@@ -107,6 +107,7 @@ function SettingsCase({
       onRemoveProject={actions.removeRepository}
       onOpenProject={(path, target) => void actions.openProject(path, target)}
       queue={state.queue}
+      globalQueue={state.globalQueue !== null}
       onQueue={state.setQueue}
       onError={notifyError}
     />
