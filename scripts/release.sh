@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # What a release needs besides the gate.
 #   scripts/release.sh version            the version in package.json
-#   scripts/release.sh check-tag vX.Y.Z   the tag names that version, and the plugin manifest agrees
+#   scripts/release.sh check-tag vX.Y.Z   the tag names that version, and every file of scripts/versions.mjs agrees
+#   scripts/release.sh files              the files a release commit carries besides CHANGELOG.md
 #   scripts/release.sh pack               the npm tarball aip-X.Y.Z.tgz and SHA256SUMS in dist/release
 #   scripts/release.sh notes              the CHANGELOG.md section of this version, else one written from git
 
@@ -14,7 +15,7 @@ sum() {
 }
 
 check_tag() {
-    local tag="${1:-}" plugin
+    local tag="${1:-}"
     [ -n "$tag" ] || die "usage: scripts/release.sh check-tag vX.Y.Z"
     tag="${tag#refs/tags/}"
     if [ "$tag" != "v$VERSION" ]; then
@@ -22,8 +23,7 @@ check_tag() {
         echo "release: run 'just release ${tag#v}', commit the result and tag that commit." >&2
         exit 1
     fi
-    plugin="$(node -p 'require(process.argv[1]).version' "$PLUGIN_FILE")"
-    [ "$plugin" = "$VERSION" ] || die "the plugin manifest says $plugin and package.json says $VERSION"
+    node "$VERSIONS" check "$VERSION"
     echo "$VERSION"
 }
 
@@ -56,6 +56,7 @@ notes() {
 case "${1:-}" in
 version)   echo "$VERSION" ;;
 check-tag) check_tag "${2:-}" ;;
+files)     node "$VERSIONS" files ;;
 pack)      pack ;;
 notes)     notes ;;
 *) echo "usage: scripts/release.sh {version|check-tag vX.Y.Z|pack|notes}" >&2; exit 2 ;;

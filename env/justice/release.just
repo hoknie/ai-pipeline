@@ -3,7 +3,7 @@
 version:
     @scripts/release.sh version
 
-# Check that a tag (vX.Y.Z) names the version in package.json and the plugin manifest
+# Check that a tag (vX.Y.Z) names the version in package.json and the other version files
 [group('release')]
 check-tag tag:
     scripts/release.sh check-tag {{ tag }}

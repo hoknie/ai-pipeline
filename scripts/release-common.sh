@@ -6,7 +6,7 @@ ROOT="$PWD"
 OUT="${OUT:-$ROOT/dist}"
 RELEASE="${RELEASE:-$OUT/release}"
 PACKAGE_FILE="$ROOT/package.json"
-PLUGIN_FILE="$ROOT/integrations/claude-code/.claude-plugin/plugin.json"
+VERSIONS="$ROOT/scripts/versions.mjs"
 
 VERSION="${VERSION:-$(node -p 'require(process.argv[1]).version' "$PACKAGE_FILE")}"
 [ -n "$VERSION" ] || { echo "release: cannot read the version out of package.json" >&2; exit 2; }

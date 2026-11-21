@@ -64,7 +64,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json package-lock.json integrations/claude-code/.claude-plugin/plugin.json CHANGELOG.md
+          git add $(scripts/release.sh files) CHANGELOG.md
           git commit -m "chore(release): release $TAG"
           git tag -a "$TAG" -m "aip $TAG"
           git push --atomic origin HEAD:main "refs/tags/$TAG"
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ steps.tag.outputs.tag }}
-      - name: The tag names the version in package.json and the plugin manifest
+      - name: The tag names the version in package.json and the other version files
         id: version
         env:
           TAG: ${{ steps.tag.outputs.tag }}

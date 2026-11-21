@@ -4,10 +4,157 @@ Every notable change of aip. Sections are written by `scripts/changelog.sh` from
 Conventional Commits between release tags; the release on GitHub carries the section of its tag.
 The versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-21
 
 ### Features
 
+- **AIP-460:** Show project color dot in queue project filter ([9ce65fa](https://github.com/hoknie/ai-pipeline/commit/9ce65faaa57aa7b6f816a925762334dd797d3f4e))
+- **AIP-458:** Add default provider for global and project scope ([ff88588](https://github.com/hoknie/ai-pipeline/commit/ff88588d5aad320f248ad51c06fd72fc0f1b3579))
+- **AIP-457:** Move attachments below task body and default editor to md ([045a5d0](https://github.com/hoknie/ai-pipeline/commit/045a5d0589c9435276ce93b3a529ff8f8950bb7f))
+- **AIP-455:** Make allowed_users optional and suggest recent senders ([d8faf2b](https://github.com/hoknie/ai-pipeline/commit/d8faf2b5f550cd2b59e055ce45106fe77a3e4f26))
+- **AIP-454:** Add integrations catalog with per-kind pages ([3bfefce](https://github.com/hoknie/ai-pipeline/commit/3bfefce0293d6cee20508a19167432fc93adc572))
+- **AIP-453:** Add human-readable labels to integrations panel ([ba5e805](https://github.com/hoknie/ai-pipeline/commit/ba5e805c4886bdeec7ad325f43f0dc97e7c23340))
+- **AIP-451:** Move integrations to settings with tabs for hooks and services ([1466460](https://github.com/hoknie/ai-pipeline/commit/146646001a3042d1cebc9c48a8da9218baff1644))
+- Updated double tasks ([e88af1b](https://github.com/hoknie/ai-pipeline/commit/e88af1bd1ad94f7e7f060b894f50b1543a4aa9fc))
+- **AIP-449:** Link aip projects to service registry projects ([9dcc57b](https://github.com/hoknie/ai-pipeline/commit/9dcc57ba9d2c867efb22605494e0cfc3cabcc398))
+- **AIP-448:** Add registry skill refs, pinning and skills command ([f1c7112](https://github.com/hoknie/ai-pipeline/commit/f1c7112725ed29c7a0ac06ed602a7d973da48a0f))
+- **AIP-431:** Add outgoing webhooks notification channel ([1018cfa](https://github.com/hoknie/ai-pipeline/commit/1018cfa58220c7442c3b2c8e04019a7b592f7758))
+- **AIP-447:** Add service-registry connection integration ([3b7f7be](https://github.com/hoknie/ai-pipeline/commit/3b7f7be5a7217ee6bad9378e1adab867dc2ac9bf))
+- **AIP-430:** Add slack bot notifications adapter ([b832632](https://github.com/hoknie/ai-pipeline/commit/b8326323e06e537ae1baf642c993c898168f23e7))
+- **AIP-445:** Add notifications feature and telegram bot adapter ([cac88ce](https://github.com/hoknie/ai-pipeline/commit/cac88ce5cd830a3d412d620bf94a2632cf0356b3))
+- **AIP-443:** Add remote push and branch-mode delivery ([9bebadc](https://github.com/hoknie/ai-pipeline/commit/9bebadc2bce8b8ee6b3f076cc5397c9c4e4b5477))
+- **AIP-442:** Add author stats, author filters and panel author display ([f17ffb5](https://github.com/hoknie/ai-pipeline/commit/f17ffb5b39f6bdb351620d439212863682cea8df))
+- **AIP-441:** Add ABAC access feature with presets, access.yaml and guards ([82aedfb](https://github.com/hoknie/ai-pipeline/commit/82aedfbe6cdfdb549285b0cb63e9bd2445d46e8d))
+- **AIP-440:** Implement authorship and audit log ([c90fd96](https://github.com/hoknie/ai-pipeline/commit/c90fd963137dd88ca62107f8b9a91ca6c52e04b9))
+- **AIP-439:** Add saml sso login with replay protection ([701eaea](https://github.com/hoknie/ai-pipeline/commit/701eaea0023d21c00611a6a19c2038c5d10797a0))
+- Moved events to ws ([d7b3417](https://github.com/hoknie/ai-pipeline/commit/d7b3417a9f3595b4fff74d4f1f6e0779d05ab472))
+- **AIP-438:** Add oidc sso login keyed by iss and sub ([2583ec9](https://github.com/hoknie/ai-pipeline/commit/2583ec9bde95ef9d0160a806abc5075517645f01))
+- **AIP-444:** Lay out runtimes settings like swarm providers ([94997cc](https://github.com/hoknie/ai-pipeline/commit/94997cc216cac665521bf337eeeff780aa0f03d3))
+- **AIP-437:** Add server mode with user accounts, tokens and remote CLI/MCP over HTTP ([595a555](https://github.com/hoknie/ai-pipeline/commit/595a555ac8fb3cbcb1acb5460a3db5db20ddf959))
+- **AIP-406:** Add connection registry, secret storage and inbound event ports ([b26cd3a](https://github.com/hoknie/ai-pipeline/commit/b26cd3af88f6e655fc58a64ed3f0ef3969545c63))
+- **AIP-436:** Make skip steps a select in create task form ([d08a85b](https://github.com/hoknie/ai-pipeline/commit/d08a85ba7837b61411a8e6156cf035d68d46c880))
+- **AIP-435:** Show all projects' pipelines read-only in panel ([c1d0303](https://github.com/hoknie/ai-pipeline/commit/c1d0303cc824bbb33f23aa55fe412e1f6fa7cd7c))
+- **AIP-434:** Make skip steps a multiselect in task form ([6bfd91b](https://github.com/hoknie/ai-pipeline/commit/6bfd91ba807b62d2a6bb645e1533e2f318998bc6))
+
+### Fixes
+
+- **AIP-459:** Show global queue note instead of endless skeleton ([4dd11b2](https://github.com/hoknie/ai-pipeline/commit/4dd11b2f57b6f78835abd9bfcc111b7b6b751959))
+- **AIP-456:** Keep action errors visible on integrations page ([55986a5](https://github.com/hoknie/ai-pipeline/commit/55986a5c803b6eb0da735df373e6d5c98c474e16))
+- Restore the check gate ([11184f4](https://github.com/hoknie/ai-pipeline/commit/11184f43f694afd3123904ff24dafe158fa67967))
+- **AIP-446:** Stack project level label under name in config picker ([2df606b](https://github.com/hoknie/ai-pipeline/commit/2df606b7b03df573900ba197b1ed8e8c0970b24b))
+- **cli:** Print the queue of a daemon that sends no author ([b1688b4](https://github.com/hoknie/ai-pipeline/commit/b1688b4a91dcfcf09a1d94db3cdd5a4b77761ae0))
+- **AIP-433:** Hide level toggle in all-projects specialist preview ([c4f452e](https://github.com/hoknie/ai-pipeline/commit/c4f452e16611c7dfda23fa11d38f832e4ba0a223))
+
+[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.4.0...v0.5.0)
+
+## [0.4.0] - 2026-11-17
+
+### Features
+
+- Updated global spec view ([802881d](https://github.com/hoknie/ai-pipeline/commit/802881d5622a8a6c5577214533de5a3d0f9cbfe6))
+- **AIP-423:** Allow dismissing returned run notice and keep its own task ([39b349e](https://github.com/hoknie/ai-pipeline/commit/39b349e311294aab629fc100b0911dc1e9377fb0))
+- Take the commit message from the author's reply when it sends no report ([5c82913](https://github.com/hoknie/ai-pipeline/commit/5c8291325cede485e1ea4e34323164991dcf6357))
+- **AIP-428:** Polish task creation form and properties sidebar ([f032a07](https://github.com/hoknie/ai-pipeline/commit/f032a07bb05b3c9696909b6490cd5324115be0d5))
+- **AIP-425:** Remove beta badge from observers menu ([42528c9](https://github.com/hoknie/ai-pipeline/commit/42528c9e5a869c1f16adc21dacc5b04147f3fbd5))
+- **AIP-421:** Group specialists and pipelines by project in all-projects view ([1b56a50](https://github.com/hoknie/ai-pipeline/commit/1b56a509ad1c4d70b4e4a7c596d3c0bc562911a0))
+- Task num to delivery payload ([7758733](https://github.com/hoknie/ai-pipeline/commit/77587338f717aa5db1988f75b4353a102d099d93))
+- Updated providers and make swarm page ([75b522e](https://github.com/hoknie/ai-pipeline/commit/75b522ea777bf57e479265bd5e5ae1cd95b7c333))
+- Added providers ([84001e5](https://github.com/hoknie/ai-pipeline/commit/84001e50c17fee164e8fc422f0518a6a09dd36ed))
+- Added bulk tags remove method ([141512d](https://github.com/hoknie/ai-pipeline/commit/141512dc639183a7782d217b01e774710ad70730))
+- Added more runtimes - codex, kilo, cline, copilot ([2192686](https://github.com/hoknie/ai-pipeline/commit/21926867c5bc64eecb0fd7114bd43a5805fa2c97))
+- Added change tier by_provider to task ([d59c65a](https://github.com/hoknie/ai-pipeline/commit/d59c65a5b0ed3512d50647909fda260139332a8d))
+- Added tier by_provider to task ([e278851](https://github.com/hoknie/ai-pipeline/commit/e278851033a03ca0b0c7ea00f7f7f84b2c660c88))
+- Added tier by_provider ([fa624b9](https://github.com/hoknie/ai-pipeline/commit/fa624b95178fa3a395eb4cfeda439513b57e26c9))
+- Normalized tests locales ([6c1fcc1](https://github.com/hoknie/ai-pipeline/commit/6c1fcc14efe3f8857b1d88a6b687e1b5a928fde2))
+
+### Fixes
+
+- Updated broken test ([a149244](https://github.com/hoknie/ai-pipeline/commit/a149244da085651869a262f1f2ce775ab6ade7b2))
+- **AIP-424:** Allow editing blocked-by link of returned task ([ccac3b6](https://github.com/hoknie/ai-pipeline/commit/ccac3b6ef2de29b73bc8c70d16e046813192bf1e))
+- **AIP-432:** Trim all-projects specialists list and restore config preview ([5347b86](https://github.com/hoknie/ai-pipeline/commit/5347b86c3ca950a31a503999e262913cdb454d3e))
+- **AIP-422:** Add back button to providers page ([4131c97](https://github.com/hoknie/ai-pipeline/commit/4131c970e33e0e732dba23f0e89b367ea3d1c8b2))
+- **AIP-414:** Match all selected tags in take filter ([faf105f](https://github.com/hoknie/ai-pipeline/commit/faf105f97e7286d4354a28e4df1d0d20939765f5))
+
+### Changes
+
+- **AIP-427:** Tidy provider page and drop duplicate label ([b22d3fb](https://github.com/hoknie/ai-pipeline/commit/b22d3fba076e981fe436f2d262b442c64c9df43f))
+
+### Other
+
+- **build:** Bump version ([1b17a1a](https://github.com/hoknie/ai-pipeline/commit/1b17a1a0747d13e3ac634c5a2b98ea272ba264c6))
+
+[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.3.1...v0.4.0)
+
+## [0.3.1] - 2026-11-16
+
+### Features
+
+- Updated runtime pool ([37e1ba7](https://github.com/hoknie/ai-pipeline/commit/37e1ba7afd48d4baf272d53f9b64782ccbc1ae12))
+- Updated tag prj color in global queue ([e8c9864](https://github.com/hoknie/ai-pipeline/commit/e8c9864de1ced39779ca52d361f437e3816f4bf9))
+- Moved hotkeys to ctrl ([67af44a](https://github.com/hoknie/ai-pipeline/commit/67af44a4be89f06b254d5aa3fb0ab260c1019fa7))
+
+### Other
+
+- **build:** Bump version ([7d3fb35](https://github.com/hoknie/ai-pipeline/commit/7d3fb35ee901cb4225cc90cba38ee423c2733387))
+
+[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.3.0...v0.3.1)
+
+## [0.3.0] - 2026-11-15
+
+### Features
+
+- Updated global queue ([fdd3df6](https://github.com/hoknie/ai-pipeline/commit/fdd3df671a52e8e77390b545f28db457b527a5af))
+- Added runtime pools, updated stats ([016a51e](https://github.com/hoknie/ai-pipeline/commit/016a51e9c5495313d2f05da98f92988851431196))
+- Added relations for tasks in web ui ([da0272f](https://github.com/hoknie/ai-pipeline/commit/da0272f53106bc725cb54464d9b6680321653a2f))
+- Added relations for tasks ([2943cbb](https://github.com/hoknie/ai-pipeline/commit/2943cbb1733762fafde4404fbf551db39be6a76f))
+- Updated global queue view ([228b22e](https://github.com/hoknie/ai-pipeline/commit/228b22e9ed6476e09850c71ec12fada669543825))
+- Updated form for cross task ([3006928](https://github.com/hoknie/ai-pipeline/commit/30069289b1e5187dba99ae700115ba4a5c5e6e09))
+- Removed tokens cost ([7694f75](https://github.com/hoknie/ai-pipeline/commit/7694f7574aff877e2d1bbb20867a22a5553d5277))
+- Added names to stats ([ba8ffd8](https://github.com/hoknie/ai-pipeline/commit/ba8ffd8a283876b0d895bc1c123f601b58a72b2a))
+- Added global queue and cross project tasks ([5bd612f](https://github.com/hoknie/ai-pipeline/commit/5bd612f6175824f8a99007fcb75e6f9754af9c63))
+- Added runtime configuration ([fc4bf7a](https://github.com/hoknie/ai-pipeline/commit/fc4bf7a0ec68e7cf69f632db90a9f8e91f524237))
+- Added attaches to task ([7e1df10](https://github.com/hoknie/ai-pipeline/commit/7e1df106342a08c268fb46d5c4a8c839cb9c2cc9))
+- Added full size new task page ([a79f9fa](https://github.com/hoknie/ai-pipeline/commit/a79f9fa0a2c90f3c8ec97fe47c55fd7228a053da))
+- Added segmentation by models to stats ([6544d37](https://github.com/hoknie/ai-pipeline/commit/6544d37ab59f2b58ea5304b2f9dce713de53a728))
+- Added script highlight ([7ea6424](https://github.com/hoknie/ai-pipeline/commit/7ea64246ca103151ee086d17106d816c02d3b901))
+- Added pipeline variant ([7b148a1](https://github.com/hoknie/ai-pipeline/commit/7b148a1c47036fd35a5d381735954c41c0ec7d92))
+
+### Fixes
+
+- Updated variant on task change ([96121f6](https://github.com/hoknie/ai-pipeline/commit/96121f6a7afd67b1ed4941aab914cee62fcf1bd0))
+
+### Other
+
+- **build:** Bump version ([2adda18](https://github.com/hoknie/ai-pipeline/commit/2adda18dbc1e37e4f199d6df6854ca3697f51321))
+
+[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.2.1...v0.3.0)
+
+## [0.2.1] - 2026-11-13
+
+### Features
+
+- Added queue filters for runs ([683ff3b](https://github.com/hoknie/ai-pipeline/commit/683ff3b81e1ff25515d36ac00289bf4d9fae0763))
+- Added mcp servers for agents (isolated env) ([8751797](https://github.com/hoknie/ai-pipeline/commit/87517975db54f3781295ac9fb69afecd3370a9d1))
+- Removed unnecessary buttons in runs ([1c8c9e4](https://github.com/hoknie/ai-pipeline/commit/1c8c9e43ae2948520f2af60da6249c66e768ac0f))
+- Added cancel auto delivery on run ([acc77d8](https://github.com/hoknie/ai-pipeline/commit/acc77d88c4e0185311a862b380d45562355b2f2f))
+
+### Fixes
+
+- Added deny for observer repair failed runs ([e6d524c](https://github.com/hoknie/ai-pipeline/commit/e6d524c4de4faa5c7a729a0b14e6334f911d8d8e))
+- Removed bug with sticky block in stats ([c248686](https://github.com/hoknie/ai-pipeline/commit/c248686e6903cf822974a2ef3373d49c9aa67b92))
+
+### Build and CI
+
+- Bump version ([43cc30f](https://github.com/hoknie/ai-pipeline/commit/43cc30fa4dc3c2fd93234e9b11976545ab6b7160))
+
+[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.2.0...v0.2.1)
+
+## [0.2.0] - 2026-11-12
+
+### Features
+
+- Updated tests ([eec28c3](https://github.com/hoknie/ai-pipeline/commit/eec28c36484f014f5be3468cc21b61bf984ad94c))
+- Updated follow button ([462dc6d](https://github.com/hoknie/ai-pipeline/commit/462dc6ddc56a4ae00bcc81173fa79119f794f020))
 - Labeled slugs ([3c28553](https://github.com/hoknie/ai-pipeline/commit/3c285530a6a02a842c21a61d9001060852a039e0))
 - Added follow button ([7683fca](https://github.com/hoknie/ai-pipeline/commit/7683fca47abde870f7973ca6d37b1e434073fa10))
 - Updated query for runs load ([ae89d51](https://github.com/hoknie/ai-pipeline/commit/ae89d512a497d2a39f89b58709a7ca4b10e4d935))
@@ -39,7 +186,7 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 - Updated changelog and release arch name ([a498b66](https://github.com/hoknie/ai-pipeline/commit/a498b668d7e4d9fc3f46837a8ed9765b7ee3ddd8))
 
-[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.1.0...HEAD)
+[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.1.0...v0.2.0)
 
 ## [0.1.0] - 2026-11-10
 

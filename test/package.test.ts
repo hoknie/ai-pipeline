@@ -46,6 +46,7 @@ describe('npm package', () => {
   it('has a marketplace whose plugin is the mod, with the version of the package', () => {
     const marketplace = json('.claude-plugin/marketplace.json');
     expect(marketplace.name).toBe('aip');
+    expect(marketplace.metadata.version).toBe(manifest.version);
     const plugin = marketplace.plugins.find((entry: { name: string }) => entry.name === 'aip');
     expect(plugin).toBeDefined();
     const mod = json(join(plugin.source, '.claude-plugin', 'plugin.json'));

@@ -3,6 +3,9 @@
   "owner": {
     "name": "hoknie"
   },
+  "metadata": {
+    "version": "0.5.0"
+  },
   "plugins": [
     {
       "name": "aip",

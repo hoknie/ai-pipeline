@@ -5,7 +5,7 @@
 #   scripts/changelog.sh next [auto|patch|minor|major]  the version the next release takes
 #   scripts/changelog.sh release [auto|patch|minor|major|X.Y.Z]
 #                                                   bumps the version in package.json, package-lock.json and
-#                                                   the plugin manifest unless package.json is already past
+#                                                   the files of scripts/versions.mjs unless package.json is already past
 #                                                   the last tag (or there is no tag yet), then writes that
 #                                                   version's section into CHANGELOG.md
 # Merges, "chore: bump version" and repeated subjects are left out. A "type!:" subject or a
@@ -178,13 +178,7 @@ next() {
 set_version() {
     local version="$1"
     (cd "$ROOT" && npm version "$version" --no-git-tag-version --allow-same-version >/dev/null)
-    node -e '
-        const fs = require("node:fs");
-        const [file, version] = process.argv.slice(1);
-        const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
-        manifest.version = version;
-        fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
-    ' "$PLUGIN_FILE" "$version"
+    node "$VERSIONS" set "$version"
 }
 
 # write_section <X.Y.Z> [stale X.Y.Z]: the version's section in place of an old one (and of the
@@ -230,7 +224,7 @@ release() {
     fi
     write_section "$version" "$stale"
     echo "changelog: CHANGELOG.md has the section of $version" >&2
-    echo "changelog: commit package.json, package-lock.json, the plugin manifest and CHANGELOG.md, then tag v$version and push the tag" >&2
+    echo "changelog: commit $(node "$VERSIONS" files | tr '\n' ' ')and CHANGELOG.md, then tag v$version and push the tag" >&2
 }
 
 case "${1:-}" in
