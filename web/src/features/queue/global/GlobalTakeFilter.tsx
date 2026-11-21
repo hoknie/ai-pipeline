@@ -35,6 +35,24 @@ function pipelineOptions(
   ];
 }
 
+function projectOptions(projects: readonly RepositoryView[]): FilterOption[] {
+  return projects.map((entry) => ({
+    value: entry.path,
+    label: entry.label,
+    render: (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <ProjectDot color={entry.color ?? 'gray'} />
+        <span className="truncate">{entry.label}</span>
+      </span>
+    ),
+  }));
+}
+
+function projectLook(projects: readonly RepositoryView[]) {
+  const colorOf = new Map(projects.map((entry) => [entry.path, entry.color ?? 'gray']));
+  return { icon: (value: string) => <ProjectDot color={colorOf.get(value) ?? 'gray'} /> };
+}
+
 type TagEntry = { project: string; color: string | null; tag: TagView };
 const tagKey = (name: string) => name.toLocaleLowerCase('und');
 
@@ -171,7 +189,8 @@ export function GlobalTakeFilter({
       />
       <FilterField
         label={t('queue.global.projects')}
-        options={projects.map((entry) => ({ value: entry.path, label: entry.label }))}
+        options={projectOptions(projects)}
+        look={projectLook(projects)}
         selected={shown.projects}
         onChange={(values) => void change({ projects: values })}
         clearLabel={t('queue.filter.clear')}

@@ -259,7 +259,12 @@ describe('page of the global queue', () => {
     expect(block.getByTitle('app · lib')).toBeTruthy();
     fireEvent.keyDown(document.body, { key: 'Escape' });
     fireEvent.click(block.getByRole('combobox', { name: 'Projects' }));
-    fireEvent.click(await screen.findByRole('option', { name: /lib/ }));
+    const libOption = await screen.findByRole('option', { name: /lib/ });
+    expect(libOption.querySelector('[data-project-color]')?.className).toContain('bg-[#8b5cf6]');
+    expect(
+      screen.getByRole('option', { name: /app/ }).querySelector('[data-project-color]')?.className,
+    ).toContain('bg-[#22c55e]');
+    fireEvent.click(libOption);
     await waitFor(() => expect(settings).toHaveBeenCalledWith({ filter: { projects: [LIB] } }));
     fireEvent.keyDown(document.body, { key: 'Escape' });
     fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
