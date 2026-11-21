@@ -2,8 +2,10 @@ import { spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
 import {
   appendFileSync,
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readFileSync,
   symlinkSync,
   writeFileSync,
@@ -673,16 +675,20 @@ if (!action.noReport) {
   }
   if (action.split)
     await client.callTool({ name: 'swarm_split', arguments: { groups: action.split } });
-  // `$n` in a task text is the number of calls already written to queued.jsonl: a script entry
-  // that several attempts repeat queues a different task each time, not a copy.
+  // `$n` in a task text is the number of queue calls before this one: a script entry that several
+  // attempts repeat queues a different task each time, not a copy. Each call reserves its number
+  // with an exclusive file, so attempts that run at the same time never take the same one.
   const numbered = <T>(value: T): T => {
-    let lines = 0;
-    try {
-      lines = readFileSync(join(state, 'queued.jsonl'), 'utf8').trim().split('\n').length;
-    } catch {
-      // nothing queued yet
+    let n = 0;
+    for (; ; n += 1) {
+      try {
+        closeSync(openSync(join(state, `queue-number-${n}`), 'wx'));
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
     }
-    return JSON.parse(JSON.stringify(value).replaceAll('$n', String(lines))) as T;
+    return JSON.parse(JSON.stringify(value).replaceAll('$n', String(n))) as T;
   };
   if (action.queue) {
     const lastQueued = (() => {

@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { startWebServer, type WebServer } from '../../src/presentation/web/server.ts';
 import type { GroupView, RunCreated } from '../../src/presentation/ipc/contract/index.ts';
-import { MANUAL_CONFIG, harness, settle, startRun, type Harness } from '../daemon/harness.ts';
+import {
+  MANUAL_CONFIG,
+  harness,
+  settle,
+  startRun,
+  until,
+  type Harness,
+} from '../daemon/harness.ts';
 import { liveStatus, openLive, type LiveProbe } from '../fixtures/live.ts';
 
 let h: Harness | null = null;
@@ -131,6 +138,11 @@ describe('live connection of the panel', () => {
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.groups[0]?.status === 'running');
+    // the diff of a group is counted in the background: the first view has none until it is ready
+    await until('the diff of the group', async () => {
+      const view = (await h.call('group', { runId, group: 'login' })) as GroupView;
+      return view.diff !== null;
+    });
     const probe = await live(base, headers);
     probe.send({ op: 'subscribe', id: 'g1', topic: { kind: 'group', runId, group: 'login' } });
     const first = await probe.message('the group', (message) => message.id === 'g1');

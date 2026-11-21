@@ -1,0 +1,35 @@
+# Every night on main, and on demand: the whole gate with every end-to-end test (npm run check:full).
+# ci.yml runs only the golden set of end-to-end tests on pushes and pull requests; this one catches
+# what the rest of the tests find, without blocking a pull request.
+# Actions are pinned to a commit SHA with the version in a comment.
+name: nightly
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: A git identity for the test repositories
+        run: |
+          git config --global user.name 'aip ci'
+          git config --global user.email 'ci@aip.cloud'
+      - run: npm ci
+      - name: npm run check:full (prettier --check, tsc, every test)
+        run: npm run check:full

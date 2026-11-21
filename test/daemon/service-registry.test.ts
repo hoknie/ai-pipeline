@@ -71,12 +71,28 @@ function lines(path: string): Record<string, unknown>[] {
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
-/** Every file below the directory, as bytes: the files of the attempts, the logs, the database. */
+/**
+ * Every file below the directory: the files of the attempts, the logs, the database. The daemon
+ * may still be removing a worktree, so what vanishes during the walk is left out.
+ */
 function filesUnder(directory: string): string[] {
-  return readdirSync(directory).flatMap((name) => {
+  const names = gone(() => readdirSync(directory)) ?? [];
+  return names.flatMap((name) => {
     const path = join(directory, name);
-    return statSync(path).isDirectory() ? filesUnder(path) : [path];
+    const stat = gone(() => statSync(path));
+    if (!stat) return [];
+    return stat.isDirectory() ? filesUnder(path) : [path];
   });
+}
+
+/** The value, or undefined when the file is gone. */
+function gone<T>(read: () => T): T | undefined {
+  try {
+    return read();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
 }
 
 describe('the MCP servers of a specialist that go through a connection', () => {
@@ -123,8 +139,8 @@ describe('the MCP servers of a specialist that go through a connection', () => {
 
     // the token of the connection is in no file below the directory of the test, nor in an argument
     for (const file of filesUnder(dirname(h.repo))) {
-      const bytes = readFileSync(file);
-      expect(bytes.includes(fake.token), file).toBe(false);
+      const bytes = gone(() => readFileSync(file));
+      expect(bytes?.includes(fake.token) ?? false, file).toBe(false);
     }
     expect(JSON.stringify(argv.argv)).not.toContain(fake.token);
   });

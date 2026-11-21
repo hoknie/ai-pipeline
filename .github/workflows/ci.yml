@@ -38,7 +38,7 @@ jobs:
           git config --global user.name 'aip ci'
           git config --global user.email 'ci@aip.invalid'
       - run: npm ci
-      - name: npm run check (prettier --check, tsc, vitest)
+      - name: npm run check (prettier --check, tsc, unit and web tests, the golden end-to-end set)
         run: npm run check
       - name: npm run build, and the built CLI starts
         run: |

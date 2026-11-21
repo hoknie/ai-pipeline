@@ -23,7 +23,12 @@ typecheck:
 test *args:
     {{ NPX }} vitest run {{ args }}
 
-# The gate: prettier --check, tsc, vitest
+# The gate: prettier --check, tsc, unit and web tests, the golden end-to-end set
 [group('quality')]
 check:
     {{ NPM }} run check
+
+# The gate with every end-to-end test
+[group('quality')]
+check-full:
+    {{ NPM }} run check:full

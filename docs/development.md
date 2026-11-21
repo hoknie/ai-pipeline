@@ -3,15 +3,20 @@
 How to check and build `aip` itself. For using `aip` see the [documentation](README.md).
 
 ```sh
-npm run check     # prettier --check → tsc → vitest
+npm run check       # prettier --check → tsc → unit and web tests → the golden end-to-end set
+npm run check:full  # the same with every end-to-end test
+npm run test:e2e    # every end-to-end test only
 npm run build
 ```
+
+End-to-end tests start a daemon, real git repositories and fake agents. The golden set (`golden` in `vitest.config.ts`) keeps one file for each main path; `AIP_E2E=golden` limits the `e2e` project to it. Run `npm run check:full` after a change to the daemon, the queue or delivery.
 
 These steps and the panel controls are also available through [just](https://github.com/casey/just) (1.27 or newer, needs `bash`; Windows is not supported). The recipes call the npm scripts, so the gate stays the same: `npm run check`.
 
 ```sh
 just                # list the recipes
 just check          # npm run check
+just check-full     # npm run check:full
 just build          # npm run build
 just web            # rebuild the frontend (dist/web) and restart aip web in the background
 just web-restart    # restart aip web without rebuilding
@@ -41,7 +46,7 @@ AIP_WEB_URL=http://127.0.0.1:7341 AIP_WEB_TOKEN=<token> npx vite --config web/vi
 
 ## Releases
 
-CI (`.github/workflows/ci.yml`) runs `npm run check` and the build on every push to `main` and on every pull request.
+CI (`.github/workflows/ci.yml`) runs `npm run check` and the build on every push to `main` and on every pull request. `.github/workflows/nightly.yml` runs `npm run check:full` every night and on demand.
 
 A release publishes `@hoknie/aip` to npm and creates a GitHub Release with the npm tarball, `SHA256SUMS` and the version's section of `CHANGELOG.md`. `CHANGELOG.md` is written from [Conventional Commits](https://www.conventionalcommits.org/) between `v*` tags: `feat` goes to Features, `fix` to Fixes, `type!:` or a `BREAKING CHANGE:` footer to Breaking changes.
 

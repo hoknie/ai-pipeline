@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -181,7 +181,9 @@ export async function harness(
     },
     environment: env,
     script(steps) {
-      writeFileSync(scriptPath, JSON.stringify(steps));
+      // a rename, not a write in place: an agent that starts meanwhile reads the old or the new script
+      writeFileSync(`${scriptPath}.next`, JSON.stringify(steps));
+      renameSync(`${scriptPath}.next`, scriptPath);
     },
     gate: (name) => join(gates, name),
     open(name) {

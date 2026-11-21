@@ -22,6 +22,26 @@ const endToEnd = [
   'test/platform/secrets/keyring.test.ts',
 ];
 
+// The golden set: one end-to-end file for each main path (a run of a pipeline, the report of a
+// specialist, the queue, delivery into the working tree, the CLI and its daemon). `npm run check` and
+// CI run these with AIP_E2E=golden; `npm run check:full` and the nightly CI job run every file.
+const golden = [
+  'test/daemon/flow.test.ts',
+  'test/daemon/worker-mcp.test.ts',
+  'test/daemon/config.test.ts',
+  'test/daemon/queue.test.ts',
+  'test/daemon/patches-flow.test.ts',
+  'test/daemon/serial.test.ts',
+  'test/daemon/lock.test.ts',
+  'test/git/delivery.test.ts',
+  'test/git/workspace.test.ts',
+  'test/cli/cli.test.ts',
+  'test/cli/daemon.test.ts',
+  'test/cli/init.test.ts',
+  'test/cli/help.test.ts',
+  'test/protocol/autostart.test.ts',
+];
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -55,7 +75,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'e2e',
-          include: endToEnd,
+          include: process.env.AIP_E2E === 'golden' ? golden : endToEnd,
           exclude: shared.exclude,
           globalSetup: shared.globalSetup,
           setupFiles: shared.setupFiles,
