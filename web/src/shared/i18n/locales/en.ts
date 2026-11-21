@@ -108,6 +108,8 @@ export const en = {
   integrations: {
     loading: 'Loading integrations',
     error: 'Could not load the integrations: {{message}}',
+    actionError: 'The action failed: {{message}}',
+    dismiss: 'Dismiss',
     retry: 'Retry',
     enabled: 'enabled',
     disabled: 'disabled',
@@ -115,6 +117,8 @@ export const en = {
       add: {
         title: 'New connection',
         name: 'Name',
+        nameHint:
+          'Lowercase Latin letters, digits, ".", "_" and "-" only; up to 40 characters; the first one a letter or a digit.',
         scope: 'Where',
         create: 'Create connection',
         secretNote:

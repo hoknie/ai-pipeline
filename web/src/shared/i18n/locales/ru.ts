@@ -109,6 +109,8 @@ export const ru: Dictionary = {
   integrations: {
     loading: 'Загрузка интеграций',
     error: 'Не удалось загрузить интеграции: {{message}}',
+    actionError: 'Не удалось выполнить действие: {{message}}',
+    dismiss: 'Закрыть',
     retry: 'Повторить',
     enabled: 'включено',
     disabled: 'выключено',
@@ -116,6 +118,8 @@ export const ru: Dictionary = {
       add: {
         title: 'Новое подключение',
         name: 'Имя',
+        nameHint:
+          'Только строчные латинские буквы, цифры, «.», «_» и «-»; до 40 символов; первым символом буква или цифра.',
         scope: 'Где',
         create: 'Создать подключение',
         secretNote:

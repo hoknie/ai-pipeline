@@ -69,8 +69,12 @@ function NameAndScope({
           id={`${prefix}-name`}
           value={name}
           maxLength={40}
+          aria-describedby={`${prefix}-name-hint`}
           onChange={(event) => onName(event.target.value)}
         />
+        <p id={`${prefix}-name-hint`} className="max-w-64 text-xs text-muted-foreground">
+          {t('integrations.connections.add.nameHint')}
+        </p>
       </div>
       <SelectField
         id={`${prefix}-scope`}

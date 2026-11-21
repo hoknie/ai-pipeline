@@ -416,6 +416,22 @@ describe('a new connection', () => {
     expect((within(form).getByLabelText('Name') as HTMLInputElement).value).toBe('main');
     expect((within(form).getByLabelText(/^Chat/) as HTMLInputElement).value).toBe('x');
   });
+
+  it('reports a refused name as a failed action, not as a failed load, until it is dismissed', async () => {
+    await open({
+      integrationAdd: vi.fn(async () => {
+        throw new ApiError(400, 'invalid connection name');
+      }),
+    });
+    const form = screen.getByRole('form', { name: 'New connection' });
+    expect(within(form).getByText(/Lowercase Latin letters/)).toBeTruthy();
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'Svc' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Create connection' }));
+    expect(await screen.findByText(/The action failed: invalid connection name/)).toBeTruthy();
+    expect(screen.queryByText(/Could not load the integrations/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText(/The action failed/)).toBeNull();
+  });
 });
 
 describe('the actions of a connection', () => {

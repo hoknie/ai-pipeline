@@ -11,6 +11,9 @@ export interface IntegrationsState {
   overview: IntegrationsOverview | null;
   /** The last failure of loading or of an action; null when everything went through. */
   error: string | null;
+  /** The refusal of the last action (a new connection, a switch): stays until closed or the next action. */
+  actionError: string | null;
+  dismissActionError: () => void;
   loading: boolean;
   reload: () => void;
   /** Runs a change, then loads again; a failure goes to `error`. Returns whether it went through. */
@@ -21,6 +24,7 @@ export interface IntegrationsState {
 export function useIntegrations(api: Api): IntegrationsState {
   const [overview, setOverview] = useState<IntegrationsOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const latest = useRef(0);
 
@@ -53,10 +57,11 @@ export function useIntegrations(api: Api): IntegrationsState {
 
   const act = useCallback(
     async <T>(change: () => Promise<T>): Promise<boolean> => {
+      setActionError(null);
       try {
         await change();
       } catch (failure) {
-        setError(messageOf(failure));
+        setActionError(messageOf(failure));
         return false;
       }
       await load();
@@ -65,5 +70,13 @@ export function useIntegrations(api: Api): IntegrationsState {
     [load],
   );
 
-  return { overview, error, loading, reload: () => void load(), act };
+  return {
+    overview,
+    error,
+    actionError,
+    dismissActionError: () => setActionError(null),
+    loading,
+    reload: () => void load(),
+    act,
+  };
 }

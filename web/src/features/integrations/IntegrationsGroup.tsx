@@ -98,7 +98,8 @@ export default function IntegrationsGroup({
   leave: (href: string) => (event: MouseEvent) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const { overview, error, loading, reload, act } = useIntegrations(api);
+  const { overview, error, actionError, dismissActionError, loading, reload, act } =
+    useIntegrations(api);
   const [version, setVersion] = useState(0);
   const done = async <T,>(change: () => Promise<T>) => {
     const ok = await act(change);
@@ -129,6 +130,14 @@ export default function IntegrationsGroup({
           <span>{t('integrations.error', { message: error })}</span>
           <Button type="button" variant="outline" size="sm" onClick={reload}>
             {t('integrations.retry')}
+          </Button>
+        </Alert>
+      )}
+      {actionError === null ? null : (
+        <Alert variant="destructive" className="flex flex-wrap items-center gap-2" role="alert">
+          <span>{t('integrations.actionError', { message: actionError })}</span>
+          <Button type="button" variant="outline" size="sm" onClick={dismissActionError}>
+            {t('integrations.dismiss')}
           </Button>
         </Alert>
       )}

@@ -110,6 +110,8 @@ export const es: Dictionary = {
   integrations: {
     loading: 'Cargando integraciones',
     error: 'No se pudieron cargar las integraciones: {{message}}',
+    actionError: 'No se pudo realizar la acción: {{message}}',
+    dismiss: 'Cerrar',
     retry: 'Reintentar',
     enabled: 'activada',
     disabled: 'desactivada',
@@ -117,6 +119,8 @@ export const es: Dictionary = {
       add: {
         title: 'Nueva conexión',
         name: 'Nombre',
+        nameHint:
+          'Solo letras latinas minúsculas, dígitos, ".", "_" y "-"; hasta 40 caracteres; el primero, una letra o un dígito.',
         scope: 'Dónde',
         create: 'Crear conexión',
         secretNote:

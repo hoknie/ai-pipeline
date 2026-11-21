@@ -98,6 +98,8 @@ export const zh: Dictionary = {
   integrations: {
     loading: '正在加载集成',
     error: '无法加载集成：{{message}}',
+    actionError: '操作失败：{{message}}',
+    dismiss: '关闭',
     retry: '重试',
     enabled: '已启用',
     disabled: '已停用',
@@ -105,6 +107,7 @@ export const zh: Dictionary = {
       add: {
         title: '新建连接',
         name: '名称',
+        nameHint: '仅限小写拉丁字母、数字、“.”、“_”和“-”；最多 40 个字符；首字符为字母或数字。',
         scope: '范围',
         create: '创建连接',
         secretNote: '面板不接收密钥：创建连接后，其卡片会显示设置密钥的 CLI 命令。',
