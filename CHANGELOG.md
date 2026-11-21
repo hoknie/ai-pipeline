@@ -38,6 +38,8 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixes
 
+- **AIP-465:** Make project-scope settings read-only unless overridden ([2168b8e](https://github.com/hoknie/ai-pipeline/commit/2168b8e2c9c6af771c9a5a97a4f72c29378555f8))
+- **AIP-466:** Take single group name and slug from run title ([050bd44](https://github.com/hoknie/ai-pipeline/commit/050bd441c794b4902507aa77d9ee5854a3da330e))
 - **AIP-461:** Show project select only for all projects ([48a9efa](https://github.com/hoknie/ai-pipeline/commit/48a9efac4b81d2a560ba6fc3f80064b84101e05c))
 - **AIP-459:** Show global queue note instead of endless skeleton ([4dd11b2](https://github.com/hoknie/ai-pipeline/commit/4dd11b2f57b6f78835abd9bfcc111b7b6b751959))
 - **AIP-456:** Keep action errors visible on integrations page ([55986a5](https://github.com/hoknie/ai-pipeline/commit/55986a5c803b6eb0da735df373e6d5c98c474e16))
@@ -48,6 +50,8 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 ### Other
 
+- **tests:** Update crashed test ([85f60b5](https://github.com/hoknie/ai-pipeline/commit/85f60b5a7cb28e453d7a3832cbce5393993da087))
+- **build:** Update changelog ([367bcc5](https://github.com/hoknie/ai-pipeline/commit/367bcc581e00b23d9c6a997d8c04c5d8044ec0d9))
 - **build:** Bump version ([e132594](https://github.com/hoknie/ai-pipeline/commit/e1325949f4f43bcf4f32c185d5cc0eae95e780c9))
 
 [Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.4.0...v0.5.0)
