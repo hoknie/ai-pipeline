@@ -38,12 +38,17 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixes
 
+- **AIP-461:** Show project select only for all projects ([48a9efa](https://github.com/hoknie/ai-pipeline/commit/48a9efac4b81d2a560ba6fc3f80064b84101e05c))
 - **AIP-459:** Show global queue note instead of endless skeleton ([4dd11b2](https://github.com/hoknie/ai-pipeline/commit/4dd11b2f57b6f78835abd9bfcc111b7b6b751959))
 - **AIP-456:** Keep action errors visible on integrations page ([55986a5](https://github.com/hoknie/ai-pipeline/commit/55986a5c803b6eb0da735df373e6d5c98c474e16))
 - Restore the check gate ([11184f4](https://github.com/hoknie/ai-pipeline/commit/11184f43f694afd3123904ff24dafe158fa67967))
 - **AIP-446:** Stack project level label under name in config picker ([2df606b](https://github.com/hoknie/ai-pipeline/commit/2df606b7b03df573900ba197b1ed8e8c0970b24b))
 - **cli:** Print the queue of a daemon that sends no author ([b1688b4](https://github.com/hoknie/ai-pipeline/commit/b1688b4a91dcfcf09a1d94db3cdd5a4b77761ae0))
 - **AIP-433:** Hide level toggle in all-projects specialist preview ([c4f452e](https://github.com/hoknie/ai-pipeline/commit/c4f452e16611c7dfda23fa11d38f832e4ba0a223))
+
+### Other
+
+- **build:** Bump version ([e132594](https://github.com/hoknie/ai-pipeline/commit/e1325949f4f43bcf4f32c185d5cc0eae95e780c9))
 
 [Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.4.0...v0.5.0)
 
