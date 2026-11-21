@@ -66,6 +66,7 @@ describe('new task from the top strip', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         title: 'Only title',
         task: 'Only title',
@@ -90,6 +91,7 @@ describe('new task from the top strip', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Do work\nAnd verify',
       }),
@@ -149,6 +151,7 @@ describe('new task from the top strip', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(2));
     expect(api.queueAdd).toHaveBeenLastCalledWith({
+      provider: null,
       pipeline: 'feature',
       title: 'title only',
       task: 'title only',
@@ -239,6 +242,7 @@ describe('new task from the top strip', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         groups: [
           { title: 'Only title', task: 'Only title' },
@@ -270,6 +274,7 @@ describe('new task from the top strip', () => {
     });
     const payload = {
       pipeline: 'feature',
+      provider: null,
       groups: [{ title: '## Original', task: '## Original\n- detail' }],
     };
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
@@ -1204,6 +1209,7 @@ describe('add and continue', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         title: 'First',
         task: 'Do it',
@@ -1232,6 +1238,7 @@ describe('add and continue', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         groups: [
           { title: 'One', task: 'One' },
@@ -1784,7 +1791,11 @@ describe('layout and keyboard of the task form', () => {
       fireEvent.change(text, { target: { value: 'Do it' } });
       fireEvent.keyDown(text, { key: 'Enter', [key]: true });
       await waitFor(() =>
-        expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Do it' }),
+        expect(api.queueAdd).toHaveBeenCalledWith({
+          provider: null,
+          pipeline: 'feature',
+          task: 'Do it',
+        }),
       );
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
       cleanup();

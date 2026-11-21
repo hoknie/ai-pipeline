@@ -63,6 +63,8 @@ export interface EntryReference {
   item?: number;
   /** `delivery.resolver` or `delivery.message_specialist`. */
   field?: string;
+  /** The setting that names the provider: the `default_provider` of a settings.yaml. */
+  setting?: 'default_provider';
   /** Pipeline point (`swarm.stages.<point>` or `stages.<point>` of the pipeline) that names an action. */
   point?: string;
   /** Root of the registry repository the reference comes from; set for shared specialists. */
@@ -93,6 +95,7 @@ export type SettingKind =
   | 'duration'
   | 'strings'
   | 'specialist'
+  | 'provider'
   | 'env'
   | 'pools'
   | 'roles'

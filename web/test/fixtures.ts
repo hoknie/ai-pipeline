@@ -1146,6 +1146,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
       errors: [],
       roles: [],
       providers: [],
+      defaultProvider: null,
       matrix: [],
     })),
     providerModels: vi.fn(async (provider: string) => ({

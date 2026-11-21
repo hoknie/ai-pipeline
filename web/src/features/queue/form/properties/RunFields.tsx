@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Label } from '../../../../shared/ui/forms/label.tsx';
@@ -107,7 +108,15 @@ function ProviderSelect({
 }) {
   const { t } = useTranslation();
   const { idPrefix, effective, change } = state;
-  const { providers, loaded } = useCommonProviders(api, repositories);
+  const { providers, loaded, defaultProvider } = useCommonProviders(api, repositories);
+  // a field the user has not touched follows the default provider of the project(s)
+  const untouched = idPrefix === 'new' && effective.providerTouched === false;
+  const follow = loaded && untouched && effective.provider !== defaultProvider;
+  useEffect(() => {
+    if (follow) change({ provider: defaultProvider });
+    // `change` is a new function on every render; the choice itself is the dependency. A draft
+    // that moves to another project meanwhile may put the provider back: the effect runs again.
+  }, [follow, defaultProvider, effective.provider, effective.repository]);
   if (loaded && providers.length === 0) return null;
   return (
     <div className="flex min-w-0 flex-col gap-1.5" title={t('queue.form.providerHint')}>
@@ -116,8 +125,9 @@ function ProviderSelect({
         id={`${idPrefix}-provider`}
         label={t('queue.form.provider')}
         value={effective.provider}
-        onChange={(provider) => change({ provider })}
+        onChange={(provider) => change({ provider, providerTouched: true })}
         providers={providers}
+        defaultSlug={defaultProvider}
         emptyLabel={t('queue.form.noProvider')}
         repository={repositories[0] ?? null}
         api={api}

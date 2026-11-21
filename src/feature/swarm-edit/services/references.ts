@@ -113,6 +113,7 @@ export function chainReferences(tree: unknown, slug: string): EntryReference[] {
 export function providerReferences(tree: unknown, slug: string): EntryReference[] {
   const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
   const references: EntryReference[] = [];
+  if (swarm.default_provider === slug) references.push({ setting: 'default_provider' });
   const chains = isMapping(swarm.chains) ? swarm.chains : {};
   for (const [name, chain] of Object.entries(chains)) {
     const items = isMapping(chain) && Array.isArray(chain.runtimes) ? chain.runtimes : [];

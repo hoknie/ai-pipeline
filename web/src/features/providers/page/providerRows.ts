@@ -18,6 +18,8 @@ export function rowsOfProject(
     key: provider.slug,
     provider,
     overrides: provider.level === 'project' && overrides(editor, provider.slug),
+    defaultLevel:
+      view.defaultProvider?.slug === provider.slug ? view.defaultProvider.level : undefined,
   }));
 }
 

@@ -33,6 +33,8 @@ export interface ProviderDraft {
   name: string;
   level: 'global' | 'project';
   enabled: boolean;
+  /** A new provider only: also written as `default_provider` once the file is saved. */
+  makeDefault: boolean;
   access: AccessDraft[];
   models: Record<string, ModelDraft>;
 }
@@ -56,6 +58,7 @@ export const emptyDraft = (): ProviderDraft => ({
   name: '',
   level: 'global',
   enabled: true,
+  makeDefault: false,
   access: [emptyAccess()],
   models: {},
 });
@@ -106,6 +109,7 @@ export function draftOf(slug: string, raw: Raw, level: 'global' | 'project'): Pr
     name: text(raw.name),
     level,
     enabled: raw.enabled !== false,
+    makeDefault: false,
     access: Array.isArray(raw.access) ? raw.access.map(accessOf) : [],
     models: modelsOf(raw.models),
   };

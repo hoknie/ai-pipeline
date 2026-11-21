@@ -155,6 +155,22 @@ const GLOBAL_ONLY_SECTIONS = [
   'queue',
 ];
 
+/** The shared `default_provider` must name a shared provider: a project one is not there for others. */
+function sharedDefaultProviderProblems(global: Level): FieldError[] {
+  const swarm = isMapping(global.tree) ? global.tree.swarm : undefined;
+  const slug = isMapping(swarm) ? swarm.default_provider : undefined;
+  const providers = isMapping(swarm) ? swarm.providers : undefined;
+  if (typeof slug !== 'string' || (isMapping(providers) && slug in providers)) return [];
+  const file = global.origins.get('swarm.default_provider');
+  return [
+    {
+      ...(file === undefined ? {} : { file }),
+      path: 'swarm.default_provider',
+      message: `the shared default provider \`${slug}\` must be a shared provider`,
+    },
+  ];
+}
+
 /** Merges the global level with the project one and validates the result. */
 export function resolveLevels(global: Level, project: Level): LoadedConfig {
   const origins = mergeOrigins(global, project);
@@ -175,6 +191,7 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
     const file = project.origins.get(`swarm.providers.${slug}`);
     problems.push({ ...(file === undefined ? {} : { file }), ...problem });
   }
+  problems.push(...sharedDefaultProviderProblems(global));
   const result = validateConfig(mergeConfigs(global.tree, project.tree) ?? null);
   const errors = [
     ...problems,
@@ -192,6 +209,14 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
   const projectActions = isMapping(projectSwarm) ? projectSwarm.actions : undefined;
   const config: ResolvedConfig = {
     ...result.config,
+    defaultProvider:
+      result.config.defaultProvider === null
+        ? null
+        : {
+            slug: result.config.defaultProvider.slug,
+            level:
+              isMapping(projectSwarm) && 'default_provider' in projectSwarm ? 'project' : 'global',
+          },
     specialists: result.config.specialists.map((specialist) =>
       isMapping(projectSpecialists) && specialist.slug in projectSpecialists
         ? specialist

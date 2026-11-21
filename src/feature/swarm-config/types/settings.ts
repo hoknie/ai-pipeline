@@ -177,7 +177,9 @@ type StoredConfig = Omit<
   | 'agy'
   | 'providers'
   | 'roles'
+  | 'defaultProvider'
 > & {
+  defaultProvider?: DefaultProvider | null;
   chains?: RuntimeChain[];
   providers?: Provider[];
   roles?: Role[];
@@ -254,6 +256,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     specialists,
     chains,
     ...withRegistryDefaults(stored),
+    defaultProvider: stored.defaultProvider ?? null,
     claude,
     opencode: { mcp: 'inherit', overrides: {}, ...stored.opencode },
     agy: { mcp: 'isolated', overrides: {}, ...stored.agy },
@@ -261,6 +264,11 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     actions,
     stages,
   };
+}
+
+export interface DefaultProvider {
+  slug: string;
+  level: 'project' | 'global';
 }
 
 export interface ResolvedConfig {
@@ -284,6 +292,8 @@ export interface ResolvedConfig {
   chains: RuntimeChain[];
   /** Providers of the providers/ directories: the registry of the known providers. */
   providers: Provider[];
+  /** The provider new tasks start on when none is chosen: the `default_provider` setting and its level. */
+  defaultProvider: DefaultProvider | null;
   /** Roles of the models, in the order of settings.yaml. */
   roles: Role[];
   pipelines: Pipeline[];

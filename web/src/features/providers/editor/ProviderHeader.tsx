@@ -4,9 +4,12 @@ import type { ProviderView } from '../../../shared/api/types.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { FilePath } from '../../../shared/ui/layout/FilePath.tsx';
+import { DefaultMark } from '../list/DefaultMark.tsx';
 import { ProviderStatusBadge } from '../list/ProviderStatus.tsx';
 import { reasonsOf } from '../list/ProvidersList.tsx';
 import { useProvidersScope } from '../page/scope.ts';
+import type { DefaultProviderState } from './useDefaultProvider.ts';
+import { DefaultProviderSwitch } from './DefaultProviderSwitch.tsx';
 
 /** The sticky bar of an existing provider: name, slug, level, status, file, and Save and Delete. */
 export function ProviderHeader(props: {
@@ -18,6 +21,8 @@ export function ProviderHeader(props: {
   canSave: boolean;
   onSave: () => void;
   onDelete: () => void;
+  /** The default provider of the scope, for the mark and the switch. */
+  defaults: DefaultProviderState;
 }) {
   const { t } = useTranslation();
   const scope = useProvidersScope();
@@ -36,11 +41,15 @@ export function ProviderHeader(props: {
         <code className="text-xs text-muted-foreground">{slug}</code>
         {live ? <Badge variant="outline">{t(`providers.level.${live.level}`)}</Badge> : null}
         {live ? <ProviderStatusBadge status={live.status} reasons={reasonsOf(live)} /> : null}
+        {live && props.defaults.current?.slug === slug ? (
+          <DefaultMark level={props.defaults.current.level} enabled={live.enabled} />
+        ) : null}
       </div>
       {live?.file ? <FilePath variant="line" path={live.file} /> : null}
       {scope === 'global' ? (
         <p className="text-sm text-muted-foreground">{t('providers.globalWarning')}</p>
       ) : null}
+      {live ? <DefaultProviderSwitch provider={live} state={props.defaults} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button disabled={busy || !props.canSave} onClick={props.onSave}>
           {t('providers.form.save')}

@@ -53,6 +53,22 @@ export const providersEn = {
   detailsEmpty: 'Pick a provider in the list or create a new one.',
   globalWarning: 'A shared provider applies in every repository.',
   header: 'Provider',
+  default: {
+    mark: 'Default',
+    markShared: 'Default · shared',
+    markOff: 'Not used while the provider is switched off',
+    switch: 'Default',
+    hint: 'A task goes to this provider when none is chosen.',
+    sharedValue: 'Set in the shared settings.',
+    offHint: 'A switched-off provider cannot be the default.',
+    confirmTitle: 'Change the default provider?',
+    confirmText: 'Default provider — «{{from}}». Take it off and assign «{{to}}»?',
+    confirmShared:
+      'It is set in the shared settings and stays the default of the other projects; this project gets its own.',
+    assign: 'Assign',
+    wizardHint: 'Assigned after the provider is saved.',
+    notAssigned: 'The provider is saved, but not made the default: {{message}}',
+  },
   chainRoles: 'Roles of the provider',
   roles: {
     models: 'Models of the role',
@@ -97,6 +113,7 @@ export const providersEn = {
     deleteDescription: 'The provider file is deleted permanently.',
     usedBy: 'The provider is still used by:',
     refChain: 'chain {{chain}}, item {{item}}',
+    refDefault: 'the default provider setting',
     newTitle: 'New provider',
     notFound: 'Provider «{{slug}}» not found',
     preset: 'Preset',
@@ -153,6 +170,7 @@ export const providersEn = {
   },
   picker: {
     current: '(current)',
+    default: 'default',
     unknown: 'unknown provider',
     search: 'Search: {{label}}',
     searchPlaceholder: 'Name or slug',

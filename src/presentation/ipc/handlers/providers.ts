@@ -50,6 +50,7 @@ export function providersView(
     errors: [],
     roles: config.roles.map((role) => ({ ...role })),
     providers,
+    defaultProvider: config.defaultProvider,
     matrix: modelMatrix(config.roles, sorted),
   };
 }
@@ -78,7 +79,14 @@ export const providerHandlers = {
     const repository = await services.registry.rootOf(params.repository);
     const result = loaded(services, repository, params.level);
     if (result instanceof ConfigLoadError) {
-      return { repository, errors: configLoadErrors(result), roles: [], providers: [], matrix: [] };
+      return {
+        repository,
+        errors: configLoadErrors(result),
+        roles: [],
+        providers: [],
+        defaultProvider: null,
+        matrix: [],
+      };
     }
     const { config, files } = result;
     const project = services.config.pathsOf(repository).project.directory;

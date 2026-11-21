@@ -55,11 +55,16 @@ describe('a copy of a waiting task in the new task form', () => {
     expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
     expect(text.value).toBe('fix the login');
     expect(api.queueAdd).toHaveBeenCalledTimes(1);
-    expect(api.queueAdd).toHaveBeenLastCalledWith({ pipeline: 'feature', task: 'fix the login' });
+    expect(api.queueAdd).toHaveBeenLastCalledWith({
+      provider: null,
+      pipeline: 'feature',
+      task: 'fix the login',
+    });
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add anyway' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(2));
     expect(api.queueAdd).toHaveBeenLastCalledWith({
+      provider: null,
       pipeline: 'feature',
       task: 'fix the login',
       allowDuplicate: true,
@@ -78,7 +83,11 @@ describe('a copy of a waiting task in the new task form', () => {
     expect(within(dialog).queryByText(/already waits in the queue/)).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(2));
-    expect(api.queueAdd).toHaveBeenLastCalledWith({ pipeline: 'feature', task: 'fix the logout' });
+    expect(api.queueAdd).toHaveBeenLastCalledWith({
+      provider: null,
+      pipeline: 'feature',
+      task: 'fix the logout',
+    });
   });
 
   it('shows any other refusal as before, without the way around', async () => {

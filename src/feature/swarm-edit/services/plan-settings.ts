@@ -132,7 +132,8 @@ function settingTypeError(
       if (!isEnvVariable(setting.path)) return fail('cannot be written as a whole');
       return typeof value === 'string' ? null : fail('must be a string');
     case 'string':
-    case 'specialist': {
+    case 'specialist':
+    case 'provider': {
       const message = textError(value);
       return message === null ? null : fail(message);
     }

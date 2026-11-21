@@ -47,10 +47,11 @@ describe('variant of the queue draft', () => {
 });
 
 describe('provider of the queue draft', () => {
-  it('starts as not chosen and is sent only when chosen, always on edit but not for a return', () => {
+  it('starts as not chosen and untouched, is always sent for a new task and an edit, not for a return', () => {
     const draft = emptyDraft('feature');
     expect(draft.provider).toBeNull();
-    expect(fieldsOf({ ...draft, task: 'x' })).not.toHaveProperty('provider');
+    expect(draft.providerTouched).toBe(false);
+    expect(fieldsOf({ ...draft, task: 'x' }).provider).toBeNull();
     expect(fieldsOf({ ...draft, task: 'x', provider: 'zai' }).provider).toBe('zai');
     expect(fieldsOf({ ...draft, task: 'x' }, () => undefined, true).provider).toBeNull();
     expect(
@@ -121,6 +122,7 @@ describe('queue draft task/title normalization', () => {
     };
     expect(draftValid(draft)).toBe(true);
     expect(fieldsOf(draft)).toEqual({
+      provider: null,
       pipeline: 'feature',
       groups: [
         { title: 'Only title', task: 'Only title' },
@@ -236,6 +238,7 @@ describe('queue draft task/title normalization', () => {
       };
       const before = structuredClone(draft);
       expect(fieldsOf(draft)).toEqual({
+        provider: null,
         pipeline: 'feature',
         groups: [{ title: '## First', task: `## First${separator}- second` }],
       });

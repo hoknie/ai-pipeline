@@ -5,6 +5,7 @@ import type { GroupInfo } from '../../../shared/lib/catalog/projectRows.ts';
 import { ProjectChips } from '../../repositories/index.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { LimitCell } from './LimitCell.tsx';
+import { DefaultMark } from './DefaultMark.tsx';
 import { ProviderStatusBadge, accessSummary } from './ProviderStatus.tsx';
 
 /** A provider of the list: the registry entry and where it comes from. */
@@ -13,6 +14,8 @@ export interface ProviderRow {
   provider: ProviderView;
   /** The project file overrides a shared one. */
   overrides: boolean;
+  /** The level of `default_provider` when this provider is the default one. */
+  defaultLevel?: 'global' | 'project' | undefined;
   /** The projects that have the provider, in the mode «All projects»; absent otherwise. */
   group?: GroupInfo;
 }
@@ -47,7 +50,12 @@ function RowBody({ row, narrow }: { row: ProviderRow; narrow: boolean }) {
         <span className="truncate font-medium" title={provider.slug}>
           {provider.name}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{provider.slug}</span>
+        <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="truncate">{provider.slug}</span>
+          {row.defaultLevel ? (
+            <DefaultMark level={row.defaultLevel} enabled={provider.enabled} />
+          ) : null}
+        </span>
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground">
         {row.group?.presences ? (

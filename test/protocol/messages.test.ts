@@ -319,7 +319,7 @@ describe('queue requests', () => {
     bad('queue_edit', { repository: '/r', item: 'q1', parent: 1.5 });
   });
 
-  it('takes a provider id on every request that makes a task, null only to reset it on edit', () => {
+  it('takes a provider id on every request that makes a task, null for no provider', () => {
     ok('run', { repository: '/r', pipeline: 'feature', task: 'x', provider: 'zai' });
     ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', provider: 'zai' });
     ok('queue_add_projects', {
@@ -332,8 +332,15 @@ describe('queue requests', () => {
     ok('queue_edit', { repository: '/r', item: 'q1', provider: 'zai' });
     ok('queue_edit', { repository: '/r', item: 'q1', provider: null });
     bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', provider: '' });
-    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', provider: null });
-    bad('run', { repository: '/r', pipeline: 'feature', task: 'x', provider: null });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', provider: null });
+    ok('run', { repository: '/r', pipeline: 'feature', task: 'x', provider: null });
+    ok('queue_add_projects', {
+      repositories: ['/a', '/b'],
+      pipeline: 'feature',
+      task: 'x',
+      provider: null,
+    });
+    ok('worker_queue_add', { token: 't', pipeline: 'feature', task: 'x', provider: null });
   });
 
   it('takes skip as a list of non-empty step ids', () => {

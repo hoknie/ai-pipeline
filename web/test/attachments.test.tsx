@@ -69,6 +69,7 @@ describe('attachments in the new task form', () => {
     fireEvent.click(add);
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Work',
         uploads: ['up-shot.png', 'up-spec.pdf'],
@@ -174,6 +175,7 @@ describe('attachments in the new task form', () => {
     fireEvent.click(add);
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Work',
         uploads: ['up-good.png'],

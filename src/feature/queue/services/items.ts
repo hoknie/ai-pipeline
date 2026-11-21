@@ -11,6 +11,7 @@ import {
   DEFAULT_VARIANT,
   checkVariant,
   findPipeline,
+  defaultProviderOf,
   providerProblem,
   variantSkip,
 } from '../../swarm-config/types/index.ts';
@@ -78,6 +79,7 @@ export class QueueItems {
     requireDeliveryMode(this.dependencies.config, params.deliveryMode);
     const queue = store.of(repository);
     const moment = now();
+    params = { ...params, provider: this.providerFor(repository, params.provider) };
     await this.ensureItem(
       repository,
       params.pipeline,
@@ -163,13 +165,22 @@ export class QueueItems {
     return store.save(queue);
   }
 
+  /**
+   * The provider of a new task: the one the request names, `null` for «no provider», and the
+   * default provider of the project when the request does not say.
+   */
+  providerFor(repository: string, provider: string | null | undefined): string | null {
+    if (provider !== undefined) return provider;
+    return defaultProviderOf(this.dependencies.config.load(repository));
+  }
+
   /** Rejects an unknown pipeline or variant, or a `skip` that does not fit the pipeline with it. */
   async ensureItem(
     repository: string,
     pipeline: string,
     variant: string = DEFAULT_VARIANT,
     skip: readonly string[] = [],
-    provider: string | null = null,
+    provider: string | null | undefined = null,
   ) {
     const config = this.dependencies.config.load(repository);
     if (!findPipeline(config, pipeline)) {
@@ -180,7 +191,8 @@ export class QueueItems {
     if (variantError !== null) throw rejected(variantError);
     const error = checkSkip(config, pipeline, [...variantSkip(config, pipeline, variant), ...skip]);
     if (error !== null) throw rejected(error);
-    const providerError = provider === null ? null : providerProblem(config, provider);
+    const providerError =
+      provider === null || provider === undefined ? null : providerProblem(config, provider);
     if (providerError !== null) throw rejected(providerError);
   }
 
@@ -213,6 +225,7 @@ export class QueueItems {
     this.dependencies.registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
+    params = { ...params, provider: this.providerFor(repository, params.provider) };
     await this.ensureItem(
       repository,
       params.pipeline,

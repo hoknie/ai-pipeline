@@ -22,7 +22,7 @@ export function formatProviderList(view: ProvidersView, style: Style = plainStyl
       ['SLUG', 'NAME', 'STATUS', 'ACCESS', 'ROLES'],
       ...view.providers.map((provider) => [
         style.argument(provider.slug),
-        provider.name,
+        view.defaultProvider?.slug === provider.slug ? `${provider.name} · default` : provider.name,
         provider.status,
         (provider.active === null ? undefined : provider.access[provider.active]?.runtime) ?? '—',
         `${filledRoles(view, provider).length}/${view.roles.length}`,
@@ -75,6 +75,9 @@ export function formatProvider(
     style.title(providerText(provider.slug, provider.name)),
     `Level: ${provider.level}${provider.file === null ? '' : ` (${provider.file})`}`,
     `Enabled: ${provider.enabled ? 'yes' : 'no'}`,
+    ...(view.defaultProvider?.slug === provider.slug
+      ? [`default: yes (${view.defaultProvider.level})`]
+      : []),
     `Status: ${provider.status}`,
     'Access:',
     ...accessLines(view, provider, style),

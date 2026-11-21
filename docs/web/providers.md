@@ -8,6 +8,7 @@ The tab is a list on the left (with "Create provider" and a search) and the form
 
 - The status is "Available" or "Unavailable" with the reasons in words: the access is turned off, its runtime is disabled in the settings, the command is not found, the key variable is not set, or the access is "API — soon".
 - A provider in a usage limit shows "Limit" with a countdown to its end; after the end the mark disappears.
+- The default provider has a "Default" mark, in a project "Default · shared" when the value comes from the shared settings. A switched-off default provider keeps the mark, with a hint that it is not used while it is off.
 - Disabled providers are dimmed. A configuration that cannot be assembled shows its errors above the list.
 - `j` and `k` move through the list, `Enter` opens the form. With "All projects" the list has one row per provider with the projects that have it under it; a row opens a read-only overview with "Open in project".
 - The matrix and "Roles" show the shared level only and cannot be changed there: choose a project to edit.
@@ -36,6 +37,10 @@ Deleting a role asks for confirmation and offers "Clear cells and delete": the c
 - "Own API address for the CLI" is off by default. Turn it on only when the CLI reaches the model through an address of its own (a proxy or a compatible API): then the address and the key variable are required. `opencode` has no such switch.
 - The form takes **names of environment variables** only. It has no field for a secret value and never stores or shows one.
 - The daemon's errors show at the field, and the form goes to its step.
+- The switch "Default" makes the provider the [default one](../configuration/providers.md#default-provider): a new task goes to it when none is chosen.
+- The switch writes `default_provider` at once, without "Save", to the settings file of the area (shared or project); turning it off removes the key. A switched-off provider cannot be the default. In a project a value set only in the shared settings shows the switch on and unavailable.
+- Turning the switch on while another provider is the default opens a dialog: "Default provider — «Anthropic». Take it off and assign «Z.ai»?". Nothing is written before "Assign"; "Cancel" and `Esc` leave everything as it was. In a project the dialog adds that the shared default stays for the other projects.
+- A new provider has the same switch on the step "General", off at the start: the setting is written after the provider file is saved, and an error of that write shows in the form while the provider stays.
 - "Delete" removes the file; if a chain still names the provider, the form lists the references and keeps the file. Switch the provider off instead.
 
 ### Presets
@@ -52,7 +57,9 @@ The first step offers presets, all editable:
 
 ## Choosing a provider elsewhere
 
-Every provider field (the task form, the queue item, "Provider" in a run, an element of a chain) is the same combobox: search by name and slug, the status, disabled ones last and not selectable, and "Create provider…" that opens the form in a dialog and selects the new one. The run list has a "Provider" filter.
+Every provider field (the task form, the queue item, "Provider" in a run, an element of a chain) is the same combobox: search by name and slug, the status, disabled ones last and not selectable, and "Create provider…" that opens the form in a dialog and selects the new one.
+
+The default provider is marked "default". A new task opens with it chosen (for several projects only when they share the same one), "Not chosen" is sent as no provider, and changing the project follows its default until you pick a provider yourself. The run list has a "Provider" filter.
 
 ## Shared providers
 

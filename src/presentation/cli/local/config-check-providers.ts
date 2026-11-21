@@ -25,6 +25,9 @@ export function providerLines(config: ResolvedConfig, states: readonly ProviderS
   if (config.roles.length === 0) lines.push('  none');
   for (const role of config.roles) lines.push(`  ${role.slug}: ${role.name}`);
   lines.push('', 'Providers:');
+  if (config.defaultProvider !== null) {
+    lines.push(`  default: ${config.defaultProvider.slug} · ${config.defaultProvider.level}`);
+  }
   if (states.length === 0) lines.push('  none');
   for (const state of states) {
     const provider = config.providers.find((item) => item.slug === state.slug) as Provider;
@@ -39,6 +42,15 @@ export function providerLines(config: ResolvedConfig, states: readonly ProviderS
 
 /** An enabled provider without a model for a role leaves an empty cell of the matrix. */
 export function providerWarnings(config: ResolvedConfig): string[] {
+  const slug = config.defaultProvider?.slug;
+  const off = config.providers.some((provider) => provider.slug === slug && !provider.enabled);
+  return [
+    ...(off ? [`default provider \`${slug}\` is disabled`] : []),
+    ...emptyRoleWarnings(config),
+  ];
+}
+
+function emptyRoleWarnings(config: ResolvedConfig): string[] {
   return config.providers
     .filter((provider) => provider.enabled)
     .flatMap((provider) =>

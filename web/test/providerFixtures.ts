@@ -54,6 +54,7 @@ export function providersView(overrides: Partial<ProvidersView> = {}): Providers
     errors: [],
     roles: [],
     providers: [],
+    defaultProvider: null,
     matrix: [],
     ...overrides,
   };

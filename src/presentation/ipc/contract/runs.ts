@@ -67,7 +67,7 @@ const runParams = z
     repository: z.string().min(1),
     pipeline: z.string().min(1),
     variant: variantId.optional(),
-    provider: providerId.optional(),
+    provider: providerId.nullable().optional(),
     task: z.string().trim().min(1).optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: z.string().trim().min(1).max(RUN_TITLE_LIMIT).optional(),

@@ -92,6 +92,18 @@ export function providerProblem(config: ProviderRegistry, provider: string): str
   return found.enabled ? null : `provider \`${provider}\` is disabled`;
 }
 
+/** The provider new tasks start on: the `default_provider` when the registry has it enabled, else null. */
+export function defaultProviderOf(config: {
+  providers: readonly Provider[];
+  defaultProvider?: { slug: string } | null;
+}): string | null {
+  const slug = config.defaultProvider?.slug;
+  if (slug === undefined) return null;
+  return config.providers.some((provider) => provider.slug === slug && provider.enabled)
+    ? slug
+    : null;
+}
+
 /** The model of a role for a route: the record of the route, else the record of the provider. */
 export function roleModelOf(
   provider: Pick<Provider, 'models'>,

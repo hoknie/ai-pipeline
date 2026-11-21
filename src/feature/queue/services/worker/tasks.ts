@@ -53,6 +53,8 @@ export class WorkerTasks {
       const state = this.runOf(params.token);
       const repository = state.run.repository;
       registry.requireEnabled(repository);
+      // A task of a specialist takes the default provider, not the provider of its own run.
+      params = { ...params, provider: items.providerFor(repository, params.provider) };
       await items.ensureItem(
         repository,
         params.pipeline,

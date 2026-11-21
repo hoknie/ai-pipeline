@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/types.ts';
@@ -16,6 +17,9 @@ import {
 import { NO_PROBLEMS, removeProvider, submitProvider, type FormProblems } from './submit.ts';
 
 export type { FormProblems };
+
+/** Writes `default_provider` at a level; resolves to the error text, or null once accepted. */
+type AssignDefault = (slug: string, level: 'global' | 'project') => Promise<string | null>;
 
 /** Words the address of the form uses: a provider with such a slug could not be opened. */
 const RESERVED = ['new', 'roles'];
@@ -47,19 +51,38 @@ interface SubmitOptions {
   onSaved: (slug: string) => void;
   onDeleted: () => void;
   onStep: (step: FormStep) => void;
+  assignDefault?: AssignDefault | undefined;
 }
 
 /** Save and delete with the answers of the daemon: problems by field, the places that use it. */
 function useSubmit(options: SubmitOptions) {
   const { api, repository, slug, source, draft } = options;
+  const { t } = useTranslation();
   const [problems, setProblems] = useState<FormProblems>(NO_PROBLEMS);
   const [busy, setBusy] = useState(false);
+  // a new provider whose file is written: a second try only writes `default_provider`
+  const created = useRef<string | null>(null);
   const save = async () => {
     if (!draft) return;
     setBusy(true);
-    const outcome = await submitProvider(api, draft, slug, source);
+    const outcome =
+      created.current === null
+        ? await submitProvider(api, draft, slug, source)
+        : { saved: created.current };
     if ('saved' in outcome) {
+      created.current = slug === null ? outcome.saved : null;
       await invalidateProviders(repository);
+      if (slug === null && draft.makeDefault && options.assignDefault) {
+        const failure = await options.assignDefault(outcome.saved, draft.level);
+        if (failure !== null) {
+          setProblems({
+            ...NO_PROBLEMS,
+            general: [t('providers.default.notAssigned', { message: failure })],
+          });
+          setBusy(false);
+          return;
+        }
+      }
       options.onSaved(outcome.saved);
     } else {
       setProblems(outcome.problems);
@@ -94,6 +117,8 @@ export function useProviderForm(options: {
   editor: ConfigEditorResponse | null;
   onSaved: (slug: string) => void;
   onDeleted: () => void;
+  /** Writes `default_provider` for a new provider made the default; resolves to an error text. */
+  assignDefault?: AssignDefault | undefined;
 }) {
   const { slug, registry, editor } = options;
   const scope = useProvidersScope();

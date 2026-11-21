@@ -108,7 +108,8 @@ export class QueueProjects {
       params.tag === undefined || params.tag.trim() === '' ? null : cleanName(params.tag);
     const color = name === null ? null : this.sharedColor(roots, name);
     for (const root of roots) {
-      const task = fields({ ...params, task: texts.get(root) ?? params.task, after });
+      const provider = this.dependencies.items.providerFor(root, params.provider);
+      const task = fields({ ...params, provider, task: texts.get(root) ?? params.task, after });
       await this.checkProject(root, params, task, moment);
     }
 
@@ -135,7 +136,13 @@ export class QueueProjects {
           let id = queueItemId(moment, randomInt(36 ** 3));
           while (used.has(id) || store.findItem(id)) id = queueItemId(moment, randomInt(36 ** 3));
           used.add(id);
-          const task = fields({ ...params, task: texts.get(root) ?? params.task, after: waits });
+          const provider = items.providerFor(root, params.provider);
+          const task = fields({
+            ...params,
+            provider,
+            task: texts.get(root) ?? params.task,
+            after: waits,
+          });
           const item = addItem(
             queue,
             { ...task, tags: taskTags.inherit(queue, own, waits) },

@@ -42,6 +42,8 @@ export interface ProviderPickerProps {
   disabled?: boolean;
   /** The slug that is in use now: marked «(current)» in the list. */
   current?: string | null;
+  /** The default provider of the project(s): marked «default» in the list. */
+  defaultSlug?: string | null;
 }
 
 function useStatusLine() {
@@ -60,11 +62,13 @@ function ProviderOption({
   provider,
   chosen,
   current,
+  isDefault,
   onSelect,
 }: {
   provider: ProviderView;
   chosen: boolean;
   current: boolean;
+  isDefault: boolean;
   onSelect: () => void;
 }) {
   const { t } = useTranslation();
@@ -82,6 +86,9 @@ function ProviderOption({
           <span className="text-xs text-muted-foreground">{provider.slug}</span>
           {current ? (
             <span className="text-xs text-muted-foreground">{t('providers.picker.current')}</span>
+          ) : null}
+          {isDefault ? (
+            <span className="text-xs text-muted-foreground">{t('providers.picker.default')}</span>
           ) : null}
         </span>
         <span
@@ -160,6 +167,7 @@ function PickerList(props: {
   onPick: (slug: string | null) => void;
   onCreate: (name: string) => void;
   current: string | null | undefined;
+  defaultSlug: string | null | undefined;
 }) {
   const { label, query, providers, value, emptyLabel, onPick } = props;
   const { t } = useTranslation();
@@ -188,6 +196,7 @@ function PickerList(props: {
               provider={provider}
               chosen={provider.slug === value}
               current={provider.slug === props.current}
+              isDefault={provider.slug === props.defaultSlug}
               onSelect={() => onPick(provider.slug)}
             />
           ))}
@@ -239,6 +248,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           <PickerList
             {...{ label, query, providers, value, emptyLabel }}
             current={props.current}
+            defaultSlug={props.defaultSlug}
             onQuery={setQuery}
             onPick={(slug) => {
               onChange(slug);

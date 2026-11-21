@@ -54,6 +54,7 @@ import {
   type WebSettings,
 } from '../types/settings.ts';
 import { defaultDefaults, type Specialist } from '../types/specialist.ts';
+import { unknownProviderMessage } from '../types/providers/provider.ts';
 
 const ROOT_KEYS = ['swarm'];
 
@@ -79,6 +80,7 @@ const SWARM_KEYS = [
   'specialists',
   'chains',
   'providers',
+  'default_provider',
   'roles',
   'pipelines',
   'actions',
@@ -188,6 +190,7 @@ function defaultConfig(): ResolvedConfig {
     specialists: [],
     chains: [],
     providers: [],
+    defaultProvider: null,
     roles: [],
     pipelines: [],
     actions: [],
@@ -254,6 +257,7 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
   if ('mcp_servers' in swarm) config.mcpServers = checkMcpCatalog(ctx, swarm.mcp_servers);
   if ('roles' in swarm) config.roles = checkRoles(ctx, swarm.roles);
   if ('providers' in swarm) config.providers = checkProviders(ctx, swarm.providers, config.roles);
+  if ('default_provider' in swarm) checkDefaultProvider(ctx, swarm.default_provider, config);
   if ('chains' in swarm) config.chains = checkChains(ctx, swarm.chains, config);
   if ('specialists' in swarm)
     config.specialists = checkSpecialists(ctx, swarm.specialists, config.defaults);
@@ -272,6 +276,17 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     checkVariantTargets(ctx, config);
   }
   return config;
+}
+
+/** The slug of `default_provider` must name a provider of the registry; the level is set by the loader. */
+function checkDefaultProvider(ctx: ValidateContext, value: unknown, config: ResolvedConfig): void {
+  const slug = readString(ctx, value, 'swarm.default_provider');
+  if (slug === null) return;
+  if (!config.providers.some((provider) => provider.slug === slug)) {
+    addError(ctx, 'swarm.default_provider', unknownProviderMessage(config, slug));
+    return;
+  }
+  config.defaultProvider = { slug, level: 'project' };
 }
 
 function checkSpecialistChains(

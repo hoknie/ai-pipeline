@@ -61,7 +61,8 @@ interface StartOptions {
   tag?: string[];
   parent?: string;
   variant?: string;
-  provider?: string;
+  /** A provider id; `false` after `--no-provider`. */
+  provider?: string | false;
   skip?: string[];
   after?: string[];
   attach?: string[];
@@ -93,7 +94,8 @@ function startParams(pipeline: string, options: StartOptions) {
     ...(options.tag !== undefined ? { tags: options.tag } : {}),
     ...(options.parent !== undefined ? { parent: options.parent } : {}),
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
-    ...(options.provider !== undefined ? { provider: options.provider } : {}),
+    ...(typeof options.provider === 'string' ? { provider: options.provider } : {}),
+    ...(options.provider === false ? { provider: null } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
     ...(links !== undefined ? { links } : {}),
@@ -104,8 +106,11 @@ function startParams(pipeline: string, options: StartOptions) {
 
 function addStart(kit: RunKit): void {
   const { print, output, examples, context, activeStyle, run } = kit;
+  const given = { provider: false, noProvider: false };
   run
     .command('start')
+    .on('option:provider', () => (given.provider = true))
+    .on('option:no-provider', () => (given.noProvider = true))
     .description(
       'Queue a pipeline task of the aip/ configuration: it goes to the end of the repository queue, a stopped queue is started',
     )
@@ -137,8 +142,9 @@ function addStart(kit: RunKit): void {
     )
     .option(
       '--provider <id>',
-      'provider of the tiers: every step on a tier runs on the model of this provider; default: none',
+      'provider of the tiers: every step on a tier runs on the model of this provider; default: the default provider of the project',
     )
+    .option('--no-provider', 'no provider, even when the configuration has a default provider')
     .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)
     .option(
       '--after <id>',
@@ -167,6 +173,9 @@ function addStart(kit: RunKit): void {
       ]),
     )
     .action(async (pipeline: string, options: StartOptions) => {
+      if (given.provider && given.noProvider) {
+        throw usage('--no-provider cannot be combined with --provider');
+      }
       const queued = (await withDuplicateHint(() =>
         call(context(), 'run', startParams(pipeline, options)),
       )) as RunQueued;

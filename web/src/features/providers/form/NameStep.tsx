@@ -138,6 +138,22 @@ export function NameStep({
           {t('providers.form.enabled')}
         </label>
       </div>
+      {isNew ? (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="provider-default"
+              checked={draft.makeDefault}
+              disabled={!draft.enabled}
+              onCheckedChange={(makeDefault) => onChange({ makeDefault })}
+            />
+            <label htmlFor="provider-default" className="cursor-pointer text-sm">
+              {t('providers.default.switch')}
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">{t('providers.default.wizardHint')}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

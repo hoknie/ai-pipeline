@@ -60,6 +60,7 @@ function taskFields(pipeline: string, options: AddOptions) {
     ...(deliveryMode !== undefined ? { deliveryMode } : {}),
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
     ...(typeof options.provider === 'string' ? { provider: options.provider } : {}),
+    ...(options.provider === false ? { provider: null } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
     ...(links !== undefined ? { links } : {}),
@@ -71,11 +72,15 @@ function taskFields(pipeline: string, options: AddOptions) {
 
 export function addAdd(kit: QueueKit): void {
   const { examples, queue, taskOptions } = kit;
+  const given = { provider: false, noProvider: false };
   taskOptions(
     queue
       .command('add')
+      .on('option:provider', () => (given.provider = true))
+      .on('option:no-provider', () => (given.noProvider = true))
       .description('Add a task to the end of the queue; it does not start the queue')
       .argument('<pipeline>', 'pipeline id from swarm.yaml')
+      .option('--no-provider', 'no provider, even when the configuration has a default provider')
       .option('--postpone', 'postpone the task: a running queue does not take it')
       .option('--allow-duplicate', ALLOW_DUPLICATE_HELP),
   )
@@ -103,6 +108,7 @@ export function addAdd(kit: QueueKit): void {
         'aip queue add feature --task "Add a login form"',
         'aip queue add feature -g g.yaml',
         'aip queue add feature --task "Fix the typo" --skip review --skip qa',
+        'aip queue add feature --task "Quick check" --no-provider',
         'aip queue add feature --task "Add the API" --after q1',
         'aip queue add feature --task "Related" --link related:#12',
         'aip queue add feature --task "Fix the layout" --attach shot.png --attach spec.pdf',
@@ -112,7 +118,12 @@ export function addAdd(kit: QueueKit): void {
         'aip queue add feature --task "Email field" --repo lib --repo web --chain --tag-all email',
       ]),
     )
-    .action((pipeline: string, options: AddOptions) => add(kit, pipeline, options));
+    .action((pipeline: string, options: AddOptions) => {
+      if (given.provider && given.noProvider) {
+        throw usage('--no-provider cannot be combined with --provider');
+      }
+      return add(kit, pipeline, options);
+    });
 }
 
 /** `aip queue add`: one project, or the same task for several. */

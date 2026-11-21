@@ -44,6 +44,16 @@ roles:
 
 A model is `<model>` or `{ model, variant, reasoning_effort }`; the options need a provider with an `opencode` route. A role the provider has no model for is an empty cell: it is not an error, `aip config check` warns about it. A model of an unknown role is an error.
 
+## Default provider
+
+`default_provider: <slug>` in `settings.yaml` names the provider a new task goes to when none is chosen. There is one value per level: the shared `settings.yaml` sets it for every project, a project `settings.yaml` replaces it. The shared value must name a shared provider; the project value any provider of the project. An unknown slug is an error at `swarm.default_provider`.
+
+```yaml
+default_provider: anthropic
+```
+
+A switched-off default provider is not used: the task stays without a provider, and `aip config check` warns. `--no-provider` (MCP and IPC `provider: null`) puts a task on no provider even when a default is set. A provider that is the default cannot be deleted; make another one the default first.
+
 ## Availability
 
 `aip provider list` and `aip provider show <slug>` show the status of a provider: `disabled`, `unavailable` or `available`. A `cli` route is available when its runtime is [switched on](runtimes.md#runtimes) (also by `AIP_<RUNTIME>_BIN`), its command is found, and the variable named in `endpoint.key_env` is set in the daemon's environment or in `runtimes.<runtime>.env`.

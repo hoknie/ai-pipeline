@@ -46,6 +46,7 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('max', 'integer', { range: MAX_RANGE }),
   field('workspace_dir', 'string'),
   field('roles', 'roles'),
+  field('default_provider', 'provider'),
   field('outside_changes', 'choice', { options: OUTSIDE_CHANGES }),
   field('defaults.runtime', 'choice', { options: RUNTIMES }),
   field('defaults.permissions', 'choice', { options: PERMISSIONS }),

@@ -126,7 +126,7 @@ export function registerQueueEdit(kit: HostKit): void {
         item,
         pipeline: z.string().optional(),
         variant,
-        provider: kit.provider.nullable(),
+        provider: kit.provider,
         task: z.string().optional(),
         groups: queueGroups.optional(),
         title: z.string().nullable().optional().describe('null removes the title'),

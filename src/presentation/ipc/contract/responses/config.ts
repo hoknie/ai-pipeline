@@ -74,6 +74,8 @@ export interface ProvidersView {
   errors: { file?: string; path: string; message: string }[];
   roles: RoleView[];
   providers: ProviderView[];
+  /** The `default_provider` setting and the level it comes from; `null` when none is set. */
+  defaultProvider: { slug: string; level: 'project' | 'global' } | null;
   matrix: MatrixCell[];
 }
 

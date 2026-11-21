@@ -57,6 +57,22 @@ export const providersRu: Dictionary['providers'] = {
   detailsEmpty: 'Выберите провайдера в списке или создайте нового.',
   globalWarning: 'Общий провайдер действует во всех репозиториях.',
   header: 'Провайдер',
+  default: {
+    mark: 'По умолчанию',
+    markShared: 'По умолчанию · общий',
+    markOff: 'Не подставляется, пока провайдер выключен',
+    switch: 'По умолчанию',
+    hint: 'Задача идёт на этого провайдера, если провайдер не выбран.',
+    sharedValue: 'Задано в общих настройках.',
+    offHint: 'Выключенный провайдер не может быть провайдером по умолчанию.',
+    confirmTitle: 'Сменить провайдера по умолчанию?',
+    confirmText: 'Провайдер по умолчанию — «{{from}}». Снять с него и назначить «{{to}}»?',
+    confirmShared:
+      'Он задан в общих настройках и остаётся по умолчанию в других проектах; у этого проекта будет свой.',
+    assign: 'Назначить',
+    wizardHint: 'Назначается после сохранения провайдера.',
+    notAssigned: 'Провайдер сохранён, но не назначен по умолчанию: {{message}}',
+  },
   chainRoles: 'Роли провайдера',
   roles: {
     models: 'Модели роли',
@@ -103,6 +119,7 @@ export const providersRu: Dictionary['providers'] = {
     deleteDescription: 'Файл провайдера будет удалён безвозвратно.',
     usedBy: 'Провайдер ещё используется:',
     refChain: 'цепочка {{chain}}, элемент {{item}}',
+    refDefault: 'настройка «провайдер по умолчанию»',
     newTitle: 'Новый провайдер',
     notFound: 'Провайдер «{{slug}}» не найден',
     preset: 'Пресет',
@@ -157,6 +174,7 @@ export const providersRu: Dictionary['providers'] = {
   },
   picker: {
     current: '(текущий)',
+    default: 'по умолчанию',
     unknown: 'неизвестный провайдер',
     search: 'Поиск: {{label}}',
     searchPlaceholder: 'Имя или slug',

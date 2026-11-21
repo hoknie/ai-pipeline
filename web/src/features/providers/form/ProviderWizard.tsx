@@ -12,12 +12,14 @@ import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import { ProviderHeader } from '../editor/ProviderHeader.tsx';
+import { useMakeDefault } from '../editor/useMakeDefault.ts';
 import { ProviderSections } from '../editor/ProviderSections.tsx';
 import { AccessStep } from './AccessStep.tsx';
 import { FORM_STEPS, type FormStep, type ProviderDraft } from './draft.ts';
 import { StepIndicator, useErrorText } from './FormParts.tsx';
 import { ModelsStep } from './ModelsStep.tsx';
 import { NameStep } from './NameStep.tsx';
+import { useDefaultProvider } from '../editor/useDefaultProvider.ts';
 import { presetDraft, type PresetId } from './presets.ts';
 import { useProviderForm, type FormProblems } from './useProviderForm.ts';
 
@@ -29,6 +31,7 @@ export function referenceText(reference: EntryReference, t: TFunction): string {
       item: (reference.item ?? 0) + 1,
     });
   }
+  if (reference.setting === 'default_provider') return t('providers.form.refDefault');
   const parts = [reference.pipeline, reference.step, reference.specialist, reference.action];
   return parts.filter((part) => part !== undefined).join(' / ');
 }
@@ -102,9 +105,10 @@ function WizardBody(
   props: Parameters<typeof ProviderWizard>[0] & {
     form: ReturnType<typeof useProviderForm>;
     errorOf: (field: string) => string | undefined;
+    onNameChange: (patch: Partial<ProviderDraft>) => void;
   },
 ) {
-  const { api, repository, slug, registry, form, errorOf } = props;
+  const { api, repository, slug, registry, form, errorOf, onNameChange } = props;
   const draft = form.draft!;
   const roles = registry?.roles ?? [];
   const sections: Record<FormStep, ReactNode> = {
@@ -113,7 +117,7 @@ function WizardBody(
         draft={draft}
         isNew={form.isNew}
         errorOf={errorOf}
-        onChange={form.setDraft}
+        onChange={onNameChange}
         onPreset={(id: PresetId) =>
           form.replaceDraft({
             ...presetDraft(
@@ -168,12 +172,15 @@ export function ProviderWizard(props: {
   const { api, repository, slug, registry, editor } = props;
   const { t } = useTranslation();
   const confirm = useConfirm();
+  const defaults = useDefaultProvider(api, repository);
   const form = useProviderForm({
     ...props,
     initial: props.initial ?? null,
     onDeleted: props.onDeleted ?? (() => {}),
+    assignDefault: defaults.assign,
   });
   const { draft } = form;
+  const onNameChange = useMakeDefault(defaults, form.setDraft, draft);
   const errorOf = useErrorText(
     Object.assign({}, ...FORM_STEPS.map((step) => form.errorsOf(step))),
     form.problems.fields,
@@ -211,10 +218,11 @@ export function ProviderWizard(props: {
           canSave={allValid}
           onSave={() => void form.save()}
           onDelete={onDelete}
+          defaults={defaults}
         />
       ) : null}
       <Problems problems={form.problems} />
-      <WizardBody {...props} form={form} errorOf={errorOf} />
+      <WizardBody {...props} form={form} errorOf={errorOf} onNameChange={onNameChange} />
       {form.isNew ? (
         <Footer
           step={form.step}

@@ -56,6 +56,22 @@ export const providersEs: Dictionary['providers'] = {
   detailsEmpty: 'Elige un proveedor de la lista o crea uno nuevo.',
   globalWarning: 'Un proveedor compartido se aplica en todos los repositorios.',
   header: 'Proveedor',
+  default: {
+    mark: 'Predeterminado',
+    markShared: 'Predeterminado · compartido',
+    markOff: 'No se usa mientras el proveedor esté desactivado',
+    switch: 'Predeterminado',
+    hint: 'La tarea va a este proveedor si no se elige otro.',
+    sharedValue: 'Definido en los ajustes compartidos.',
+    offHint: 'Un proveedor desactivado no puede ser el predeterminado.',
+    confirmTitle: '¿Cambiar el proveedor predeterminado?',
+    confirmText: 'Proveedor predeterminado — «{{from}}». ¿Quitarlo y asignar «{{to}}»?',
+    confirmShared:
+      'Está definido en los ajustes compartidos y sigue siendo el predeterminado de los otros proyectos; este proyecto tendrá el suyo.',
+    assign: 'Asignar',
+    wizardHint: 'Se asigna al guardar el proveedor.',
+    notAssigned: 'El proveedor está guardado, pero no es el predeterminado: {{message}}',
+  },
   chainRoles: 'Roles del proveedor',
   roles: {
     models: 'Modelos del rol',
@@ -101,6 +117,7 @@ export const providersEs: Dictionary['providers'] = {
     deleteDescription: 'El archivo del proveedor se elimina de forma permanente.',
     usedBy: 'El proveedor aún se usa en:',
     refChain: 'cadena {{chain}}, elemento {{item}}',
+    refDefault: 'el ajuste del proveedor predeterminado',
     newTitle: 'Nuevo proveedor',
     notFound: 'No se encuentra el proveedor «{{slug}}»',
     preset: 'Preajuste',
@@ -157,6 +174,7 @@ export const providersEs: Dictionary['providers'] = {
   },
   picker: {
     current: '(actual)',
+    default: 'predeterminado',
     unknown: 'proveedor desconocido',
     search: 'Buscar: {{label}}',
     searchPlaceholder: 'Nombre o slug',

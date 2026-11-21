@@ -241,7 +241,11 @@ aip queue edit <item> --provider anthropic
 aip queue edit <item> --no-provider                          # not chosen again
 ```
 
-`--provider <id>` (also on `aip run start`, MCP `provider`) names a [provider](../configuration/providers.md). The steps whose specialist uses a tier then run on the item of that provider. Without it the task has no provider and the tiers take their items in file order. `aip queue list` shows `provider: zai (Z.ai)`, `aip run list` shows `feature@zai`.
+`--provider <id>` (also on `aip run start`, MCP `provider`) names a [provider](../configuration/providers.md). The steps whose specialist uses a tier then run on the item of that provider. Without it a new task goes to the [default provider](../configuration/providers.md#default-provider) of the project, and with no default provider it has none and the tiers take their items in file order.
+
+`--no-provider` (also on `aip run start`, MCP and IPC `provider: null`) keeps a task without a provider even when a default is set. A task a specialist adds also takes the default provider, not the provider of its own run, and a task for several projects takes the default of each project. An edit never changes the provider by itself.
+
+`aip queue list` shows `provider: zai (Z.ai)`, `aip run list` shows `feature@zai`.
 
 - An unknown provider is refused with the list of the known ones (`anthropic (Anthropic), zai (Z.ai)`), or `known: none`; a disabled one is refused with ``provider `zai` is disabled``. A task for several projects needs the provider, enabled, in every project; the answer names the first project that lacks it, and no queue changes.
 - The provider acts only on steps that use a tier. Steps with an explicit runtime and model, other chain modes, the name generator and the observers ignore it.

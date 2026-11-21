@@ -568,7 +568,11 @@ describe('new task form', () => {
     expect(add.disabled).toBe(false);
     fireEvent.click(add);
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Build sign-in' }),
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
+        pipeline: 'feature',
+        task: 'Build sign-in',
+      }),
     );
     await screen.findByLabelText('tasks in the queue');
     await openNewTask();
@@ -641,6 +645,7 @@ describe('new task form', () => {
     fireEvent.click(add);
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         groups: [
           { title: 'Sign-in', task: 'form' },
@@ -690,6 +695,7 @@ describe('new task form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         title: 'Search',
         task: 'Search',
@@ -712,6 +718,7 @@ describe('new task form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(/unknown pipeline/);
     expect(api.queueAdd).toHaveBeenCalledWith({
+      provider: null,
       pipeline: 'feature',
       groups: [{ title: 'First line', task: 'First line\n- Markdown body' }],
     });
@@ -780,6 +787,7 @@ describe('automatic delivery switch', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Build sign-in',
         autoDeliver: false,
@@ -1570,6 +1578,7 @@ describe('tags in the queue', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Build sign-in',
         tags: ['auth', 'v2'],
@@ -1854,6 +1863,7 @@ describe('dependencies in the form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'API',
         links: [{ kind: 'blocked_by', target: 'q1' }],
@@ -2520,6 +2530,7 @@ describe('delivery mode of a task', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Build sign-in',
         deliveryMode: 'branch',
@@ -2551,7 +2562,11 @@ describe('delivery mode of a task', () => {
     fireEvent.change(text, { target: { value: 'Build' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Build' }),
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
+        pipeline: 'feature',
+        task: 'Build',
+      }),
     );
   });
 
@@ -2725,6 +2740,7 @@ describe('postponed items', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'X',
         postponed: true,
@@ -3032,6 +3048,7 @@ describe('main and properties columns of the task form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'T',
         skip: ['review', 'qa'],
@@ -3049,7 +3066,7 @@ describe('main and properties columns of the task form', () => {
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'small', task: 'T' }),
+      expect(api.queueAdd).toHaveBeenCalledWith({ provider: null, pipeline: 'small', task: 'T' }),
     );
   });
 
@@ -3093,7 +3110,7 @@ describe('main and properties columns of the task form', () => {
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'T' }),
+      expect(api.queueAdd).toHaveBeenCalledWith({ provider: null, pipeline: 'feature', task: 'T' }),
     );
   });
 
@@ -3140,6 +3157,7 @@ describe('main and properties columns of the task form', () => {
       // the task keeps only its own skip: the steps of the variant are not in it
       await waitFor(() =>
         expect(api.queueAdd).toHaveBeenCalledWith({
+          provider: null,
           pipeline: 'feature',
           variant: 'light',
           task: 'T',
@@ -3254,7 +3272,11 @@ describe('main and properties columns of the task form', () => {
       fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() =>
-        expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'T' }),
+        expect(api.queueAdd).toHaveBeenCalledWith({
+          provider: null,
+          pipeline: 'feature',
+          task: 'T',
+        }),
       );
     });
 
@@ -3433,6 +3455,7 @@ describe('parent task in the form', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Next',
         links: [{ kind: 'parent', target: 'run1' }],
@@ -3512,6 +3535,7 @@ describe('parent task in the form', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
+        provider: null,
         pipeline: 'feature',
         task: 'Next',
         links: [{ kind: 'parent', target: 'new' }],

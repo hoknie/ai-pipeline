@@ -46,7 +46,7 @@ function queueKit(program: Command, io: CliIo, style: Style) {
       )
       .option(
         '--provider <id>',
-        'provider of the tiers: every step on a tier runs on the model of this provider; default: none',
+        'provider of the tiers: every step on a tier runs on the model of this provider; default: the default provider of the project (queue add)',
       )
       .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)
       .option(

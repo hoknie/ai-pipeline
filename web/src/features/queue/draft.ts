@@ -22,6 +22,11 @@ export interface QueueDraft {
   variant: string;
   /** Id of the chosen provider of the tiers; `null`: not chosen. */
   provider: string | null;
+  /**
+   * `false`: the user has not chosen in the field, so the form follows the default provider of the
+   * project. Absent (a draft of an edit): the provider is the item's own.
+   */
+  providerTouched?: boolean;
   mode: 'task' | 'groups';
   task: string;
   groups: { title: string; task: string }[];
@@ -62,6 +67,7 @@ export function emptyDraft(pipeline = ''): QueueDraft {
     pipeline,
     variant: 'default',
     provider: null,
+    providerTouched: false,
     mode: 'task',
     task: '',
     groups: [{ title: '', task: '' }],
@@ -200,8 +206,9 @@ export function fieldsOf(
   return {
     pipeline: draft.pipeline,
     ...(allTags || draft.variant !== 'default' ? { variant: draft.variant } : {}),
-    // A returned run keeps its provider: an edit of it does not send the field.
-    ...(returned || (!allTags && draft.provider === null) ? {} : { provider: draft.provider }),
+    // A returned run keeps its provider: an edit of it does not send the field. A new task always
+    // sends it, `null` included: without the field the daemon takes the default provider.
+    ...(returned ? {} : { provider: draft.provider }),
     ...(draft.mode === 'task'
       ? { task: draft.task.trim() || title }
       : {
