@@ -9,14 +9,17 @@ import { start, queueOf, add, waitQueue } from './queue-harness.ts';
 
 /**
  * `parallel: 1`, `skipFailed`: task A fails and is skipped, task B runs and waits at gate `b`.
- * Returns the ids of both runs. The retry of A is the third call of the `code` script.
+ * Returns the ids of both runs. `retry` is the second call of A at the step `code`.
  */
 async function skippedAndRunning(
   h: Harness,
   retry: Record<string, unknown>,
   failB: Record<string, unknown> = {},
 ): Promise<{ a: string; b: string }> {
-  h.script({ code: [{ noReport: true }, { waitFor: h.gate('b'), ...failB }, retry, {}] });
+  h.script({
+    'code@A': [{ noReport: true }, retry, {}],
+    'code@B': [{ waitFor: h.gate('b'), ...failB }, {}],
+  });
   await h.call('queue_settings', { repository: h.repo, skipFailed: true });
   await add(h, 'A');
   await add(h, 'B');
@@ -110,7 +113,10 @@ describe('freezing for a priority run', () => {
 
   it('freezes nobody for a run on pause that was stopped in a full queue', async () => {
     const h = await start();
-    h.script({ code: [{ waitFor: h.gate('p') }, { waitFor: h.gate('b') }, {}] });
+    h.script({
+      'code@P': [{ waitFor: h.gate('p') }, {}],
+      'code@B': [{ waitFor: h.gate('b') }, {}],
+    });
     await add(h, 'P');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
@@ -246,7 +252,8 @@ describe('freezing for a priority run', () => {
         - { id: code, specialist: coder }
 `);
     h.script({
-      code: [{ noReport: true }, { waitFor: h.gate('b') }, { waitFor: h.gate('a') }, {}],
+      'code@A': [{ noReport: true }, { waitFor: h.gate('a') }, {}],
+      'code@B': [{ waitFor: h.gate('b') }, {}],
     });
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
     await add(h, 'A', { provider: 'zai' });

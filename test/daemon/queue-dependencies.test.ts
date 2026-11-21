@@ -100,13 +100,11 @@ describe('dependencies of queue items', () => {
 
   it('starts an independent task before a dependent one and the dependent one after delivery', async () => {
     const h = await start();
-    // A and C both run; whichever took the first action finishes first, the other one after it
+    // A and C both run; A finishes first, C after it, and B reads what A delivered
     h.script({
-      code: [
-        { ...WRITE_LIB, waitFor: h.gate('first') },
-        { waitFor: h.gate('second') },
-        { read: ['lib.ts'] },
-      ],
+      'code@A': [{ ...WRITE_LIB, waitFor: h.gate('first') }],
+      'code@C': [{ waitFor: h.gate('second') }],
+      'code@B': [{ read: ['lib.ts'] }],
     });
     const a = await add(h, 'A');
     const b = await add(h, 'B', { after: [a.item] });
@@ -130,7 +128,7 @@ describe('dependencies of queue items', () => {
 
   it('waits for apply when the predecessor is not delivered automatically', async () => {
     const h = await start();
-    h.script({ code: [WRITE_LIB, { read: ['lib.ts'] }] });
+    h.script({ 'code@A': [WRITE_LIB], 'code@B': [{ read: ['lib.ts'] }] });
     const a = await add(h, 'A', { autoDeliver: false });
     await add(h, 'B', { after: [a.item] });
     await h.call('queue_start', { repository: h.repo });

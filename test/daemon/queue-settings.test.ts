@@ -59,7 +59,7 @@ describe('queue settings', () => {
 
   it('does not lift a stop when the autopilot is turned on', async () => {
     const h = await start();
-    h.script({ code: [{ noReport: true }, {}] });
+    h.script({ 'code@A': [{ noReport: true }], 'code@B': [{}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
@@ -74,7 +74,7 @@ describe('queue settings', () => {
 
   it('does not stop on a failed run when failed runs are skipped', async () => {
     const h = await start();
-    h.script({ code: [{ noReport: true }, {}] });
+    h.script({ 'code@A': [{ noReport: true }], 'code@B': [{}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });

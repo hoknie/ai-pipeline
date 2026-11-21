@@ -108,7 +108,7 @@ describe('name of the pipeline in the queue', () => {
 describe('running the queue', () => {
   it('runs one task at a time and gives the next one the delivered result', async () => {
     const h = await start();
-    h.script({ code: [WRITE_LIB, { read: ['lib.ts'] }] });
+    h.script({ 'code@first': [WRITE_LIB], 'code@second': [{ read: ['lib.ts'] }] });
     await add(h, 'first');
     await add(h, 'second');
     await h.call('queue_start', { repository: h.repo });
@@ -190,7 +190,7 @@ describe('running the queue', () => {
 
   it('keeps running on a question to a human and goes on after the answer', async () => {
     const h = await start();
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth or password?' }, {}, {}] });
+    h.script({ 'code@A': [{ verdict: 'needs_human', feedback: 'OAuth or password?' }, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
@@ -211,7 +211,7 @@ describe('running the queue', () => {
 
   it('takes the next task when started again after a failed run', async () => {
     const h = await start();
-    h.script({ code: [{ noReport: true }, {}] });
+    h.script({ 'code@A': [{ noReport: true }, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
@@ -294,7 +294,7 @@ describe('running the queue', () => {
 
   it('stops the queue when a run started now fails', async () => {
     const h = await start();
-    h.script({ code: [{ waitFor: h.gate('never') }, { noReport: true }] });
+    h.script({ 'code@A': [{ waitFor: h.gate('never') }], 'code@C': [{ noReport: true }] });
     await add(h, 'A');
     await add(h, 'B');
     const c = await add(h, 'C');
@@ -315,7 +315,7 @@ describe('running the queue', () => {
 
   it('restores the queue after the daemon restarts and keeps watching its runs', async () => {
     const h = await start();
-    h.script({ code: [{ waitFor: h.gate('never') }, {}] });
+    h.script({ 'code@A': [{ waitFor: h.gate('never') }, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });

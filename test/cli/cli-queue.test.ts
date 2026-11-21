@@ -584,7 +584,7 @@ describe('cli', () => {
     await waitUntil('the changes of the group', async () => {
       const group = await client.callTool({
         name: 'swarm_group',
-        arguments: { run_id: runId, group: 'add-sign-in' },
+        arguments: { run_id: runId, group: 'sign-in-page' },
       });
       changes = (group.content as { text: string }[])[0]!.text;
       return changes.includes('Changes:');

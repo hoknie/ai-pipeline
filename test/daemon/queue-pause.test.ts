@@ -264,7 +264,11 @@ describe('pause a run: scenarios of the queue', () => {
 
   it('does not take the return item of a paused run by advance; run-now continues its step', async () => {
     const h = await start(PIPELINE_CONFIG);
-    h.script({ code: [{ waitFor: h.gate('a') }, { waitFor: h.gate('b') }, {}], review: [{}, {}] });
+    h.script({
+      'code@A': [{ waitFor: h.gate('a') }, {}],
+      'code@B': [{ waitFor: h.gate('b') }, {}],
+      review: [{}],
+    });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });

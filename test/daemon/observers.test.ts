@@ -257,10 +257,10 @@ describe('Pause after an observer timeout', () => {
   it('does not call the agent again during the pause, and takes the incident after it', async () => {
     const h = await startTimed();
     h.script({ code: [FAIL, {}], repair: [{ hang: true }, retry()] });
-    await configure(h, { specialist: { timeout: '1s' } });
+    await configure(h, { specialist: { timeout: '4s' } });
     const runId = await launch(h);
     await until('the repair call', () => callsOf(h).length === 1);
-    // The agent hangs until the low timeout of the profile: the repair is given back and paused.
+    // The agent hangs until the low timeout of the profile (long enough for the fake to start): the repair is given back and paused.
     const failed = await h.waitFor(
       runId,
       (view) => view.repair?.incident === null && view.repair?.repairs === 0,
@@ -284,7 +284,7 @@ describe('Pause after an observer timeout', () => {
   it('keeps a queued task waiting for the observer during the pause', async () => {
     const h = await startTimed();
     h.script({ code: [FAIL, {}], repair: [{ hang: true }, retry()] });
-    await configure(h, { specialist: { timeout: '1s' } });
+    await configure(h, { specialist: { timeout: '4s' } });
     await h.call('queue_add', {
       repository: h.repo,
       pipeline: 'feature',

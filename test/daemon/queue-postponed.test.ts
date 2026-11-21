@@ -160,7 +160,9 @@ describe('retried runs join the queue', () => {
   it('keeps both retried runs among the places and does not take tasks meanwhile', async () => {
     const h = await start();
     h.script({
-      code: [{ noReport: true }, { noReport: true }, { waitFor: h.gate('retries') }],
+      // A and B fail, their retries wait for the gate; C does its work at once
+      code: [{ noReport: true }, { waitFor: h.gate('retries') }],
+      'code@C': [{}],
     });
     await add(h, 'A');
     await add(h, 'B');

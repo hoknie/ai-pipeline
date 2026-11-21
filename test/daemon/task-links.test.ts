@@ -167,7 +167,7 @@ describe('links of tasks', () => {
   it('moves the links of an item to its run and shows the children of the run', async () => {
     const h = await start();
     try {
-      h.script({ code: [{ waitFor: h.gate('a') }, {}, {}] });
+      h.script({ 'code@A': [{ waitFor: h.gate('a') }], code: [{}] });
       const first = await add(h, 'A');
       const child = await add(h, 'B', { links: [{ kind: 'parent', target: first.item }] });
       const other = await add(h, 'C', { links: [{ kind: 'related', target: first.item }] });
@@ -190,7 +190,8 @@ describe('links of tasks', () => {
     const h = await start(PIPELINE_CONFIG);
     try {
       h.script({
-        code: [{ noReport: true }, { waitFor: h.gate('b') }, { waitFor: h.gate('a') }, {}],
+        'code@A': [{ noReport: true }, { waitFor: h.gate('a') }, {}],
+        'code@B': [{ waitFor: h.gate('b') }],
       });
       await h.call('queue_settings', { repository: h.repo, skipFailed: true });
       await add(h, 'A');
@@ -219,7 +220,8 @@ describe('links of tasks', () => {
     const h = await start(PIPELINE_CONFIG);
     try {
       h.script({
-        code: [{ noReport: true }, { waitFor: h.gate('b') }, { waitFor: h.gate('a') }, {}],
+        'code@A': [{ noReport: true }, { waitFor: h.gate('a') }, {}],
+        'code@B': [{ waitFor: h.gate('b') }],
       });
       await h.call('queue_settings', { repository: h.repo, skipFailed: true });
       await add(h, 'A');
@@ -262,7 +264,7 @@ describe('links of tasks', () => {
   it('removes blocked_by that a returned run kept from before its start', async () => {
     const h = await start(PIPELINE_CONFIG);
     try {
-      h.script({ code: [{}, { noReport: true }, { waitFor: h.gate('b') }, {}] });
+      h.script({ 'code@A': [{}], 'code@B': [{ noReport: true }, { waitFor: h.gate('b') }, {}] });
       await h.call('queue_settings', { repository: h.repo, skipFailed: true });
       const first = await add(h, 'A');
       await add(h, 'B', { after: [first.item] });
