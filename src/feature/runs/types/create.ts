@@ -198,9 +198,10 @@ export function createRun(input: NewRun): RunState {
   return state;
 }
 
-export function groupsFromTask(task: string): NewGroup[] {
+/** One group of a task: its title is the title of the run, else the first line of the task. */
+export function groupsFromTask(task: string, title?: string): NewGroup[] {
   const firstLine = task.trim().split('\n')[0] ?? '';
-  return [{ title: firstLine.slice(0, 80) || 'task', task }];
+  return [{ title: title?.trim() || firstLine.slice(0, 80) || 'task', task }];
 }
 
 function base36(value: number, width: number): string {

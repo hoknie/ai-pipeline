@@ -126,7 +126,7 @@ export class RunRequests {
       baseCommit: prepared.baseCommit,
       config,
       dirtyWarning: prepared.dirty,
-      groups: params.groups ?? groupsFromTask(params.task ?? ''),
+      groups: params.groups ?? groupsFromTask(params.task ?? '', params.title),
       split: params.task !== undefined,
       fromQueue: true,
       queueItem: queueItem.id,

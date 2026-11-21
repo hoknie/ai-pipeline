@@ -4,6 +4,7 @@ import {
   type RunState,
   GROUP_STATUSES,
   groupSlugs,
+  groupsFromTask,
   RUN_ID_LENGTH,
   runId,
   runningBySpecialist,
@@ -329,6 +330,18 @@ describe('identifiers', () => {
 
   it('suffixes duplicate titles', () => {
     expect(groupSlugs(['Логин', 'логин', 'ЛОГИН'])).toEqual(['login', 'login-2', 'login-3']);
+  });
+
+  it('titles the group of a task with the run title, else with its first line', () => {
+    const task = 'http://127.0.0.1:7341/#settings\nsecond line';
+    expect(groupsFromTask(task, 'Проектное редактирование')[0]?.title).toBe(
+      'Проектное редактирование',
+    );
+    expect(slugify(groupsFromTask(task, 'Проектное редактирование')[0]!.title)).toBe(
+      'proektnoe-redaktirovanie',
+    );
+    expect(groupsFromTask('Логин\nтело', '  ')[0]?.title).toBe('Логин');
+    expect(groupsFromTask('Логин\nтело')[0]?.title).toBe('Логин');
   });
 
   it('makes fixed-length run ids that sort by time', () => {
