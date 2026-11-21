@@ -7,7 +7,9 @@ import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { MarkdownField } from '../../../shared/ui/forms/MarkdownField.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
+import type { Api } from '../../../shared/api/api.ts';
 import { TITLE_LIMIT, type QueueDraft } from '../draft.ts';
+import { AttachmentFields } from './AttachmentFields.tsx';
 
 export type FormState = {
   idPrefix: string;
@@ -98,6 +100,8 @@ export function TaskFields(props: {
   extras?: ReactNode;
   /** The text of the task grows with the column. */
   fill?: boolean;
+  /** The files of the task go under its text; without the api there is no field. */
+  api?: Api | undefined;
 }) {
   const { t } = useTranslation();
   const { state } = props;
@@ -140,6 +144,7 @@ export function TaskFields(props: {
       ) : (
         <GroupsEditor {...state} />
       )}
+      {props.api && !state.several ? <AttachmentFields state={state} api={props.api} /> : null}
       {props.extras}
     </div>
   );

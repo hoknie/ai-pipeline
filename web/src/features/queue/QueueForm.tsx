@@ -288,7 +288,13 @@ export function QueueForm({
           fill && 'flex-1',
         )}
       >
-        <TaskFields state={state} repositoryField={repositoryField} extras={extras} fill={fill} />
+        <TaskFields
+          state={state}
+          repositoryField={repositoryField}
+          extras={extras}
+          fill={fill}
+          api={api}
+        />
         <SideFields
           {...{ state, pipelines, repository, api, linkChoices, returnedRun, projectsPanel }}
           {...{ autoDeliverDefault, deliveryModeDefault, providerError: sent.providerError }}

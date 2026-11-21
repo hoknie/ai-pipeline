@@ -1158,7 +1158,7 @@ export const en = {
       tags: 'Tags',
       sectionProjects: 'Projects',
       sectionRun: 'Run',
-      sectionFiles: 'Tags and files',
+      sectionTags: 'Tags',
       sectionDelivery: 'Delivery',
       submitShortcut: 'Ctrl/⌘+Enter — send the form',
       duplicate: 'This task already waits in the queue as {{number}}.',

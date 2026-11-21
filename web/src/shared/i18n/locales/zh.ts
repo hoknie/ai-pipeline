@@ -1132,7 +1132,7 @@ export const zh: Dictionary = {
       tags: '标签',
       sectionProjects: '项目',
       sectionRun: '运行',
-      sectionFiles: '标签和文件',
+      sectionTags: '标签',
       sectionDelivery: '交付',
       submitShortcut: 'Ctrl/⌘+Enter — 提交表单',
       duplicate: '该任务已在队列中等待：{{number}}。',

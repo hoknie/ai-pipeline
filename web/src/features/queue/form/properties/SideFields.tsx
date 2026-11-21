@@ -6,7 +6,6 @@ import type { Api } from '../../../../shared/api/api.ts';
 import type { PipelinesView } from '../../../../shared/api/types.ts';
 import { formatRoute } from '../../../../shared/lib/nav/route.ts';
 import { LinksEditor, type LinkKind, type LinkTargetGroup } from '../../../runs/index.ts';
-import { AttachmentFields } from '../AttachmentFields.tsx';
 import { DeliveryFields } from '../DeliveryFields.tsx';
 import { FormSection } from './FormSection.tsx';
 import { TagsField } from '../LinkFields.tsx';
@@ -15,7 +14,7 @@ import type { FormState } from '../TaskFields.tsx';
 
 const SECTION_LEGEND = 'mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase';
 
-/** The properties column: projects, run, links, tags with files, and delivery. */
+/** The properties column: projects, run, links, tags, and delivery. */
 export function SideFields(props: {
   state: FormState;
   pipelines: PipelinesView | null;
@@ -71,9 +70,8 @@ export function SideFields(props: {
         ) : null}
       </div>
       {state.several ? null : (
-        <FormSection title={t('queue.form.sectionFiles')}>
+        <FormSection title={t('queue.form.sectionTags')}>
           <TagsField state={state} repository={repository} api={api} />
-          {api ? <AttachmentFields state={state} api={api} /> : null}
         </FormSection>
       )}
       <FormSection title={t('queue.form.sectionDelivery')}>

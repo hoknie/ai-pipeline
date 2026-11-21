@@ -45,8 +45,8 @@ function replaceRange(
 }
 
 /**
- * A text field of Markdown with a toolbar: the switch of the display (`Plain` by default, `MD`
- * unlocks the markup buttons and the preview). Formatted text pasted into it (a page, a
+ * A text field of Markdown with a toolbar: the switch of the display (`MD` by default, `Plain`
+ * hides the markup buttons and the preview). Formatted text pasted into it (a page, a
  * document) becomes Markdown; plain text, including Markdown, is pasted as it is.
  */
 export function MarkdownField({
@@ -59,7 +59,7 @@ export function MarkdownField({
   disabled,
   grow = false,
 }: MarkdownFieldProps) {
-  const [mode, setMode] = useState<Mode>('plain');
+  const [mode, setMode] = useState<Mode>('markdown');
   const [preview, setPreview] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();

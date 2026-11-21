@@ -1182,7 +1182,7 @@ export const ru: Dictionary = {
       tags: 'Теги',
       sectionProjects: 'Проекты',
       sectionRun: 'Запуск',
-      sectionFiles: 'Теги и файлы',
+      sectionTags: 'Теги',
       sectionDelivery: 'Доставка',
       submitShortcut: 'Ctrl/⌘+Enter — отправить форму',
       duplicate: 'Такая задача уже ждёт в очереди: {{number}}.',

@@ -31,7 +31,7 @@ A task with links shows them on a second line, grouped by kind; see [Links](#lin
 
 ## The task form
 
-"New task" opens a dialog with two columns: the task on the left (repository, title, the "Task / Groups" switch, then the text or the groups) and a column of properties on the right, split into titled sections: "Projects" (only in several projects), "Run", "Links", "Tags and files" and "Delivery". On a narrow screen the columns stack.
+"New task" opens a dialog with two columns: the task on the left (repository, title, the "Task / Groups" switch, then the text or the groups, then the attachments under the text) and a column of properties on the right, split into titled sections: "Projects" (only in several projects), "Run", "Links", "Tags" and "Delivery". On a narrow screen the columns stack.
 
 **Ctrl+Enter** (⌘+Enter on macOS) adds the task from any field, like "Add".
 
@@ -77,7 +77,7 @@ The left half holds what is shared: name, pipeline and variant, text and the sha
 
 ### The text editor
 
-The text of a task and of each group has a toolbar. Its first element is the display switch `Plain` / `MD`; `Plain` is the default at every opening.
+The text of a task and of each group has a toolbar. Its first element is the display switch `Plain` / `MD`; `MD` is the default at every opening.
 
 - `MD` enables the markup buttons: heading, bold, italic, strikethrough, bulleted, numbered and task lists, quote, code, code block and link. A button wraps the selection (or the lines it touches) in the markup, and pressing it again takes the markup off.
 - "Preview" shows the text as Markdown.

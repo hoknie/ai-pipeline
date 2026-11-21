@@ -3001,7 +3001,7 @@ describe('main and properties columns of the task form', () => {
   it('titles the sections of the properties column', async () => {
     show(queueOf());
     const dialog = await openNewTask();
-    for (const name of ['Run', 'Links', 'Tags and files', 'Delivery'])
+    for (const name of ['Run', 'Links', 'Tags', 'Delivery'])
       expect(within(dialog).getByRole('group', { name })).toBeTruthy();
     expect(within(dialog).queryByRole('group', { name: 'Projects' })).toBeNull();
   });

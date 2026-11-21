@@ -1183,7 +1183,7 @@ export const es: Dictionary = {
       tags: 'Etiquetas',
       sectionProjects: 'Proyectos',
       sectionRun: 'Ejecución',
-      sectionFiles: 'Etiquetas y archivos',
+      sectionTags: 'Etiquetas',
       sectionDelivery: 'Entrega',
       submitShortcut: 'Ctrl/⌘+Enter — enviar el formulario',
       duplicate: 'Esta tarea ya espera en la cola: {{number}}.',

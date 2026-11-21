@@ -965,22 +965,40 @@ describe('markdown field of the new task', () => {
     'Link',
   ];
 
-  it('starts on Plain with the markup buttons and the preview unavailable', async () => {
+  it('starts on MD with the markup buttons and the preview available', async () => {
     const { dialog } = await openDialog();
     const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
     const first = bar.querySelector('button, [role="radio"]');
     expect(first?.textContent).toBe('Plain');
-    expect(within(bar).getByRole('radio', { name: 'Plain' }).getAttribute('aria-checked')).toBe(
+    expect(within(bar).getByRole('radio', { name: 'MD' }).getAttribute('aria-checked')).toBe(
       'true',
     );
     for (const name of [...MARKS, 'Preview']) {
       const button = within(bar).getByRole<HTMLButtonElement>('button', { name });
-      expect(button.disabled).toBe(true);
+      expect(button.disabled).toBe(false);
+    }
+    expect(bar.lastElementChild?.textContent).toBe('Preview');
+  });
+
+  it('puts the attachments right under the text of the task', async () => {
+    const { dialog } = await openDialog();
+    const area = within(dialog).getByLabelText('Task text');
+    const files = within(dialog).getByTestId('new-attachments-input');
+    expect(area.compareDocumentPosition(files) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const delivery = within(dialog).getByText('Delivery');
+    expect(files.compareDocumentPosition(delivery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('takes the markup buttons away on Plain', async () => {
+    const { dialog } = await openDialog();
+    const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
+    fireEvent.click(within(bar).getByRole('radio', { name: 'Plain' }));
+    for (const name of [...MARKS, 'Preview']) {
+      expect(within(bar).getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(true);
     }
     expect(within(bar).getByRole('button', { name: 'Bold' }).getAttribute('title')).toBe(
       'Bold (switch to MD)',
     );
-    expect(bar.lastElementChild?.textContent).toBe('Preview');
   });
 
   it('enables the buttons on MD and takes them away again on Plain from the preview', async () => {
@@ -1060,14 +1078,14 @@ describe('markdown field of the new task', () => {
     expect(within(dialog).getByText('Nothing to preview')).toBeTruthy();
   });
 
-  it('opens on Plain with the focus in the field after a preview', async () => {
+  it('opens on MD with the focus in the field after a preview', async () => {
     const { dialog } = await openDialog();
     previewMarkdown(dialog);
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
     fireEvent.click(strip().getByRole('button', { name: 'New task' }));
     const again = await screen.findByRole('dialog', { name: 'New task' });
-    expect(within(again).getByRole('radio', { name: 'Plain' }).getAttribute('aria-checked')).toBe(
+    expect(within(again).getByRole('radio', { name: 'MD' }).getAttribute('aria-checked')).toBe(
       'true',
     );
     await waitFor(() => expect(document.activeElement?.id).toBe('new-task'));
@@ -1098,7 +1116,7 @@ describe('markdown field of the new task', () => {
     previewMarkdown(second);
     expect(within(second).getByRole('heading', { name: 'Second' })).toBeTruthy();
     expect(within(first).queryByRole('heading')).toBeNull();
-    expect(within(first).getByRole('radio', { name: 'Plain' }).getAttribute('aria-checked')).toBe(
+    expect(within(first).getByRole('radio', { name: 'MD' }).getAttribute('aria-checked')).toBe(
       'true',
     );
     expect(within(first).getByLabelText<HTMLTextAreaElement>('Text of group 1').hidden).toBe(false);
@@ -1458,7 +1476,7 @@ describe('new task in several projects', () => {
       .map((group) => group.querySelector(':scope > legend')?.textContent);
     expect(titles.indexOf('Projects')).toBeGreaterThanOrEqual(0);
     expect(titles.indexOf('Projects')).toBeLessThan(titles.indexOf('Run'));
-    expect(within(dialog).queryByRole('group', { name: 'Tags and files' })).toBeNull();
+    expect(within(dialog).queryByRole('group', { name: 'Tags' })).toBeNull();
     expect(within(dialog).queryByRole('radio', { name: 'Groups' })).toBeNull();
   });
 
