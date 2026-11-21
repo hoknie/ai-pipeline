@@ -204,7 +204,7 @@ describe('the group «Swarm» of the settings', () => {
   it('shows the project specialist on the project tab', async () => {
     mount('#settings/project/swarm/specialists/coder');
     expect(await screen.findByRole('heading', { name: 'coder' })).toBeTruthy();
-    expect(screen.getByRole('combobox', { name: 'Project' })).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: 'Project' })).toBeNull();
   });
 
   it('shows the shared directory and no project selector on the shared tab', async () => {
@@ -215,10 +215,10 @@ describe('the group «Swarm» of the settings', () => {
     expect(screen.queryByRole('combobox', { name: 'Project' })).toBeNull();
   });
 
-  it('shows the level note and the project selector on the project tab', async () => {
+  it('shows the level note and no project selector on the project tab', async () => {
     mount('#settings/project/swarm/providers');
-    expect(await screen.findByRole('combobox', { name: 'Project' })).toBeTruthy();
-    const region = screen.getByRole('region', { name: 'Where the settings are saved' });
+    const region = await screen.findByRole('region', { name: 'Where the settings are saved' });
+    expect(screen.queryByRole('combobox', { name: 'Project' })).toBeNull();
     expect(within(region).getByText(/The level is chosen when saving/)).toBeTruthy();
   });
 

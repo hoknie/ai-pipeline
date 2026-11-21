@@ -101,6 +101,7 @@ function SettingsCase({
       repository={state.selected}
       repositories={state.repositories}
       onSelectRepository={(path) => void actions.switchProject(path)}
+      allProjects={panel.allProjects}
       registry={state.registry}
       onRegistry={state.setRegistry}
       onProjectMoved={actions.projectMoved}

@@ -174,6 +174,7 @@ export function SettingsRoute(props: {
   repository: string | null;
   repositories: string[];
   onSelectRepository: (path: string) => void;
+  allProjects?: boolean;
   registry: RepositoryView[];
   onRegistry: (registry: RepositoryView[]) => void;
   onProjectMoved: (from: string, to: string) => void;

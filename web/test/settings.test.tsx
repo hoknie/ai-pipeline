@@ -511,7 +511,8 @@ describe('settings page', () => {
     show(queueOf(), {}, '#settings/project/general');
     await screen.findByTestId('setting-max');
     expect(groupNames()).toEqual(PROJECT_GROUPS);
-    expect(screen.getByRole('combobox', { name: 'Project' })).toBeTruthy();
+    // a project chosen in the header: no select of the project here
+    expect(screen.queryByRole('combobox', { name: 'Project' })).toBeNull();
     expect(screen.getByText(PROJECT_FILE)).toBeTruthy();
     cleanup();
     show(queueOf(), {}, '#settings/global/general');
@@ -1550,6 +1551,7 @@ describe('project of the settings', () => {
     path,
     displayPath: path,
     addedAt: 1,
+    enabled: true,
     unfinished: 0,
     waiting: 0,
     queued: 0,
@@ -1584,7 +1586,10 @@ describe('project of the settings', () => {
     };
   }
 
+  afterEach(() => window.localStorage.removeItem('aip.web.projects.all'));
+
   it('shows the settings of another project when it is chosen', async () => {
+    window.localStorage.setItem('aip.web.projects.all', 'true');
     const api = open('#settings/project/general');
     await screen.findByTestId('setting-max');
     const { other, choose } = await openOther();
@@ -1606,6 +1611,7 @@ describe('project of the settings', () => {
   });
 
   it('asks about unsaved changes when the project is changed', async () => {
+    window.localStorage.setItem('aip.web.projects.all', 'true');
     const api = open('#settings/project/general');
     const { other, choose } = await openOther();
     fireEvent.change(await screen.findByLabelText('Parallel groups'), { target: { value: '9' } });
@@ -1630,7 +1636,7 @@ describe('settings target block', () => {
     show(queueOf(), {}, '#settings/project/general');
     await screen.findByTestId('setting-max');
     const block = within(target());
-    expect(block.getByRole('combobox', { name: 'Project' })).toBeTruthy();
+    expect(block.queryByRole('combobox', { name: 'Project' })).toBeNull();
     expect(block.getByText('/repo')).toBeTruthy();
     expect(block.getByText('Saved to')).toBeTruthy();
     expect(block.getByText(PROJECT_FILE)).toBeTruthy();
@@ -1669,7 +1675,8 @@ describe('settings target block', () => {
   it('shows the project and no file in the Tags group of Project', async () => {
     show(queueOf(), {}, '#settings/project/tags');
     await screen.findByRole('region', { name: 'Regular tags' });
-    expect(within(target()).getByRole('combobox', { name: 'Project' })).toBeTruthy();
+    expect(within(target()).queryByRole('combobox', { name: 'Project' })).toBeNull();
+    expect(within(target()).getByText('/repo')).toBeTruthy();
     expect(within(target()).queryByText('Saved to')).toBeNull();
   });
 

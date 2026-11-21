@@ -22,6 +22,20 @@ describe('selects stay controlled', () => {
     expect(screen.getByText('/work/a')).toBeTruthy();
   });
 
+  it('SettingsTarget: the project select is shown only when all projects are chosen in the header', () => {
+    const props = {
+      scope: 'project' as const,
+      repositories: ['/work/a', '/work/b'],
+      onSelectRepository: () => {},
+      file: null,
+      repository: '/work/a',
+    };
+    const view = render(<SettingsTarget {...props} allProjects={false} />);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    view.rerender(<SettingsTarget {...props} allProjects />);
+    expect(screen.getByRole('combobox')).toBeTruthy();
+  });
+
   it('DeliveryFields: unknown mode, then a known one', () => {
     const api = {} as Api;
     const onReload = () => {};

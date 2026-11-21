@@ -481,11 +481,13 @@ describe('bulk tag selection', () => {
       path,
       displayPath: path,
       addedAt: 1,
+      enabled: true,
       unfinished: 0,
       waiting: 0,
       queued: 0,
     });
     window.localStorage.setItem('aip.web.repository', JSON.stringify('/repo'));
+    window.localStorage.setItem('aip.web.projects.all', 'true');
     const lib = { ...tagView('lib-only', 'red', 'b'), repository: '/work/lib' };
     window.location.hash = '#settings/project/tags';
     render(<App api={fakeApi({ runs: vi.fn(async () => [runView()]) })} openStream={openFake} />);

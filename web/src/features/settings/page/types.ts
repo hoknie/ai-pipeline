@@ -57,6 +57,8 @@ export interface SettingsPageProps {
   /** The repositories of the panel, the choices of «Project». */
   repositories: string[];
   onSelectRepository: (path: string) => void;
+  /** The header has «All projects» chosen; the project select is shown only then. */
+  allProjects?: boolean;
   queue: QueueView | null;
   /** The queue is global: there is no queue of a project to edit. */
   globalQueue?: boolean;

@@ -50,7 +50,10 @@ export function SettingsTarget({
   file,
   note = null,
   anyProject = repositories.length > 0,
+  allProjects = true,
 }: {
+  /** The header has «All projects» chosen; only then the project is picked here. */
+  allProjects?: boolean;
   scope: SettingsScope;
   repository: string | null;
   repositories: string[];
@@ -77,22 +80,26 @@ export function SettingsTarget({
           <NoProjects anyProject={anyProject} />
         ) : (
           <div className="flex min-w-0 flex-col gap-1 sm:w-72 sm:shrink-0">
-            <Label htmlFor="settings-project">{t('settingsPage.project')}</Label>
-            <Select value={repository ?? ''} onValueChange={onSelectRepository}>
-              <SelectTrigger id="settings-project" className="w-full" title={repository ?? ''}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {repositories.map((path) => (
-                  <SelectItem key={path} value={path} title={path}>
-                    <span className="flex items-center gap-1.5">
-                      <ProjectDot path={path} />
-                      {repositoryLabel(path)}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {allProjects ? (
+              <>
+                <Label htmlFor="settings-project">{t('settingsPage.project')}</Label>
+                <Select value={repository ?? ''} onValueChange={onSelectRepository}>
+                  <SelectTrigger id="settings-project" className="w-full" title={repository ?? ''}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {repositories.map((path) => (
+                      <SelectItem key={path} value={path} title={path}>
+                        <span className="flex items-center gap-1.5">
+                          <ProjectDot path={path} />
+                          {repositoryLabel(path)}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null}
             {repository ? (
               <p className="truncate text-xs text-muted-foreground" title={repository}>
                 {repository}

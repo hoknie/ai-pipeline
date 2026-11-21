@@ -79,6 +79,7 @@ export default function SettingsPage(props: SettingsPageProps) {
               : null
         }
         anyProject={props.registry.length > 0}
+        allProjects={props.allProjects}
       />
       {scope === 'project' && repositories.length === 0 ? null : (
         <div className="grid w-full gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
