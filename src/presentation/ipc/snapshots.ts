@@ -180,7 +180,7 @@ export class Snapshots {
   /** Whether `queue_return` would take the run: something to retry, and not in its queue yet. */
   private returnable(state: RunState): boolean {
     const queue = this.services.queue.store.get(state.run.repository);
-    if (!queue) return retryableGroups(state).length > 0;
+    if (!queue) return retryableGroups(state).length > 0 && state.run.cleanedAt === null;
     return canReturn(queue, state);
   }
 }

@@ -20,7 +20,8 @@ Addresses can be shared: `#runs/<run-id>` opens a run, `#runs/<run-id>/<group>` 
 - The first row of the header summary, "Status", holds the state of the run, its delivery and the status of the open group or step.
 - The title is edited in place: Enter or leaving the field saves, Escape cancels.
 - The action row has "Deliver", "Return to the queue" and "Steps".
-- The "More" menu has "Retry failed (N)" ("Retry failed and cancelled (N)") and "Retry with current config (N)" when the run has failed or cancelled groups, then "Create subtask…", "Deliver with --force…" and "Copy run id".
+- The "More" menu has "Retry failed (N)" ("Retry failed and cancelled (N)") and "Retry with current config (N)" when the run has failed or cancelled groups, then "Create subtask…", "Deliver with --force…", "Mark as delivered…", "Clean up…" and "Copy run id".
+- "Clean up…" is for a finished run. After a confirmation it [deletes](../usage/runs.md#cleaning-up) the worktrees and internal refs of the run; the dialog warns when merged groups are not delivered, because their changes then stay in the patch only. A cleaned-up run has no retry and delivery items. It needs the same permission as cancelling.
 - "Create subtask…" opens the [task form](queue.md#the-task-form) on the repository of the run with that run as the "Parent task". The text already typed in the dialog is kept.
 - ["Retry with current config"](../usage/runs.md#retry-with-the-current-configuration) is also next to "Retry" in the "⋯" menu of a failed or cancelled group or split step. Commit message and resolver steps do not have it.
 

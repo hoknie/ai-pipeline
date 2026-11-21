@@ -14,6 +14,8 @@ export interface RunActionsApi {
   /** Switches an unfinished run to another provider of the tiers (null: none); a running step on a tier whose item changes starts again. */
   setRunProvider(runId: string, provider: string | null): Promise<RunView>;
   cancel(runId: string, group?: string): Promise<unknown>;
+  /** Removes the worktrees and service refs of a finished run; the patch, logs and the run stay. */
+  cleanRun(runId: string): Promise<{ run: RunView; removed: string[] }>;
   apply(runId: string, force: boolean): Promise<ApplyResult>;
   /** Marks merged groups delivered after the user merged them by hand; nothing is applied. */
   markDelivered(runId: string, groups?: string[]): Promise<ApplyResult>;
@@ -45,6 +47,7 @@ export function runActionsApi(): RunActionsApi {
       group
         ? post(`/api/runs/${enc(runId)}/groups/${enc(group)}/cancel`)
         : post(`/api/runs/${enc(runId)}/cancel`),
+    cleanRun: (runId) => post(`/api/runs/${enc(runId)}/clean`, {}),
     apply: (runId, force) => post(`/api/runs/${enc(runId)}/apply`, force ? { force: true } : {}),
     markDelivered: (runId, groups) =>
       post(`/api/runs/${enc(runId)}/delivered`, groups ? { groups } : {}),

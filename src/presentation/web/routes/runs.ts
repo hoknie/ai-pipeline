@@ -65,6 +65,11 @@ export function runsRoutes(kit: RouteKit): Route[] {
     },
     {
       method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/clean$`),
+      handle: ([runId]) => call('run_clean', { runId: runId ?? '' }),
+    },
+    {
+      method: 'POST',
       pattern: new RegExp(`^/api/runs/${segment}/pause$`),
       handle: ([runId]) => call('run_pause', { runId: runId ?? '' }),
     },

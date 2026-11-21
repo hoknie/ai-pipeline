@@ -12,8 +12,6 @@ import {
 } from '../../src/presentation/ipc/contract/index.ts';
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
-import { cleanRun } from '../../src/presentation/cli/local/clean.ts';
-import type { Context } from '../../src/presentation/cli/context.ts';
 import { CODE_ONLY_CONFIG, git, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
@@ -283,7 +281,7 @@ describe('step artifacts', () => {
     );
 
     await h.call('apply', { runId });
-    await cleanRun({ stateDirectory: h.state } as Context, runId, true);
+    await h.call('run_clean', { runId, all: true });
     await h.restart();
     expect(existsSync(orphan)).toBe(false);
     expect(await list(h, runId)).toHaveLength(1);

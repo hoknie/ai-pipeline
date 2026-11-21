@@ -97,6 +97,8 @@ interface Context {
 }
 
 /** The features below the runs: configuration, agents, the registry, tags and their editor. */
+const stderr = (message: string): void => console.error(`[aip] ${message}`);
+
 function createLower(context: Context) {
   const { options, environment, database, now, ports } = context;
   const { agents, providers } = createAgents(environment);
@@ -230,10 +232,10 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
               : {}),
           }
         : null,
-    log: (message) => console.error(`[aip] ${message}`),
+    log: stderr,
   });
   const queue = createQueueServices({
-    ...{ database, runs, tags, registry, config, now, attachments },
+    ...{ database, runs, tags, registry, config, now, attachments, log: stderr },
     repair: ports.repair.port,
     observe: ports.observe.port,
     publish: ports.queuePublish.port,

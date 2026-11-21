@@ -5,7 +5,7 @@ import { rejected } from '../../../platform/errors/index.ts';
 import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
-import { checkSkip } from '../../runs/types/index.ts';
+import { checkSkip, isRunFinished, type RunState } from '../../runs/types/index.ts';
 import { requireDeliveryMode, type ConfigService } from '../../swarm-config/services/index.ts';
 import {
   DEFAULT_VARIANT,
@@ -47,8 +47,10 @@ export interface QueueItemsDependencies {
   tags: TagCatalogService;
   registry: RegistryService;
   config: ConfigService;
-  runs: Pick<RunsServices, 'states' | 'engine' | 'effects'>;
+  runs: Pick<RunsServices, 'states' | 'engine' | 'effects' | 'cleanup'>;
   now: () => number;
+  /** Receives the messages of the daemon; a failed cleanup is written here. */
+  log?: (message: string) => void;
 }
 
 /** The fields of a new item without the tags, which are resolved separately. */
@@ -155,6 +157,7 @@ export class QueueItems {
     if (held && held.run.hold !== null) {
       await runs.engine.apply(held, { kind: 'hold', hold: null });
     }
+    if (held) await this.cleanReturned(held);
     for (const other of touched) {
       store.save(other);
       // An item of another project that waited for the removed one may be ready now.
@@ -163,6 +166,17 @@ export class QueueItems {
     }
     this.dependencies.links.onRemoved(params.item);
     return store.save(queue);
+  }
+
+  /** A finished returned run goes with its item: worktrees and service refs, not the branch. */
+  private async cleanReturned(state: RunState): Promise<void> {
+    if (!isRunFinished(state) || state.run.cleanedAt !== null) return;
+    try {
+      await this.dependencies.runs.cleanup.clean(state, { all: false });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.dependencies.log?.(`cleaning up run ${state.run.id} failed: ${reason}`);
+    }
   }
 
   /**

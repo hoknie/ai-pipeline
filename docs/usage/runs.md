@@ -139,7 +139,13 @@ Worktrees and internal refs are removed by themselves after delivery. To do it b
 ```sh
 aip run clean                # list finished runs that can be cleaned up
 aip run clean <run-id>       # remove the worktrees and internal refs of a finished run
+aip run clean <run-id> --all # also delete the branch aip/<run-id>
 ```
+
+- Cancelling a run deletes nothing, so you can look at its worktrees. Clean it up afterwards: `aip run clean <run-id>`, or "Clean up…" in the [panel](../web/runs.md).
+- [Removing the task](queue.md#returning-a-run) of a failed or cancelled run from the queue cleans the run up as well.
+- A cleaned-up run keeps its record, groups, logs, artifacts and [patch](../web/http-api.md#the-patch-of-a-run). It can no longer be retried, returned to the queue or delivered; the merged groups that were not delivered stay in the patch only.
+- `aip run clean <run-id>` goes through the daemon and starts it when needed; the list without an id is read without it. An active run is refused, and so is a run whose task stands in the queue: removing the task cleans it up. `aip run show --json` has `cleanedAt` and `cleanable`.
 
 ## Artifacts
 

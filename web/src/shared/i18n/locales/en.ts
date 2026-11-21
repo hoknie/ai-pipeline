@@ -746,6 +746,17 @@ export const en = {
         'The changes are not applied: mark it only when you have merged the result yourself. The run becomes finished, and the queue tasks that depend on it continue.',
       markDeliveredAction: 'Mark as delivered',
       markDeliveredKeep: 'Do not mark',
+      clean: 'Clean up…',
+      cleanTitle: 'Clean up this run?',
+      cleanDescription:
+        'The worktrees and service refs of the run are deleted. Its patch, logs, artifacts and the run itself stay; the run can no longer be retried, returned to the queue or delivered.',
+      cleanUndelivered:
+        'Some merged groups are not delivered: their changes stay only in the saved patch.',
+      cleanConfirm: 'Clean up',
+      cleanKeep: 'Keep',
+      cleaned: 'Run cleaned up',
+      cleanHint: 'Removes the worktrees and service refs of a finished run',
+      cleanQueued: 'The run is in the queue: remove its task to clean it up',
       markedDelivered: 'Marked as delivered',
       cancelAutoDelivery: 'Cancel auto delivery',
       autoDeliveryCancelled: 'Auto delivery cancelled',
@@ -1235,6 +1246,8 @@ export const en = {
       unmetTitle: 'Dependencies are not met',
       unmetText: 'The task still waits for: {{items}}. Run it anyway?',
       removeDependents: 'These tasks wait for it: {{items}}. They will stop waiting for it.',
+      removeCleans:
+        'The worktrees and service refs of this run will be deleted: the run can no longer be retried. Its patch and logs stay.',
       autoDelivery: 'auto delivery',
       skips: 'skips: {{steps}}',
       skipsTitle: 'Steps skipped by this task',

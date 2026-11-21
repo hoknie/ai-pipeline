@@ -162,6 +162,9 @@ describe('pause a run: more scenarios', () => {
     await h.call('queue_remove', { repository: h.repo, item: view.item });
     const after = (await h.status(runId)) as RunView;
     expect(after).toMatchObject({ hold: null, state: 'cancelled' });
+    expect(after.cleanedAt).toEqual(expect.any(Number));
+    expect(existsSync(join(h.repo, '.aip', 'worktrees', runId))).toBe(false);
+    expect(git(h.repo, 'for-each-ref', `refs/aip/${runId}/`)).toBe('');
     h.open('a');
   });
 

@@ -72,4 +72,6 @@ export const LATER_MIGRATIONS: string[] = [
   // the versions of registry skills fixed for a run (JSON by skill name); old rows have none
   `ALTER TABLE runs ADD COLUMN pinned_skills_json TEXT`,
   SERVICE_REGISTRY_LINKS_MIGRATION,
+  // when the worktrees and service refs of a run were removed; old rows stay NULL
+  `ALTER TABLE runs ADD COLUMN cleaned_at INTEGER`,
 ];

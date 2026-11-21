@@ -62,6 +62,7 @@ const SAMPLES: Record<Method, unknown> = {
   run_provider: { ...run, provider: 'openai' },
   apply: run,
   run_mark_delivered: run,
+  run_clean: { ...run, all: true },
   answer: { ...target, answer: 'yes' },
   message: { ...target, seq: 1, text: 'hi' },
   queue: repository,

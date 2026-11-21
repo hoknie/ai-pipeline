@@ -263,6 +263,7 @@ describe('retry every failed group', () => {
       'Add link…',
       'Deliver with --force…',
       'Mark as delivered…',
+      'Clean up…',
       'Copy run id',
     ]);
   });

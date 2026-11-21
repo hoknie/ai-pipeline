@@ -126,6 +126,12 @@ describe('cli', () => {
     await aip(box, 'run', 'cancel', runId);
     const cleaned = await aip(box, 'run', 'clean', runId, '--all');
     expect(cleaned.stdout).toContain(`removed refs/aip/${runId}/run`);
+    const shown = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
+      cleanedAt: number | null;
+      cleanable: boolean;
+    };
+    expect(shown.cleanedAt).toEqual(expect.any(Number));
+    expect(shown.cleanable).toBe(false);
     expect(
       execFileSync('git', ['for-each-ref', 'refs/aip/'], {
         cwd: box.repo,
@@ -215,6 +221,25 @@ describe('cli', () => {
     await aip(box, 'run', 'clean', first.runId);
     expect(JSON.parse((await aip(box, 'run', 'clean', '--json')).stdout)).toEqual([]);
     await aip(box, 'run', 'cancel', second.runId);
+  });
+
+  it('does not list a run whose task stands in the queue', async () => {
+    const box = sandbox();
+    writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'a', '--json')).stdout,
+    );
+    await aip(box, 'run', 'cancel', runId);
+    const before = JSON.parse((await aip(box, 'run', 'clean', '--json')).stdout) as {
+      id: string;
+    }[];
+    expect(before.map((run) => run.id)).toEqual([runId]);
+
+    expect((await aip(box, 'queue', 'return', runId)).code).toBe(0);
+    expect(JSON.parse((await aip(box, 'run', 'clean', '--json')).stdout)).toEqual([]);
+    const refused = await aip(box, 'run', 'clean', runId);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain('run is in the queue; remove its task to clean it up');
   });
 
   it('checks the configuration, prints CLI versions and warns about full permissions', async () => {

@@ -169,7 +169,7 @@ export function createRun(input: NewRun): RunState {
       config,
       dirtyWarning: input.dirtyWarning,
       nextMergeSeq: 0,
-      ...{ pendingDelivery: null, remoteBranch: null },
+      ...{ pendingDelivery: null, remoteBranch: null, cleanedAt: null },
       title: input.title?.trim() || null,
       name: input.title?.trim() ? runName(input.title) : null,
       namingUsage: null,

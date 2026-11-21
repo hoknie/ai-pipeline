@@ -4,6 +4,7 @@ import {
   type RunRequests,
 } from '../../../feature/runs/services/index.ts';
 
+import { rejected } from '../../../platform/errors/index.ts';
 import { visible } from './access/visible.ts';
 import { authorParam } from './access/author.ts';
 import type { HandlerTable, IpcContext } from './types.ts';
@@ -84,6 +85,15 @@ export const runHandlers = {
     })),
   retry: async (params, { services, snapshots }) =>
     snapshots.run(await services.queue.control.retry(params)),
+  run_clean: (params, { services, snapshots }) =>
+    services.runs.engine.serial(async () => {
+      const state = services.runs.states.get(params.runId);
+      if (snapshots.run(state).queueItem !== null) {
+        throw rejected('run is in the queue; remove its task to clean it up');
+      }
+      const removed = await services.runs.cleanup.clean(state, { all: params.all ?? false });
+      return { run: snapshots.run(state), removed };
+    }),
   run_title: (params, { services, snapshots }) =>
     services.runs.engine.serial(async () =>
       snapshots.run(await services.runs.requests.setTitle(params.runId, params.title)),

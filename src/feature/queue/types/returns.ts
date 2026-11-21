@@ -76,6 +76,7 @@ export function returnRun(queue: Queue, state: RunState, id: string, now: number
   if (retryableGroups(state).length === 0) {
     throw rejected('run has no failed or cancelled groups');
   }
+  if (state.run.cleanedAt !== null) throw rejected('run is cleaned up');
   if (queue.runs.includes(run)) throw rejected('run already holds a place in the queue');
   if (queue.items.some((item) => item.run === run)) {
     throw rejected('run is already in the queue');
@@ -92,6 +93,7 @@ export function canReturn(queue: Queue, state: RunState): boolean {
   const id = state.run.id;
   return (
     retryableGroups(state).length > 0 &&
+    state.run.cleanedAt === null &&
     !queue.runs.includes(id) &&
     !queue.items.some((item) => item.run === id)
   );

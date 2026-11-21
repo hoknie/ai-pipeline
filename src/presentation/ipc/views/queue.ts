@@ -48,6 +48,7 @@ import {
   serviceStatus,
   systemGroups,
 } from './rows.ts';
+import { itemRunMarks } from './cleanup/index.ts';
 import { deliveryStage } from './runs.ts';
 import { tagViews } from './tags.ts';
 
@@ -293,7 +294,7 @@ export function queueView(
       createdAt: item.createdAt,
       error: item.error,
       run: item.run,
-      hold: (item.run === null ? undefined : lookup(item.run)?.run.hold) ?? null,
+      ...itemRunMarks(item, lookup),
       attachments:
         item.run === null
           ? attachments(item.id)

@@ -51,6 +51,7 @@ A reverse proxy in front of the panel must pass WebSocket upgrades. `aip events 
 | `POST /api/runs/<id>/cancel`, `POST /api/runs/<id>/pause` | Cancels or pauses a run |
 | `POST /api/runs/<id>/apply` | Delivers groups |
 | `POST /api/runs/<id>/delivered` | Marks groups as delivered |
+| `POST /api/runs/<id>/clean` | Removes the worktrees and internal refs of a finished run |
 | `POST /api/runs/<id>/observer` | Allows or forbids observers in a run |
 | `GET /api/runs/<id>/patch` | Downloads the patch of the run |
 
@@ -59,6 +60,7 @@ A reverse proxy in front of the panel must pass WebSocket upgrades. `aip events 
   - `limit` is an integer from 1 to 100 (15 by default). `before` is the `next` of the previous page; leave it out for the first page. `next` is `null` on the last page.
   - A `limit` out of range, a `before` that is not a cursor or a `repository` that is not an absolute path is answered with 400.
 - `POST /api/runs/<id>/title` takes `{"title": "<new title>"}` (trimmed, 1 to 60 characters) and returns the run. The short `name` stays, and a later answer of the naming model does not replace the title. An empty or too long title comes back with code 400, an unknown run with code 404.
+- `POST /api/runs/<id>/clean` takes no body and returns `{run, removed}`: the run (with `cleanedAt` set) and the list of removed directories, refs and branches. It keeps the visible branch `aip/<id>`. A second call is accepted and keeps the time. An active run and a run whose task stands in the queue come back with code 400, an unknown one with code 404.
 - `POST /api/runs/<id>/skip` takes `{"step": "<step id>", "skip": true}` (`false` brings it back) and returns the run. A refusal (unknown step, a step every group has passed) comes back with code 400.
 - `POST /api/runs/<id>/observer` takes `{"enabled": <boolean>}` and returns the run. `false` stops the repair in progress and forbids observers in this task; `true` gives it back and resets the repair count. A wrong body comes back with code 400, an unknown run with code 404.
 

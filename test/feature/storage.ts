@@ -83,7 +83,9 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
 
 /** Takes away the columns of the newest migrations (the variants and the take filter), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
-  // The newest migration adds the versions of the registry skills of a run.
+  // The newest migration adds the cleanup time of a run.
+  dropColumn(database, 'runs', 'cleaned_at');
+  // The one before adds the versions of the registry skills of a run.
   dropColumn(database, 'runs', 'pinned_skills_json');
   // The one before adds the attempts of webhook deliveries and the failures of a subscription.
   database.exec('DROP TABLE IF EXISTS notification_attempts');

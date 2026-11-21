@@ -1,8 +1,10 @@
 import { existsSync } from 'node:fs';
 
 import { databasePath } from '../platform/paths/index.ts';
+import { hasRunLeftovers } from '../platform/git/index.ts';
 import { Database } from '../platform/sqlite/index.ts';
-import { createRunArchive, type RunArchive } from '../feature/runs/services/index.ts';
+import { queuedRunIds } from '../feature/queue/services/index.ts';
+import { cleanPlanOf, createRunArchive, type RunArchive } from '../feature/runs/services/index.ts';
 import type { ProviderState } from '../feature/agents/types/index.ts';
 import type { RunState } from '../feature/runs/types/index.ts';
 import type {
@@ -18,6 +20,10 @@ export interface Maintenance {
   loadRun(runId: string): RunState | undefined;
   /** Finished runs, the latest finished first; none when the database does not exist yet. */
   finishedRuns(): RunState[];
+  /** The runs whose return item stands in a queue: removing the task cleans them up. */
+  queuedRuns(): Set<string>;
+  /** Whether the run still has a worktree, service refs or group branches to clean. */
+  hasLeftovers(state: RunState): Promise<boolean>;
   close(): void;
 }
 
@@ -39,6 +45,8 @@ export function openMaintenance(stateDirectory: string): Maintenance {
   return {
     loadRun: (runId) => open().archive.load(runId),
     finishedRuns: () => (opened || existsSync(path) ? open().archive.finishedRuns() : []),
+    queuedRuns: () => (opened || existsSync(path) ? queuedRunIds(open().database) : new Set()),
+    hasLeftovers: (state) => hasRunLeftovers(cleanPlanOf(state, false)),
     close: () => opened?.database.close(),
   };
 }

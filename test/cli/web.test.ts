@@ -329,6 +329,31 @@ describe('aip web', () => {
     expect(((await missing.json()) as { error: string }).error).toContain('unknown group');
   });
 
+  it('cleans a finished run up through the API and refuses an unknown run', async () => {
+    const { h, web, base } = await setup();
+    h.script({ code: [{ exitCode: 1, noReport: true }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.groups[0]?.status === 'failed');
+    const post = (id: string) =>
+      fetch(`${base}/api/runs/${id}/clean`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: '{}',
+      });
+    expect((await post('nope')).status).toBe(404);
+    const cleaned = await post(runId);
+    expect(cleaned.status).toBe(200);
+    const body = (await cleaned.json()) as { run: RunView; removed: string[] };
+    expect(body.run).toMatchObject({ id: runId, cleanable: false });
+    expect(body.run.cleanedAt).toEqual(expect.any(Number));
+    expect(body.removed.length).toBeGreaterThan(0);
+    expect(existsSync(join(h.repo, '.aip', 'worktrees', runId))).toBe(false);
+  });
+
   it('passes refreshConfig of a retry to the daemon', async () => {
     const { h, web, base } = await setup();
     h.script({ code: [{ exitCode: 1, noReport: true }] });

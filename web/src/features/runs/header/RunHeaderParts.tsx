@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '../../../shared/ui/overlays/dropdown-menu.tsx';
 import type { useRetryFailed, useRunDelivery, useRunHold, useRunObserver } from './useRunHeader.ts';
+import { CleanMenuItem, type useRunCleanup } from './cleanup/index.ts';
 import { pushFailed } from './delivery.ts';
 
 type Repair = ReturnType<typeof repairOf>;
@@ -138,6 +139,7 @@ export function MoreMenu({
   run,
   retry,
   delivery,
+  cleanup,
   onSubtask,
   onAddLink,
   onChangeVariant,
@@ -146,6 +148,7 @@ export function MoreMenu({
   run: RunView;
   retry: ReturnType<typeof useRetryFailed>;
   delivery: ReturnType<typeof useRunDelivery>;
+  cleanup: ReturnType<typeof useRunCleanup>;
   onSubtask: ((run: RunView) => void) | undefined;
   onAddLink?: (() => void) | undefined;
   /** Opens the choice of another variant; undefined: the run has no other variant or is finished. */
@@ -200,6 +203,7 @@ export function MoreMenu({
         >
           {t('runs.header.markDelivered')}
         </DropdownMenuItem>
+        <CleanMenuItem cleanup={cleanup} />
         <DropdownMenuItem
           onSelect={() => {
             void navigator.clipboard?.writeText(run.id);

@@ -15,6 +15,7 @@ import {
   registryProjectResolved,
   reportAttempt,
 } from './answers.ts';
+import { cleanRunMark, markCleanedByEffects, rejectCleaned } from './cleanup/index.ts';
 import { afterDeliveryDone, markDelivered } from './delivery-checks.ts';
 import {
   advanceChecks,
@@ -47,6 +48,7 @@ function updateFinished(state: RunState, now: number): void {
 type Handlers = { [K in Event['kind']]: (m: Ctx, event: Extract<Event, { kind: K }>) => void };
 
 function deliveryRequested(m: Ctx, event: Extract<Event, { kind: 'deliver_requested' }>): void {
+  rejectCleaned(m, 'deliver');
   const retry = retryPush(m.state, event.groups);
   if (retry !== null) {
     m.effects.push(...retry);
@@ -105,6 +107,7 @@ const HANDLERS: Handlers = {
   message: (m, e) => messageAttempt(m, e.group, e.seq, e.text),
   cancel: (m, e) => cancelGroups(m, e.group, e.reason),
   retry: (m, e) => {
+    rejectCleaned(m, 'retry');
     retryGroup(m, e.group, e.permissions, e.specialists);
     if (e.hold !== undefined) m.state.run.hold = e.hold;
   },
@@ -128,6 +131,7 @@ const HANDLERS: Handlers = {
   repair_start: (m, e) => repairStart(m, e.incident, e.specialist),
   repair_allowed: (m, e) => repairAllowed(m, e.allowed),
   skills_pinned: (m, e) => pinSkills(m, e.pins),
+  clean: cleanRunMark,
   interrupted: (m) => interrupted(m),
 };
 
@@ -187,5 +191,6 @@ export function transition(state: RunState, event: Event, now: number): Effect[]
   if (state.run.finishedAt !== null && retryableGroups(state).length === 0 && !keepHold) {
     state.run.hold = null;
   }
+  markCleanedByEffects(m, m.effects);
   return m.effects;
 }

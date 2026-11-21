@@ -63,6 +63,8 @@ export interface QueueItemView {
   error: string | null;
   /** A returned run: taking the item retries it; null for a new task. */
   run: string | null;
+  /** Removing the item cleans the run up: it is finished and not cleaned up yet. */
+  cleansRun: boolean;
   /** Hold of the run of a returned item; null for a new task and for a run without a hold. */
   hold: RunHold | null;
   /** Files attached to the task; a returned run shows those of the run. */

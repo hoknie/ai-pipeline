@@ -224,8 +224,10 @@ export function addClean(kit: RunKit): void {
         return;
       }
       if (options.json) throw usage('--json lists runs and cannot be used with a <run-id>');
-      const { cleanRun } = await import('../local/clean.ts');
-      for (const removed of await cleanRun(context(), runId, options.all ?? false))
-        print(`removed ${removed}`);
+      const result = (await call(context(), 'run_clean', {
+        runId,
+        ...(options.all ? { all: true } : {}),
+      })) as { removed: string[] };
+      for (const removed of result.removed) print(`removed ${removed}`);
     });
 }

@@ -32,6 +32,11 @@ export interface QueueServices {
   links: TaskLinks;
 }
 
+/** The runs whose return item stands in a queue, read from the database without a daemon. */
+export function queuedRunIds(database: Database): Set<string> {
+  return new Set(new QueueRepository(database, new TaskLinksRepository(database)).queuedRunIds());
+}
+
 export function createQueueServices(dependencies: {
   database: Database;
   runs: RunsServices;
@@ -43,6 +48,7 @@ export function createQueueServices(dependencies: {
   repair: RepairPolicyPort;
   observe: QueueObservePort;
   publish: QueuePublishPort;
+  log?: (message: string) => void;
 }): QueueServices {
   const { database, runs, attachments, tags, registry, config, now } = dependencies;
   const linksTable = new TaskLinksRepository(database);
@@ -72,6 +78,7 @@ export function createQueueServices(dependencies: {
     config,
     runs,
     now,
+    ...(dependencies.log ? { log: dependencies.log } : {}),
   };
   const items = new QueueItems(shared);
   const projects = new QueueProjects({

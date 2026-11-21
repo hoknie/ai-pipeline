@@ -58,6 +58,7 @@ import {
   waitingTopology,
   type WaitOf,
 } from './run-stages.ts';
+import { cleanMarks } from './cleanup/index.ts';
 import { tagViews } from './tags.ts';
 
 /**
@@ -170,7 +171,8 @@ export function withQueue(view: RunView, item: string | null): RunView {
       : view.finished
         ? 'queued'
         : view.state;
-  return { ...view, queueItem: item, state };
+  // the task of the run stays in the queue: the run is cleaned up by removing it
+  return { ...view, queueItem: item, state, cleanable: false };
 }
 
 /** Marks the view with the links of the run. */
@@ -239,6 +241,7 @@ function runHead(state: RunState, observers: RepairPolicy) {
     baseCommit: state.run.baseCommit,
     fromQueue: state.run.fromQueue,
     returnable: false,
+    ...cleanMarks(state),
     // The queue is unknown here: the daemon fills it in with `withQueue`.
     queueItem: null,
     // The links are unknown here: the daemon fills them in with `withLinks`.

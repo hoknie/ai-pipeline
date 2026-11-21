@@ -141,6 +141,8 @@ export type Event =
   | { kind: 'repair_allowed'; allowed: boolean }
   /** Versions of registry skills chosen for an attempt; a name the run already has keeps its first version. */
   | { kind: 'skills_pinned'; pins: Record<string, PinnedSkill> }
+  /** The worktrees and service refs of a finished run are removed; the machine only marks the run. */
+  | { kind: 'clean' }
   | { kind: 'interrupted' };
 
 /** What a transition works on: the run, the clock, the collected effects and two flags. */

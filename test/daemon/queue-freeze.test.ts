@@ -74,6 +74,21 @@ describe('freezing for a priority run', () => {
     await h.waitFor(b, (view) => view.finished);
   });
 
+  it('refuses to remove the item of an unfinished frozen run and cleans nothing up', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
+    const returned = (await h.call('queue_return', { runId: a })) as QueueView;
+    const item = returned.items[0]!;
+    expect(item).toMatchObject({ run: b, hold: 'frozen', cleansRun: false });
+    await expect(h.call('queue_remove', { repository: h.repo, item: item.id })).rejects.toThrow(
+      'a frozen run stays in the queue; continue or cancel it',
+    );
+    expect(await h.status(b)).toMatchObject({ hold: 'frozen', cleanedAt: null });
+    expect(existsSync(join(h.repo, '.aip', 'worktrees', b))).toBe(true);
+    h.open('a');
+    h.open('b');
+  });
+
   it('keeps a frozen run that failed while finishing its step first in the queue and retries it later', async () => {
     const h = await start();
     const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') }, { noReport: true });

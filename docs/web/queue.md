@@ -14,7 +14,7 @@ Drag a task by its handle to reorder it, or use `Alt+↑` / `Alt+↓`. The row a
 
 - "Edit" (while the form is open it is "Cancel");
 - ["Postpone"](../usage/queue.md#postponed-tasks): it stays pressed while the task is postponed, and pressing it again puts the task back;
-- "Remove";
+- "Remove". For the task of a finished run the confirmation says that the worktrees and internal refs of the run will be [deleted](../usage/runs.md#cleaning-up) and the run cannot be retried afterwards;
 - "Run now" ("Continue" on a paused or frozen task). Its tooltip carries the warning about [freezing](../usage/queue.md#freezing).
 
 "Run now" on a task that is not ready asks to confirm "Dependencies are not met" and lists them.

@@ -158,6 +158,10 @@ export const runsRequests = [
     }),
   }),
   z.object({
+    method: z.literal('run_clean'),
+    params: z.object({ runId: z.string().min(1), all: z.boolean().optional() }),
+  }),
+  z.object({
     method: z.literal('run_title'),
     params: z.object({ runId: z.string().min(1), title: titleSchema }),
   }),

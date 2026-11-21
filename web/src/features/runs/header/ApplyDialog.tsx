@@ -15,6 +15,31 @@ import {
 } from '../../../shared/ui/overlays/dialog.tsx';
 import { Skeleton } from '../../../shared/ui/feedback/skeleton.tsx';
 
+/** The forced delivery of the header: open while `delivery.forcing` is set. */
+export function ForceDeliverDialog({
+  run,
+  api,
+  delivery,
+}: {
+  run: RunView;
+  api: Api;
+  delivery: {
+    forcing: boolean;
+    setForcing: (on: boolean) => void;
+    apply: (force: boolean) => Promise<void>;
+  };
+}) {
+  if (!delivery.forcing) return null;
+  return (
+    <ApplyDialog
+      run={run}
+      api={api}
+      onConfirm={() => void delivery.apply(true)}
+      onClose={() => delivery.setForcing(false)}
+    />
+  );
+}
+
 /** Confirms `apply --force`, listing why each pending group was refused and its files. */
 export function ApplyDialog({
   run,

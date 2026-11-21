@@ -25,6 +25,7 @@ import {
   pauseQueue,
   problemKeys,
   removeItem,
+  returnRun,
   runDone,
   setParallel,
   setQueueSettings,
@@ -1663,6 +1664,16 @@ describe('can return', () => {
     const merged = mergedRun('b', false);
     group(merged).delivery = { ...group(merged).delivery, state: 'apply_failed' };
     expect(canReturn(queue, merged)).toBe(false);
+  });
+
+  it('is false for a cleaned-up run, which cannot be returned to the queue', () => {
+    const failed = failedRun('a');
+    const queue = emptyQueue('/repo', 1);
+    expect(canReturn(queue, failed)).toBe(true);
+    failed.run.cleanedAt = 5;
+    expect(canReturn(queue, failed)).toBe(false);
+    expect(() => returnRun(queue, failed, 'item', 6)).toThrow('run is cleaned up');
+    expect(queue.items).toEqual([]);
   });
 
   it('is false for a run that holds a place or is already an item', () => {

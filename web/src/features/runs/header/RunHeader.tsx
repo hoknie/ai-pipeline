@@ -24,7 +24,8 @@ import {
   useRunTags,
 } from './useRunHeader.ts';
 
-import { ApplyDialog } from './ApplyDialog.tsx';
+import { ForceDeliverDialog } from './ApplyDialog.tsx';
+import { useRunCleanup } from './cleanup/index.ts';
 import { useRunProviderSwitch } from './provider/index.ts';
 import { useRunVariantSwitch } from './variant/index.ts';
 import { useAccess } from '../../../shared/lib/access/useAccess.ts';
@@ -109,6 +110,7 @@ export function RunHeader({
   const retry = useRetryFailed(run, api, onError);
   const access = useAccess(api, run.repository);
   const delivery = useRunDelivery(run, api, onError, onDeliver, access);
+  const cleanup = useRunCleanup(run, api, onError, access);
   const [linksOpen, setLinksOpen] = useState(false);
   const variantSwitch = useRunVariantSwitch(run, api);
   const providerSwitch = useRunProviderSwitch(run, api);
@@ -131,6 +133,7 @@ export function RunHeader({
               run={run}
               retry={retry}
               delivery={delivery}
+              cleanup={cleanup}
               onSubtask={onSubtask}
               onAddLink={linkChoices ? () => setLinksOpen(true) : undefined}
               onChangeVariant={variantSwitch.open}
@@ -157,14 +160,7 @@ export function RunHeader({
       />
       {variantSwitch.dialog}
       {providerSwitch.dialog}
-      {delivery.forcing ? (
-        <ApplyDialog
-          run={run}
-          api={api}
-          onConfirm={() => void delivery.apply(true)}
-          onClose={() => delivery.setForcing(false)}
-        />
-      ) : null}
+      <ForceDeliverDialog run={run} api={api} delivery={delivery} />
     </header>
   );
 }

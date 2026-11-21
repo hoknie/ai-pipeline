@@ -55,6 +55,7 @@ const VIEW: QueueView & { item: string } = {
       createdAt: 1,
       error: null,
       run: null,
+      cleansRun: false,
       hold: null,
       attachments: [],
     },

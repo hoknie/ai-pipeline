@@ -205,6 +205,10 @@ export interface RunView {
   fromQueue: boolean;
   /** The run can go back to its queue: it has failed or cancelled groups and is not in the queue. */
   returnable: boolean;
+  /** When the worktrees and service refs were removed; `null`: not cleaned up. */
+  cleanedAt: number | null;
+  /** The run is finished and not cleaned up yet: `run_clean` takes it. */
+  cleanable: boolean;
   /** Id of the queue item that retries the run when taken; null when the run has none. */
   queueItem: string | null;
   /** Links where the run is the source. */

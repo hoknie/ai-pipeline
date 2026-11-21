@@ -115,10 +115,10 @@ const retryable = (status: string) => status === 'failed' || status === 'cancell
 export function useRetryFailed(run: RunView, api: Api, onError: OnError) {
   const { t } = useTranslation();
   const [retrying, setRetrying] = useState<'plain' | 'refresh' | null>(null);
-  const failed: { slug: string; title: string; status: string }[] = run.groups.filter((group) =>
-    retryable(group.status),
-  );
-  if (run.split && retryable(run.split.status)) {
+  // A cleaned-up run has no worktrees left: nothing can be retried.
+  const failed: { slug: string; title: string; status: string }[] =
+    run.cleanedAt !== null ? [] : run.groups.filter((group) => retryable(group.status));
+  if (run.cleanedAt === null && run.split && retryable(run.split.status)) {
     failed.unshift({ slug: '_split', title: t('runs.header.split'), status: run.split.status });
   }
   const hasCancelled = failed.some((group) => group.status === 'cancelled');

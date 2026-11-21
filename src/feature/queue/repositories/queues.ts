@@ -33,6 +33,14 @@ export class QueueRepository {
     return rows.map((row) => this.hydrateQueue(row));
   }
 
+  /** The runs that a return item of some queue refers to. */
+  queuedRunIds(): string[] {
+    const rows = this.database
+      .prepare('SELECT DISTINCT run_id FROM queue_items WHERE run_id IS NOT NULL')
+      .all() as Row[];
+    return rows.map((row) => String(row.run_id));
+  }
+
   /** The largest task number among the queue items of the repository; 0 when none. */
   maxItemNumber(repository: string): number {
     const row = this.database

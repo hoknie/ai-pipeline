@@ -89,6 +89,44 @@ describe('the audit journal of the server mode', () => {
     h.open('hold');
   });
 
+  it('records the cleanup of a run with `all`, and refuses it without the right to cancel', async () => {
+    const h = await start(true);
+    const alice = await signIn(h, 'alice@corp.com');
+    const viewer = await signIn(h, 'viewer@corp.com');
+    await as(h, undefined, 'users_set', {
+      email: 'viewer@corp.com',
+      attributes: { role: ['viewer'] },
+    });
+    h.script({ code: [{ waitFor: h.gate('hold') }, {}] });
+    await as(h, alice, 'run', { repository: h.repo, pipeline: 'feature', task: 'work' });
+    await until(
+      'the run',
+      async () => ((await as(h, alice, 'status', {})) as RunView[]).length === 1,
+    );
+    const runId = ((await as(h, alice, 'status', {})) as RunView[])[0]!.id;
+    await as(h, alice, 'cancel', { runId });
+    await h.waitFor(runId, (run) => run.finished);
+
+    await expect(as(h, viewer, 'run_clean', { runId })).rejects.toMatchObject({
+      remoteCode: 'access.denied',
+    });
+    expect((await h.status(runId)).cleanedAt).toBeNull();
+
+    await as(h, alice, 'run_clean', { runId, all: true });
+    const entries = await journal(h, { action: 'run.clean' });
+    expect(entries.map((entry) => [entry.outcome, entry.subject])).toEqual([
+      ['ok', alice],
+      ['denied', viewer],
+    ]);
+    expect(entries[0]).toMatchObject({
+      action: 'run.clean',
+      resourceKind: 'run',
+      resourceId: runId,
+      details: { all: true },
+    });
+    h.open('hold');
+  });
+
   it('records a refused call as denied, and the shared level apart from the project', async () => {
     const h = await start(true);
     const bob = await signIn(h, 'bob@corp.com');

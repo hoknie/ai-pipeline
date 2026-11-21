@@ -70,6 +70,8 @@ export interface Run {
   pendingDelivery: PendingDelivery | null;
   /** The branch `aip/<run>` in the remote repository once it is sent there; `null` before. */
   remoteBranch: RemoteBranch | null;
+  /** When the worktrees and service refs of the run were removed; `null`: not cleaned up. */
+  cleanedAt: number | null;
   /** Short title in the language of the task; null until known. */
   title: string | null;
   /** English kebab-case name, like the name of an OpenSpec change. */

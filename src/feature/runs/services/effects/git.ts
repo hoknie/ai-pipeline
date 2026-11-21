@@ -1,5 +1,4 @@
 import {
-  cleanRun,
   commitAll,
   commitMessage,
   commitResolve,
@@ -8,7 +7,6 @@ import {
   git,
   mergeBranch,
   prepareResolve,
-  runWorktreeRoot,
   updateFromBranch,
   type GroupChange,
 } from '../../../../platform/git/index.ts';
@@ -24,11 +22,12 @@ import {
   type RunState,
 } from '../../types/index.ts';
 
+import { removeRunFiles } from '../cleanup/index.ts';
 import type { ActionRunner } from './actions.ts';
 import { purgeGroupConversations } from './conversations.ts';
 import type { EffectDependencies } from './context.ts';
 import type { OutsideChanges } from './outside.ts';
-import { ensureGroupWorktree, resolveWorktree, workspaceOf, worktreePath } from './worktrees.ts';
+import { ensureGroupWorktree, resolveWorktree, worktreePath } from './worktrees.ts';
 
 function groupChanges(state: RunState, slugs: string[]): GroupChange[] {
   return state.groups
@@ -199,15 +198,7 @@ export class GitEffects {
     // The refs the patch is built from go away with the cleanup.
     await this.dependencies.diff.savePatch(state);
     try {
-      await cleanRun({
-        repository: state.run.repository,
-        root: runWorktreeRoot(workspaceOf(state), state.run.id),
-        runBranch: deliveryBranch(state.run),
-        groupBranches: [],
-        refPrefix: `refs/aip/${state.run.id}/`,
-        all: false,
-        active: false,
-      });
+      await removeRunFiles(state, false);
     } catch {
       return;
     }

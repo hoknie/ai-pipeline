@@ -1145,6 +1145,27 @@ describe('items', () => {
     await screen.findByText('The queue is empty');
   });
 
+  it('warns that the removal cleans a returned run up, and not for a plain task', async () => {
+    const [plain, returned] = items('A', 'B');
+    const api = show(queueOf({ items: [plain!, { ...returned!, run: 'run1', cleansRun: true }] }), {
+      queueRemove: vi.fn(async () => queueOf()),
+    });
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const [first, second] = screen.getAllByRole('button', { name: 'Remove' });
+    fireEvent.click(first!);
+    const plainDialog = await screen.findByRole('alertdialog');
+    expect(plainDialog.textContent).not.toContain('worktrees');
+    fireEvent.click(within(plainDialog).getByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    fireEvent.click(second!);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain(
+      'The worktrees and service refs of this run will be deleted',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(api.queueRemove).toHaveBeenCalledWith('q2'));
+  });
+
   it('runs now and links the run', async () => {
     const api = show(queueOf({ items: items('A') }));
     await screen.findByRole('list', { name: 'tasks in the queue' });

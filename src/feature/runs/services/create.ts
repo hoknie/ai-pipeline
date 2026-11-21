@@ -27,6 +27,7 @@ import {
 import { RunArchive } from './archive.ts';
 import type { EffectTimings } from './effects/context.ts';
 import { RunEffects } from './effects/effects.ts';
+import { RunCleanup } from './cleanup/index.ts';
 import { RunEngine } from './engine.ts';
 import { RunReads } from './reads.ts';
 import { RunRequests } from './requests.ts';
@@ -67,6 +68,7 @@ export interface RunsServices {
   effects: RunEffects;
   requests: RunRequests;
   reads: RunReads;
+  cleanup: RunCleanup;
 }
 
 export function createRunsServices(dependencies: RunsDependencies): RunsServices {
@@ -109,6 +111,7 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
     effects,
     requests: new RunRequests({ states, engine, effects, registry, config, now }),
     reads: new RunReads({ states, effects, agents }),
+    cleanup: new RunCleanup({ engine, diff: dependencies.diff }),
   };
 }
 

@@ -8,6 +8,21 @@ export function groupsText(count: number, t: TFunction): string {
   return t('queue.list.groups', { count });
 }
 
+/** The warnings of the removal dialog: waiting tasks and a run that goes with the item. */
+export function removeNotes(item: QueueItemView, waiting: QueueItemView[], t: TFunction): string {
+  const notes = [
+    ...(waiting.length > 0
+      ? [
+          t('queue.list.removeDependents', {
+            items: waiting.map((other) => itemLabel(other, t)).join(', '),
+          }),
+        ]
+      : []),
+    ...(item.cleansRun ? [t('queue.list.removeCleans')] : []),
+  ];
+  return notes.join('\n\n');
+}
+
 export function itemLabel(item: QueueItemView, t: TFunction): string {
   if (item.title) return item.title;
   if (item.groups) return groupsText(item.groups.length, t);

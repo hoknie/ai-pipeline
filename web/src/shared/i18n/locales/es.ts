@@ -759,6 +759,17 @@ export const es: Dictionary = {
         'Los cambios no se aplican: márquela solo si ya fusionó el resultado usted mismo. La ejecución pasa a terminada y las tareas de la cola que dependen de ella continúan.',
       markDeliveredAction: 'Marcar como entregado',
       markDeliveredKeep: 'No marcar',
+      clean: 'Limpiar…',
+      cleanTitle: '¿Limpiar esta ejecución?',
+      cleanDescription:
+        'Se eliminan los worktrees y las referencias de servicio de la ejecución. El parche, los registros, los artefactos y la propia ejecución se conservan; ya no se podrá reintentar, devolver a la cola ni entregar.',
+      cleanUndelivered:
+        'Algunos grupos fusionados no están entregados: sus cambios solo quedan en el parche guardado.',
+      cleanConfirm: 'Limpiar',
+      cleanKeep: 'Conservar',
+      cleaned: 'Ejecución limpiada',
+      cleanHint: 'Elimina los worktrees y las referencias de servicio de una ejecución terminada',
+      cleanQueued: 'La ejecución está en la cola: elimine su tarea para limpiarla',
       markedDelivered: 'Marcado como entregado',
       cancelAutoDelivery: 'Cancelar la entrega automática',
       autoDeliveryCancelled: 'Entrega automática cancelada',
@@ -1260,6 +1271,8 @@ export const es: Dictionary = {
       unmetTitle: 'Las dependencias no se han cumplido',
       unmetText: 'La tarea aún espera a: {{items}}. ¿Ejecutarla de todos modos?',
       removeDependents: 'Estas tareas dependen de ella: {{items}}. Dejarán de esperarla.',
+      removeCleans:
+        'Se eliminarán los worktrees y las referencias de servicio de esta ejecución: ya no se podrá reintentar. El parche y los registros se conservan.',
       autoDelivery: 'entrega automática',
       skips: 'sin etapas: {{steps}}',
       skipsTitle: 'Etapas que omite esta tarea',

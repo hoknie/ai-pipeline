@@ -298,9 +298,9 @@ describe('return a run to the queue', () => {
     await h.waitFor(runId, (view) => view.state === 'finished');
   });
 
-  it('sends a run event when the return item is removed or run now takes it', async () => {
+  it('sends a run event when the return item is removed: the run is cleaned up', async () => {
     const h = await start();
-    h.script({ code: [{ noReport: true }, { waitFor: h.gate('taken') }] });
+    h.script({ code: [{ noReport: true }] });
     const runId = await failedRun(h);
     const events: RunView[] = [];
     const ended = subscribe(h.socket, (line) => {
@@ -313,10 +313,26 @@ describe('return a run to the queue', () => {
     await until('the queued event', () => last()?.state === 'queued');
     await h.call('queue_remove', { repository: h.repo, item: first.item });
     await until('the event after remove', () => last()?.queueItem === null);
-    expect(last()).toMatchObject({ state: 'failed', returnable: true });
+    expect(last()).toMatchObject({ state: 'failed', returnable: false, cleanable: false });
+    expect(last()?.cleanedAt).toEqual(expect.any(Number));
+    await h.close();
+    current = null;
+    await ended;
+  });
 
+  it('sends a run event when run now takes the return item', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, { waitFor: h.gate('taken') }] });
+    const runId = await failedRun(h);
+    const events: RunView[] = [];
+    const ended = subscribe(h.socket, (line) => {
+      const event = streamEventSchema.parse(JSON.parse(line));
+      if (event.event === 'run' && event.run.id === runId)
+        events.push(event.run as unknown as RunView);
+    });
+    const last = () => events.at(-1);
     const second = (await h.call('queue_return', { runId })) as QueueView & { item: string };
-    await until('queued again', () => last()?.queueItem === second.item);
+    await until('queued', () => last()?.queueItem === second.item);
     await h.call('queue_run_now', { repository: h.repo, item: second.item });
     await until(
       'the event after run now',

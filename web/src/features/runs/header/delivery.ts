@@ -2,7 +2,9 @@ import type { ApplyResult, RunView } from '../../../shared/api/types.ts';
 
 /** Whether merged groups wait for delivery and none is being delivered now. */
 export function canDeliver(run: RunView): boolean {
-  return run.delivery.merged > run.delivery.applied && !run.delivery.inProgress;
+  return (
+    run.cleanedAt === null && run.delivery.merged > run.delivery.applied && !run.delivery.inProgress
+  );
 }
 
 /** The branch of the delivery did not reach the remote repository: `apply` sends it again. */

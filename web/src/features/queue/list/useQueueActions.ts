@@ -7,7 +7,7 @@ import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import type { QueueItemView, QueueView } from '../../../shared/api/types.ts';
 import type { QueueDraft } from '../QueueForm.tsx';
 import { dependents, unmet } from './links.tsx';
-import { itemLabel } from './itemText.ts';
+import { itemLabel, removeNotes } from './itemText.ts';
 import type { ItemScope } from './itemScope.ts';
 import type { QueueNotice } from './useQueueOrder.ts';
 
@@ -84,15 +84,10 @@ export function useQueueActions(
 
   const remove = async (item: QueueItemView) => {
     const waiting = dependents(scope.queueOf(item), item.id);
+    const notes = removeNotes(item, waiting, t);
     const yes = await confirm({
       title: t('queue.list.removeTitle', { item: itemLabel(item, t) }),
-      ...(waiting.length > 0
-        ? {
-            description: t('queue.list.removeDependents', {
-              items: waiting.map((other) => itemLabel(other, t)).join(', '),
-            }),
-          }
-        : {}),
+      ...(notes !== '' ? { description: notes } : {}),
       confirmLabel: t('queue.list.remove'),
       cancelLabel: t('queue.list.keep'),
       destructive: true,

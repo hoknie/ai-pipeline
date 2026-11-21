@@ -11,6 +11,7 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
     }),
   },
   cancel: { action: 'run.cancel', info: runWith('group') },
+  run_clean: { action: 'run.clean', info: runWith('all') },
   retry: { action: 'run.retry', info: runWith('group', 'refreshConfig') },
   run_skip: { action: 'run.skip', info: runWith('step') },
   run_variant: { action: 'run.variant', info: runWith('variant') },
