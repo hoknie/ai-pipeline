@@ -55,7 +55,7 @@ export class QueueRepository {
   dropFilterTag(repository: string, id: string): void {
     this.database
       .prepare(
-        `UPDATE queues SET filter_json = json_set(filter_json, '$.tags', (SELECT json_group_array(value) FROM json_each(filter_json, '$.tags') WHERE value <> ?))
+        `UPDATE queues SET filter_json = json_set(filter_json, '$.tags', json((SELECT json_group_array(value) FROM json_each(filter_json, '$.tags') WHERE value <> ?)))
          WHERE repository = ? AND EXISTS (SELECT 1 FROM json_each(filter_json, '$.tags') WHERE value = ?)`,
       )
       .run(id, repository, id);
