@@ -90,10 +90,9 @@ describe('the script of an action draft', () => {
 });
 
 describe('the form of an action', () => {
-  it('creates a command action on the chosen level', async () => {
+  it('creates a command action in the project, with no level to choose', async () => {
     const writeAction = saved();
     render(<Page api={api({ writeAction })} start="new" />);
-    fireEvent.click(await screen.findByRole('radio', { name: 'Global' }));
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'lint' } });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lint' } });
     fireEvent.change(screen.getByLabelText('Script'), { target: { value: 'npm run lint' } });
@@ -105,8 +104,9 @@ describe('the form of an action', () => {
       'lint',
       { name: 'Lint', run: 'npm run lint', timeout: 120, on_failure: 'continue' },
       null,
-      'global',
+      'project',
     ]);
+    expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
   });
 
   it('creates a specialist action in the project', async () => {
@@ -271,5 +271,72 @@ describe('the form of an action', () => {
     const alert = await screen.findByText('must not be empty');
     const editor = screen.getByLabelText('Script').closest('[data-testid="code-editor"]')!;
     expect(editor.parentElement!.contains(alert)).toBe(true);
+  });
+});
+
+describe('a shared action in the project', () => {
+  const shared = actionEntry('notify', { specialist: 'writer', additional_prompt: 'Hi' }, 'global');
+  const mountShared = (overrides: Partial<Api> = {}) => {
+    const built = api({
+      config: vi.fn(async () => configView({ specialists, actions: [shared], pipelines: [] })),
+      ...overrides,
+    });
+    render(<Page api={built} start="notify" />);
+    return built;
+  };
+
+  it('is view only: fields are off, no Save, no Delete, no level switch', async () => {
+    const built = mountShared();
+    expect(await screen.findByText(/view only here/)).toBeTruthy();
+    for (const field of screen.getAllByRole('textbox')) {
+      expect((field as HTMLInputElement).disabled).toBe(true);
+    }
+    for (const name of ['Save', 'Delete', 'Discard changes']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
+    expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
+    expect(built.writeAction).not.toHaveBeenCalled();
+    expect(built.deleteAction).not.toHaveBeenCalled();
+  });
+
+  it('is copied into the project by «Override in the project»', async () => {
+    const writeAction = saved();
+    mountShared({ writeAction });
+    fireEvent.click(await screen.findByRole('button', { name: 'Override in the project' }));
+    await waitFor(() => expect(writeAction).toHaveBeenCalledTimes(1));
+    expect(lastValue(writeAction)).toEqual([
+      'notify',
+      { specialist: 'writer', additional_prompt: 'Hi' },
+      null,
+      'project',
+    ]);
+  });
+
+  it('shows the switch of levels only for an action with both files, and the shared one is view only', async () => {
+    const both = {
+      ...actionEntry('notify', { specialist: 'writer' }, 'project_over_global'),
+      sources: {
+        project: {
+          file: '/repo/aip/actions/notify.yaml',
+          revision: 'p',
+          raw: { specialist: 'writer' },
+        },
+        global: {
+          file: '/xdg/aip/actions/notify.yaml',
+          revision: 'g',
+          raw: { specialist: 'coder' },
+        },
+      },
+    };
+    const built = api({
+      config: vi.fn(async () => configView({ specialists, actions: [both], pipelines: [] })),
+    });
+    render(<Page api={built} start="notify" />);
+    expect(await screen.findByRole('button', { name: 'Remove the override' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Global' }));
+    expect(await screen.findByText(/view only here/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove the override' })).toBeNull();
+    expect(built.writeAction).not.toHaveBeenCalled();
   });
 });

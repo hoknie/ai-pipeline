@@ -55,6 +55,14 @@ export const providersEs: Dictionary['providers'] = {
   search: 'Buscar proveedor',
   detailsEmpty: 'Elige un proveedor de la lista o crea uno nuevo.',
   globalWarning: 'Un proveedor compartido se aplica en todos los repositorios.',
+  sharedReadOnly:
+    'Un proveedor compartido aquí es solo de lectura. Anúlelo en el proyecto para cambiarlo en este proyecto, o edítelo en Ajustes para todos los repositorios.',
+  override: 'Anular en el proyecto',
+  overrideStrips:
+    'La copia del proyecto no tiene command ni args: un archivo de proyecto no puede ejecutar sus propios programas.',
+  removeOverride: 'Quitar la anulación',
+  editInSettings: 'Editar en Ajustes',
+  cellShared: 'Proveedor compartido: anúlelo en el proyecto para cambiar el modelo.',
   header: 'Proveedor',
   default: {
     mark: 'Predeterminado',
@@ -115,6 +123,9 @@ export const providersEs: Dictionary['providers'] = {
     delete: 'Eliminar',
     deleteTitle: '¿Eliminar el proveedor «{{name}}»?',
     deleteDescription: 'El archivo del proveedor se elimina de forma permanente.',
+    removeOverrideTitle: '¿Quitar la anulación de «{{name}}»?',
+    removeOverrideDescription:
+      'Se elimina el archivo del proyecto del proveedor; el compartido se mantiene.',
     usedBy: 'El proveedor aún se usa en:',
     refChain: 'cadena {{chain}}, elemento {{item}}',
     refDefault: 'el ajuste del proveedor predeterminado',

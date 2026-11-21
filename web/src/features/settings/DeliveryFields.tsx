@@ -51,7 +51,7 @@ export function Toggle({
 }
 
 /**
- * «Auto delivery» and «Delivery mode». A write goes to the file the value comes from. The values
+ * «Auto delivery» and «Delivery mode». A write always goes to the project file; a value that comes from the shared file is only shown. The values
  * come from `config` (read once by the page); with `effective` (the queue) they follow the queue,
  * which is updated by events, and `null` there means that the configuration is not valid.
  */
@@ -70,22 +70,19 @@ export function DeliveryFields({
 }) {
   const { t } = useTranslation();
   const source = config ?? undefined;
-  const auto = useGeneralSetting(api, 'delivery.auto', source, onReload);
-  const mode = useSetting<string>(api, 'delivery.mode', 'string', source, onReload);
+  const auto = useGeneralSetting(api, 'delivery.auto', source, onReload, true);
+  const mode = useSetting<string>(api, 'delivery.mode', 'string', source, onReload, true);
   const invalid = effective
     ? effective.autoDeliver === null || effective.deliveryMode === null
     : config !== null && config.errors.length > 0;
   const invalidTitle = invalid ? t('queue.settings.autoDeliverInvalid') : undefined;
   const checked = effective ? effective.autoDeliver === true : auto.value;
   const shownMode = effective ? effective.deliveryMode : mode.value;
-  const savedTo = (setting: { level: 'global' | 'project'; file: string | null }) =>
+  const savedTo = (setting: { overridden: boolean; file: string | null }) =>
     setting.file
-      ? t(
-          setting.level === 'project'
-            ? 'queue.settings.savedToProject'
-            : 'queue.settings.savedToGlobal',
-          { file: setting.file },
-        )
+      ? t(setting.overridden ? 'queue.settings.savedToProject' : 'queue.settings.inheritedShared', {
+          file: setting.file,
+        })
       : null;
   return (
     <>

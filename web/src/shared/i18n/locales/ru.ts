@@ -1020,7 +1020,7 @@ export const ru: Dictionary = {
       autoDeliver: 'Автодоставка',
       autoDeliverHint: 'Действует на задачи без своей автодоставки в момент их старта.',
       savedToProject: 'Сохраняется в файл проекта: {{file}}',
-      savedToGlobal: 'Сохраняется в общий файл: {{file}}',
+      inheritedShared: 'Взято из общего файла; изменение сохранится в файл проекта: {{file}}',
       autoDeliverInvalid: 'Конфигурация не проходит проверку',
       deliveryMode: 'Способ доставки',
       deliveryModeHint:
@@ -1709,6 +1709,8 @@ export const ru: Dictionary = {
       reread: 'Перечитать действие',
       usedBy: 'Действие ещё указано здесь:',
       projectHint: 'Действие записывается в проект; общее с тем же id остаётся.',
+      sharedReadOnly:
+        'Общее действие здесь только для просмотра. Переопределите его в проекте, чтобы изменить для этого проекта.',
       name: 'Название',
       kind: 'Тип',
       command: 'Команда',
@@ -1927,7 +1929,6 @@ export const ru: Dictionary = {
       conflict: 'Конфликт: {{message}}. Файл изменили после того, как вы открыли форму.',
       save: 'Сохранить',
       overrideInProject: 'Переопределить в проекте',
-      makeGlobal: 'Сделать общим',
       saveAs: 'Сохранить как…',
       createCopy: 'Создать копию',
     },
@@ -2128,7 +2129,8 @@ export const ru: Dictionary = {
         project_over_global: 'Проект поверх общего',
       },
     },
-    swarmNoteProject: 'Уровень сохранения выбирается при записи: проект или общий.',
+    swarmNoteProject:
+      'Всё здесь сохраняется в проект. Общие записи только для просмотра: переопределите их в проекте или измените на вкладке «Общие».',
     group: {
       integrations: 'Интеграции',
       swarm: 'Рой',

@@ -15,18 +15,25 @@ function mount(props: {
   preset?: string | null;
   overrides?: Parameters<typeof fakeApi>[0];
   files?: Record<string, Record<string, unknown>>;
+  /** The level of the files: the project scope may write only «project». */
+  level?: 'global' | 'project';
 }) {
   counter += 1;
   const files = props.files ?? {};
   const roles = [roleView('think'), roleView('code')];
   const providers = Object.keys(files).map((slug) =>
-    providerView(slug, { name: String(files[slug]?.name ?? slug) }),
+    providerView(slug, {
+      name: String(files[slug]?.name ?? slug),
+      level: props.level ?? 'project',
+    }),
   );
   const api = fakeApi({
     providers: vi.fn(async () => providersView({ roles, providers })),
     config: vi.fn(async () =>
       configView({
-        providers: Object.entries(files).map(([slug, raw]) => editorProvider(slug, raw)),
+        providers: Object.entries(files).map(([slug, raw]) =>
+          editorProvider(slug, raw, props.level ?? 'project'),
+        ),
       }),
     ),
     ...props.overrides,
@@ -66,7 +73,20 @@ describe('the form of a new provider', () => {
     expect(call[0]).toBe('zai-glm');
     expect(call[1]).toEqual({ name: 'Z.ai GLM', access: [{ kind: 'cli', runtime: 'claude' }] });
     expect(call[2]).toBeNull();
+    // the project scope writes a new provider at the project level, with no choice
+    expect(call[3]).toBe('project');
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith(null));
+  });
+
+  it('shows the level of the scope instead of a choice, and no command and args', async () => {
+    mount({ selected: 'new', preset: 'gemini' });
+    await screen.findByLabelText('Name');
+    expect((screen.getByLabelText('Level') as HTMLInputElement).value).toBe('Project');
+    expect(screen.queryByRole('combobox', { name: 'Level' })).toBeNull();
+    next();
+    await screen.findByText('Access 1');
+    expect(screen.queryByLabelText('command')).toBeNull();
+    expect(screen.queryByLabelText('args')).toBeNull();
   });
 
   it('refuses a slug that is taken', async () => {
@@ -203,7 +223,7 @@ describe('the form of an existing provider', () => {
     const header = await screen.findByRole('toolbar', { name: 'Provider' });
     expect(within(header).getByRole('heading', { level: 2, name: 'Z.ai' })).toBeTruthy();
     expect(within(header).getByText('zai').tagName).toBe('CODE');
-    expect(within(header).getByText('Shared')).toBeTruthy();
+    expect(within(header).getByText('Project')).toBeTruthy();
     expect(within(header).getByText('Available')).toBeTruthy();
     expect(within(header).getByRole('button', { name: 'Save' })).toBeTruthy();
     expect(within(header).getByRole('button', { name: 'Delete' })).toBeTruthy();
@@ -233,7 +253,7 @@ describe('the form of an existing provider', () => {
       'zai',
       { name: 'Z.ai 2', access: [{ kind: 'cli', runtime: 'claude' }] },
       'zai-r1',
-      'global',
+      'project',
     ]);
   });
 
@@ -244,7 +264,9 @@ describe('the form of an existing provider', () => {
     fireEvent.click(
       within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
     );
-    await waitFor(() => expect(api.deleteProvider).toHaveBeenCalledWith('zai', 'zai-r1', 'global'));
+    await waitFor(() =>
+      expect(api.deleteProvider).toHaveBeenCalledWith('zai', 'zai-r1', 'project'),
+    );
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith(null));
   });
 
@@ -268,5 +290,41 @@ describe('the form of an existing provider', () => {
     );
     expect(await screen.findByText('chain thinking, item 2')).toBeTruthy();
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe('a shared provider in the project scope', () => {
+  const shared = {
+    zai: {
+      name: 'Z.ai',
+      access: [{ kind: 'cli', runtime: 'opencode', command: 'opencode', args: ['run'] }],
+    },
+  };
+
+  it('is view only: fields are off, no Save and no Delete', async () => {
+    const { api } = mount({ selected: 'zai', files: shared, level: 'global' });
+    const form = await screen.findByRole('form', { name: 'Provider form' });
+    expect(within(form).getByRole('status', { name: '' }).textContent).toMatch(/view only/);
+    expect(form.querySelector('fieldset')?.disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Edit in Settings' }).getAttribute('href')).toContain(
+      '#settings/global/swarm/providers/zai',
+    );
+    expect(api.writeProvider).not.toHaveBeenCalled();
+    expect(api.deleteProvider).not.toHaveBeenCalled();
+  });
+
+  it('is copied by «Override in the project» without command and args', async () => {
+    const { api } = mount({ selected: 'zai', files: shared, level: 'global' });
+    await screen.findByText(/leaves? out|no command and args/i);
+    fireEvent.click(await screen.findByRole('button', { name: 'Override in the project' }));
+    await waitFor(() => expect(api.writeProvider).toHaveBeenCalledTimes(1));
+    expect(api.writeProvider).toHaveBeenCalledWith(
+      'zai',
+      { name: 'Z.ai', access: [{ kind: 'cli', runtime: 'opencode' }] },
+      null,
+      'project',
+    );
   });
 });

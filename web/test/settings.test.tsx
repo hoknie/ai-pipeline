@@ -120,7 +120,7 @@ describe('queue settings block', () => {
     );
   });
 
-  it('writes delivery.auto to the global settings when auto delivery is turned off', async () => {
+  it('writes delivery.auto to the project settings when auto delivery is turned off', async () => {
     const api = show(queueOf({ autoDeliver: true }));
     const block = await settingsBlock();
     const toggle = await waitFor(() => {
@@ -133,7 +133,7 @@ describe('queue settings block', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     fireEvent.click(toggle);
     await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, null, 'project'),
     );
     act(() => {
       stream().open();
@@ -176,11 +176,15 @@ describe('queue settings block', () => {
     );
   });
 
-  it('shows the shared file for a value that is not in the project file', async () => {
+  it('says that a value not in the project file comes from the shared one', async () => {
     show(queueOf({ autoDeliver: true }));
     const block = await settingsBlock();
     await waitFor(() =>
-      expect(block.getAllByText('Saved to the shared file: /xdg/aip/settings.yaml').length).toBe(2),
+      expect(
+        block.getAllByText(
+          'Taken from the shared file; a change is saved to the project file: /repo/aip/settings.yaml',
+        ).length,
+      ).toBe(2),
     );
   });
 
@@ -198,7 +202,7 @@ describe('delivery mode in the queue settings', () => {
   const settingsBlock = async () =>
     within(await screen.findByRole('region', { name: 'queue settings' }));
 
-  it('shows the mode and writes delivery.mode to the global settings', async () => {
+  it('shows the mode and writes delivery.mode to the project settings', async () => {
     const api = show(queueOf({ deliveryMode: 'worktree' }));
     const block = await settingsBlock();
     const select = await waitFor(() => {
@@ -210,7 +214,7 @@ describe('delivery mode in the queue settings', () => {
     fireEvent.keyDown(select, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: 'Commit' }));
     await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'commit', 'g1', 'global'),
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'commit', null, 'project'),
     );
     act(() => {
       stream().open();
@@ -279,16 +283,16 @@ describe('delivery mode in the queue settings', () => {
   });
 
   it('toggling auto delivery then choosing a mode writes both without conflict', async () => {
-    let revision = 'g1';
+    let revision = 'p1';
     const api = show(queueOf({ autoDeliver: true, deliveryMode: 'worktree' }), {
       config: vi.fn(async () =>
         configView({
-          settingsFiles: { ...settingsFiles, global: { ...settingsFiles.global, revision } },
+          settingsFiles: { ...settingsFiles, project: { ...settingsFiles.project, revision } },
         }),
       ),
       writeSetting: vi.fn(async () => {
-        revision = 'g2';
-        return { ok: true as const, revision: 'g2' };
+        revision = 'p2';
+        return { ok: true as const, revision: 'p2' };
       }),
     });
     const block = await settingsBlock();
@@ -302,28 +306,28 @@ describe('delivery mode in the queue settings', () => {
     const reads = vi.mocked(api.config).mock.calls.length;
     fireEvent.click(toggle);
     await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'p1', 'project'),
     );
     await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
     await pick('Branch');
     await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'branch', 'g2', 'global'),
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'branch', 'p2', 'project'),
     );
   });
 
   it('shows a write conflict and writes the next time with the re-read revision', async () => {
-    let revision = 'g1';
+    let revision = 'p1';
     const writeSetting = vi
       .fn()
       .mockImplementationOnce(async () => {
-        revision = 'g3';
+        revision = 'p3';
         return { ok: false as const, reason: 'conflict' as const, message: 'changed' };
       })
-      .mockImplementation(async () => ({ ok: true as const, revision: 'g4' }));
+      .mockImplementation(async () => ({ ok: true as const, revision: 'p4' }));
     const api = show(queueOf({ deliveryMode: 'worktree' }), {
       config: vi.fn(async () =>
         configView({
-          settingsFiles: { ...settingsFiles, global: { ...settingsFiles.global, revision } },
+          settingsFiles: { ...settingsFiles, project: { ...settingsFiles.project, revision } },
         }),
       ),
       writeSetting,
@@ -335,7 +339,7 @@ describe('delivery mode in the queue settings', () => {
     await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
     await pick('Branch');
     await waitFor(() =>
-      expect(writeSetting).toHaveBeenLastCalledWith('delivery.mode', 'branch', 'g3', 'global'),
+      expect(writeSetting).toHaveBeenLastCalledWith('delivery.mode', 'branch', 'p3', 'project'),
     );
   });
 });

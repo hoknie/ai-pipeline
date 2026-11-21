@@ -86,7 +86,7 @@ export function useEditorDerived(
   const file = levelView(specialist, level);
   const initial = useMemo(() => draftOf(file.raw), [file.raw]);
   // a shared (global) specialist is view only; the project override is how to change it
-  const readOnly = Boolean(locked) || (Boolean(specialist) && level === 'global' && !sharedOnly);
+  const readOnly = Boolean(locked) || (level === 'global' && !sharedOnly);
   const dirty = !sameDraft(draft, initial) || (!specialist && slug !== '');
   useEffect(() => {
     onDirty(dirty);

@@ -39,9 +39,13 @@ export interface CellProps {
 /** The model of a role at a provider as text. */
 function ReadOnlyCell({ cell, role, provider }: Pick<CellProps, 'cell' | 'role' | 'provider'>) {
   const { t } = useTranslation();
+  const scope = useProvidersScope();
   const model = cell?.model?.model ?? '';
   return (
     <span
+      title={
+        scope === 'project' && provider.level === 'global' ? t('providers.cellShared') : undefined
+      }
       data-empty={model === '' ? 'true' : undefined}
       aria-label={`${role.name} × ${provider.name}`}
       className="min-w-40 text-sm text-muted-foreground"

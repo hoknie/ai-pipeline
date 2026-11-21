@@ -1,7 +1,7 @@
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, ProviderView } from '../../../shared/api/types.ts';
 import { editFailure } from '../matrix/useCellWrite.ts';
-import { sourceOf, type ProvidersScope, type Raw } from '../page/sources.ts';
+import { writableSourceOf, type ProvidersScope, type Raw } from '../page/sources.ts';
 
 const isRaw = (value: unknown): value is Raw =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -59,7 +59,7 @@ export async function clearHolders(
 ): Promise<Removal> {
   const cleared: string[] = [];
   for (const holder of holders) {
-    const source = sourceOf(
+    const source = writableSourceOf(
       editor.providers.find((item) => item.slug === holder.slug),
       scope,
     );

@@ -38,14 +38,13 @@ export interface HeaderProps {
   canSave: boolean;
   /** Which copy buttons are offered. */
   overrideInProject: boolean;
-  makeGlobal: boolean;
   canRemove: boolean;
   removeBlocked: boolean;
   removeBlockedReason: string;
   removeLabel: string;
   onLevel: (level: WriteLevel) => void;
   onSave: () => void;
-  onCopyTo: (level: WriteLevel) => void;
+  onOverride: () => void;
   onSaveAs: () => void;
   onRemove: () => void;
 }
@@ -83,13 +82,8 @@ export function SpecialistHeader(props: HeaderProps) {
           </Button>
         )}
         {props.overrideInProject ? (
-          <Button variant="outline" disabled={busy} onClick={() => props.onCopyTo('project')}>
+          <Button variant="outline" disabled={busy} onClick={props.onOverride}>
             {t('settings.editor.overrideInProject')}
-          </Button>
-        ) : null}
-        {props.makeGlobal ? (
-          <Button variant="outline" disabled={busy} onClick={() => props.onCopyTo('global')}>
-            {t('settings.editor.makeGlobal')}
           </Button>
         ) : null}
         {specialist && !readOnly ? (

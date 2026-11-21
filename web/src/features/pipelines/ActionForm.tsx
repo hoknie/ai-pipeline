@@ -90,7 +90,7 @@ export function ActionForm(props: ActionEditorInput & { notice: string | null; l
     >
       <ActionHeader action={action} editor={editor} locked={locked} />
       <ActionNotices editor={editor} view={view} notice={notice} />
-      {locked ? null : (
+      {locked || !editor.bothLevels ? null : (
         <>
           <ToggleGroup
             type="single"
@@ -103,18 +103,16 @@ export function ActionForm(props: ActionEditorInput & { notice: string | null; l
             <ToggleGroupItem value="project">{t('settings.editor.project')}</ToggleGroupItem>
             <ToggleGroupItem value="global">{t('settings.editor.global')}</ToggleGroupItem>
           </ToggleGroup>
-          <p className="text-sm text-muted-foreground">
-            {level === 'global'
-              ? t('settings.editor.globalHint')
-              : t('pipeline.actions.projectHint')}
-          </p>
+          {level === 'global' ? null : (
+            <p className="text-sm text-muted-foreground">{t('pipeline.actions.projectHint')}</p>
+          )}
         </>
       )}
       <div className="@container">
         <div className="grid items-start gap-3 @3xl:grid-cols-2">
           <ActionFields
             draft={draft}
-            disabled={busy || locked}
+            disabled={busy || locked || editor.readOnly}
             update={update}
             errorsOf={errorsOf}
             options={editor.options}

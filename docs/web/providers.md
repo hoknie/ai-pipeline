@@ -24,7 +24,9 @@ The matrix has a row for each role and a column for each enabled provider ("Show
 
 ## Roles tab
 
-The list of roles is on the left, the open role on the right with "Models of the role": its model at each provider, edited in place like a cell of the matrix. You can add a role (the slug comes from the name), rename it and move it up or down (`Alt+↑`, `Alt+↓`). The level, "Shared" by default, is chosen in the project area; the shared area writes the shared level only.
+The list of roles is on the left, the open role on the right with "Models of the role": its model at each provider, edited in place like a cell of the matrix. You can add a role (the slug comes from the name), rename it and move it up or down (`Alt+↑`, `Alt+↓`). 
+
+A project writes only its own `roles`, with no level to choose. A shared role can be renamed there as a project override, but not moved or removed. The shared area writes the shared level only.
 
 Deleting a role asks for confirmation and offers "Clear cells and delete": the cells of the role are cleared one by one, then the role is removed. The first error stops the process and is shown in the dialog.
 
@@ -33,6 +35,8 @@ Deleting a role asks for confirmation and offers "Clear cells and delete": the c
 "New provider" and a provider row open the form at `#providers/new` and `#providers/<slug>`.
 
 - A new provider goes through the steps "General", "Access" and "Models". An existing one has a pinned header with its name, slug, level, status, file and the buttons "Save" and "Delete", and the three sections as cards on one page; its slug and level are read-only.
+- In a project a new provider is always a project one. A provider that exists only at the shared level opens view only, and so do its cells in the matrix and in "Models of the role".
+- "Override in the project" copies a shared provider into the project without `command` and `args`, which only a shared file may set. "Edit in Settings" leads to `#settings/global/swarm/providers/<slug>`; "Remove the override" deletes the project copy.
 - Access is "CLI" (the runtime and, for some runtimes, the model prefix or the command). "API" is not available yet. The order of accesses is the order of trying.
 - "Own API address for the CLI" is off by default. Turn it on only when the CLI reaches the model through an address of its own (a proxy or a compatible API): then the address and the key variable are required. `opencode` has no such switch.
 - The form takes **names of environment variables** only. It has no field for a secret value and never stores or shows one.

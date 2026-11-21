@@ -52,6 +52,14 @@ export const providersEn = {
   search: 'Search providers',
   detailsEmpty: 'Pick a provider in the list or create a new one.',
   globalWarning: 'A shared provider applies in every repository.',
+  sharedReadOnly:
+    'A shared provider is view only here. Override it in the project to change it for this project, or edit it in Settings for every repository.',
+  override: 'Override in the project',
+  overrideStrips:
+    'The project copy has no command and args: a project file may not run its own programs.',
+  removeOverride: 'Remove the override',
+  editInSettings: 'Edit in Settings',
+  cellShared: 'Shared provider: override it in the project to change the model.',
   header: 'Provider',
   default: {
     mark: 'Default',
@@ -111,6 +119,9 @@ export const providersEn = {
     delete: 'Delete',
     deleteTitle: 'Delete the provider «{{name}}»?',
     deleteDescription: 'The provider file is deleted permanently.',
+    removeOverrideTitle: 'Remove the override of «{{name}}»?',
+    removeOverrideDescription:
+      'The project file of the provider is deleted; the shared provider stays.',
     usedBy: 'The provider is still used by:',
     refChain: 'chain {{chain}}, item {{item}}',
     refDefault: 'the default provider setting',

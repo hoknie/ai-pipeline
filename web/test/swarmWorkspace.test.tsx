@@ -219,7 +219,7 @@ describe('the group «Swarm» of the settings', () => {
     mount('#settings/project/swarm/providers');
     const region = await screen.findByRole('region', { name: 'Where the settings are saved' });
     expect(screen.queryByRole('combobox', { name: 'Project' })).toBeNull();
-    expect(within(region).getByText(/The level is chosen when saving/)).toBeTruthy();
+    expect(within(region).getByText(/Shared entries are view only/)).toBeTruthy();
   });
 
   it('has no groups of chains, specialists and pipelines beside «Swarm»', async () => {
@@ -291,5 +291,108 @@ describe('the section «Swarm» of the strip', () => {
     openPalette();
     fireEvent.click(await screen.findByText('Swarm → Roles'));
     await waitFor(() => expect(window.location.hash).toBe('#providers/roles'));
+  });
+});
+
+describe('the project scope never writes the shared level', () => {
+  const shared = (raw: Record<string, unknown>) => ({
+    file: '/xdg/aip/x.yaml',
+    revision: 'g',
+    raw,
+  });
+
+  /** Shared-only entries of every kind the window edits. */
+  function sharedConfig() {
+    const pipeline = { name: 'Quick', steps: [{ id: 'code', specialist: 'coder' }] };
+    return configView({
+      specialists: [
+        specialistEntry('coder', {
+          level: 'global',
+          file: '/xdg/aip/specialists/coder.yaml',
+          revision: null,
+          sources: { global: shared({ name: 'Coder' }) },
+        }),
+      ],
+      pipelines: [
+        {
+          id: 'quick',
+          level: 'global',
+          file: '/xdg/aip/pipelines/quick.yaml',
+          revision: null,
+          raw: pipeline,
+          sources: { global: shared(pipeline) },
+          shared_tags: [],
+          own_tags: [],
+        },
+      ],
+      providers: [
+        editorProvider('zai', { name: 'Z.ai', access: [{ kind: 'cli', runtime: 'claude' }] }),
+      ],
+    } as never);
+  }
+
+  const methods = [
+    'writeProvider',
+    'deleteProvider',
+    'writeSpecialist',
+    'deleteSpecialist',
+    'writePipeline',
+    'deletePipeline',
+    'writeAction',
+    'deleteAction',
+    'writeChain',
+    'deleteChain',
+    'writeSetting',
+  ] as const;
+
+  const levelsOf = (api: ReturnType<typeof mount>) =>
+    methods.flatMap((method) =>
+      vi
+        .mocked(api[method] as (...args: unknown[]) => unknown)
+        .mock.calls.map((call) => ({ method, level: call[call.length - 1] })),
+    );
+
+  it.each([
+    ['#settings/project/swarm/providers/zai', 'writeProvider'],
+    ['#settings/project/swarm/specialists/coder', 'writeSpecialist'],
+    ['#settings/project/swarm/pipelines/quick', 'writePipeline'],
+  ] as const)(
+    'shows a shared entry at %s view only and overrides it at the project level',
+    async (hash, method) => {
+      const api = mount(hash, { config: vi.fn(async () => sharedConfig()) });
+      const override = await screen.findByRole('button', { name: 'Override in the project' });
+      for (const name of ['Save', 'Delete', 'Make global']) {
+        expect(screen.queryByRole('button', { name })).toBeNull();
+      }
+      fireEvent.click(override);
+      await waitFor(() => expect(api[method]).toHaveBeenCalled());
+      const levels = levelsOf(api);
+      expect(levels.length).toBeGreaterThan(0);
+      expect(levels.every((call) => call.level === 'project')).toBe(true);
+    },
+  );
+
+  it('writes the auto delivery of the queue to the project file when the project does not set it', async () => {
+    const api = mount('#settings/project/queue');
+    const block = within(await screen.findByRole('region', { name: 'queue settings' }));
+    const toggle = await waitFor(() => {
+      const found = block.getByRole<HTMLButtonElement>('switch', {
+        name: 'Auto delivery by default',
+      });
+      expect(found.disabled).toBe(false);
+      return found;
+    });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(api.writeSetting).toHaveBeenCalled());
+    expect(levelsOf(api).every((call) => call.level === 'project')).toBe(true);
+  });
+
+  it('writes the copy of a shared provider only at the project level', async () => {
+    const api = mount('#settings/project/swarm/providers/zai', {
+      config: vi.fn(async () => sharedConfig()),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Override in the project' }));
+    await waitFor(() => expect(api.writeProvider).toHaveBeenCalled());
+    expect(vi.mocked(api.writeProvider).mock.calls.map((call) => call[3])).toEqual(['project']);
   });
 });

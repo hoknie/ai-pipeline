@@ -44,15 +44,8 @@ function PresetField({ onPreset }: { onPreset: (id: PresetId) => void }) {
   );
 }
 
-function LevelField({
-  draft,
-  isNew,
-  onChange,
-}: {
-  draft: ProviderDraft;
-  isNew: boolean;
-  onChange: (patch: Partial<ProviderDraft>) => void;
-}) {
+/** The level of the file is the one of the scope (the project scope never writes the shared level). */
+function LevelField({ draft }: { draft: ProviderDraft }) {
   const { t } = useTranslation();
   return (
     <Field
@@ -60,19 +53,7 @@ function LevelField({
       label={t('providers.form.level')}
       hint={t('providers.form.levelHint')}
     >
-      <Select
-        value={draft.level}
-        disabled={!isNew}
-        onValueChange={(level) => onChange({ level: level as 'global' | 'project' })}
-      >
-        <SelectTrigger id="provider-level">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="global">{t('providers.level.global')}</SelectItem>
-          <SelectItem value="project">{t('providers.level.project')}</SelectItem>
-        </SelectContent>
-      </Select>
+      <Input id="provider-level" readOnly value={t(`providers.level.${draft.level}`)} />
     </Field>
   );
 }
@@ -127,7 +108,7 @@ export function NameStep({
           onChange={(event) => onChange({ slug: event.target.value, slugTouched: true })}
         />
       </Field>
-      {scope === 'project' ? <LevelField draft={draft} isNew={isNew} onChange={onChange} /> : null}
+      {scope === 'project' ? <LevelField draft={draft} /> : null}
       <div className="flex items-center gap-2 self-end pb-2">
         <Switch
           id="provider-enabled"

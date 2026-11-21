@@ -11,37 +11,63 @@ afterEach(cleanup);
 
 let counter = 0;
 
-function rolesSetting(global: Record<string, unknown>): EditorSetting {
+function rolesSetting(
+  global: Record<string, unknown>,
+  project: Record<string, unknown> = {},
+): EditorSetting {
   return {
     path: 'roles',
     kind: 'record',
-    value: global,
+    value: { ...global, ...project },
     file: null,
     globalOnly: false,
     defaultValue: {},
     globalValue: global,
-    written: { global },
+    written: { global, project },
   } as unknown as EditorSetting;
 }
 
+/** The levels a call of the fake API wrote to, for every `write*` and `delete*` method. */
+function levelsWritten(api: ReturnType<typeof fakeApi>): unknown[] {
+  return [
+    ...vi.mocked(api.writeSetting).mock.calls.map((call) => call[3]),
+    ...vi.mocked(api.writeProvider).mock.calls.map((call) => call[3]),
+  ];
+}
+
+/** The shared roles think and code, the project ones draft and extra; draft has models. */
 function mount(overrides: Parameters<typeof fakeApi>[0] = {}) {
   counter += 1;
-  const roles = [roleView('think', 'Think'), roleView('code', 'Code')];
+  const roles = [
+    roleView('think', 'Think'),
+    roleView('code', 'Code'),
+    roleView('draft', 'Draft', 'project'),
+    roleView('extra', 'Extra', 'project'),
+  ];
   const providers = [
-    providerView('zai', { name: 'Z.ai', models: { code: { model: 'glm' } } as never }),
+    providerView('zai', { name: 'Z.ai', models: { draft: { model: 'glm' } } as never }),
     providerView('anthropic', {
       name: 'Anthropic',
-      models: { code: { model: 'sonnet' } } as never,
+      models: { draft: { model: 'sonnet' } } as never,
     }),
   ];
   const api = fakeApi({
     providers: vi.fn(async () => providersView({ roles, providers })),
     config: vi.fn(async () =>
       configView({
-        settings: [rolesSetting({ think: { name: 'Think' }, code: { name: 'Code' } })],
+        settings: [
+          rolesSetting(
+            { think: { name: 'Think' }, code: { name: 'Code' } },
+            { draft: { name: 'Draft' }, extra: { name: 'Extra' } },
+          ),
+        ],
         providers: [
-          editorProvider('zai', { name: 'Z.ai', models: { code: 'glm', think: 'x' } }, 'project'),
-          editorProvider('anthropic', { name: 'Anthropic', models: { code: 'sonnet' } }, 'project'),
+          editorProvider('zai', { name: 'Z.ai', models: { draft: 'glm', think: 'x' } }, 'project'),
+          editorProvider(
+            'anthropic',
+            { name: 'Anthropic', models: { draft: 'sonnet' } },
+            'project',
+          ),
         ],
       }),
     ),
@@ -68,87 +94,104 @@ async function pick(line: RegExp) {
   fireEvent.click(within(tab).getByText(line));
 }
 
+const enabled = (name: string) =>
+  waitFor(() =>
+    expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false),
+  );
+
 describe('the tab «Roles»', () => {
   it('shows the models of the open role by provider', async () => {
     mount();
     expect(await screen.findByText('Pick a role in the list.')).toBeTruthy();
-    await pick(/code · Shared/);
+    await pick(/draft · Project/);
     const models = await screen.findByRole('region', { name: 'Models of the role' });
     expect(within(models).getByText('Z.ai')).toBeTruthy();
     expect(within(models).getByText('Anthropic')).toBeTruthy();
     expect(within(models).getByText('glm')).toBeTruthy();
   });
 
-  it('lists the roles with the number of providers and shared level by default', async () => {
+  it('lists the roles with their level and the number of providers, with no level to choose', async () => {
     mount();
     const tab = await screen.findByRole('region', { name: 'Roles' });
-    expect(within(tab).getByText(/code · Shared · 2 providers/)).toBeTruthy();
-    expect(within(tab).getByRole('radio', { name: 'Shared' }).getAttribute('data-state')).toBe(
-      'on',
-    );
+    expect(within(tab).getByText(/think · Shared · 0 providers/)).toBeTruthy();
+    expect(within(tab).getByText(/draft · Project · 2 providers/)).toBeTruthy();
+    expect(within(tab).queryByRole('radio')).toBeNull();
   });
 
-  it('adds a role with a slug made of the name', async () => {
+  it('adds a role to the project roles only', async () => {
     const api = mount();
     await screen.findByRole('region', { name: 'Roles' });
-    await waitFor(() =>
-      expect((screen.getByRole('button', { name: 'Add role' }) as HTMLButtonElement).disabled).toBe(
-        false,
-      ),
-    );
+    await enabled('Add role');
     fireEvent.click(screen.getByRole('button', { name: 'Add role' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Review' } });
     expect((within(dialog).getByLabelText('Slug') as HTMLInputElement).value).toBe('review');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add role' }));
     await waitFor(() => expect(api.writeSetting).toHaveBeenCalled());
-    expect(vi.mocked(api.writeSetting).mock.calls[0]?.slice(0, 2)).toEqual([
+    const call = vi.mocked(api.writeSetting).mock.calls[0]!;
+    expect([call[0], call[1], call[3]]).toEqual([
       'roles',
-      { think: { name: 'Think' }, code: { name: 'Code' }, review: { name: 'Review' } },
+      { draft: { name: 'Draft' }, extra: { name: 'Extra' }, review: { name: 'Review' } },
+      'project',
     ]);
   });
 
-  it('moves a role down and keeps the others in place', async () => {
+  it('moves a project role down and keeps the others in place', async () => {
     const api = mount();
-    await pick(/think · Shared/);
-    await waitFor(() =>
-      expect(
-        (screen.getByRole('button', { name: 'Move Think down' }) as HTMLButtonElement).disabled,
-      ).toBe(false),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Move Think down' }));
+    await pick(/draft · Project/);
+    await enabled('Move Draft down');
+    fireEvent.click(screen.getByRole('button', { name: 'Move Draft down' }));
     await waitFor(() => expect(api.writeSetting).toHaveBeenCalled());
     expect(Object.keys(vi.mocked(api.writeSetting).mock.calls[0]?.[1] as object)).toEqual([
-      'code',
-      'think',
+      'extra',
+      'draft',
     ]);
+    expect(levelsWritten(api)).toEqual(['project']);
   });
 
   it('moves the selected role with Alt+↓', async () => {
     const api = mount();
-    await pick(/think · Shared/);
-    await waitFor(() =>
-      expect(
-        (screen.getByRole('button', { name: 'Move Think down' }) as HTMLButtonElement).disabled,
-      ).toBe(false),
-    );
+    await pick(/draft · Project/);
+    await enabled('Move Draft down');
     fireEvent.keyDown(window, { key: 'ArrowDown', altKey: true });
     await waitFor(() => expect(api.writeSetting).toHaveBeenCalled());
-    expect(Object.keys(vi.mocked(api.writeSetting).mock.calls[0]?.[1] as object)).toEqual([
-      'code',
-      'think',
+    expect(levelsWritten(api)).toEqual(['project']);
+  });
+
+  it('keeps a shared role view only: it cannot be moved or removed', async () => {
+    const api = mount();
+    await pick(/think · Shared/);
+    await enabled('Rename Think');
+    for (const name of ['Move Think up', 'Move Think down', 'Remove Think']) {
+      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true);
+    }
+    fireEvent.keyDown(window, { key: 'ArrowDown', altKey: true });
+    expect(api.writeSetting).not.toHaveBeenCalled();
+  });
+
+  it('renames a shared role as an override in the project roles', async () => {
+    const api = mount();
+    await pick(/think · Shared/);
+    await enabled('Rename Think');
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Think' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Thinker' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rename' }));
+    await waitFor(() => expect(api.writeSetting).toHaveBeenCalled());
+    const call = vi.mocked(api.writeSetting).mock.calls[0]!;
+    expect([call[0], call[1], call[3]]).toEqual([
+      'roles',
+      { draft: { name: 'Draft' }, extra: { name: 'Extra' }, think: { name: 'Thinker' } },
+      'project',
     ]);
+    expect(levelsWritten(api)).toEqual(['project']);
   });
 
   it('removes a role through clearing its cells, one provider after another', async () => {
     const api = mount();
-    await pick(/code · Shared/);
-    await waitFor(() =>
-      expect(
-        (screen.getByRole('button', { name: 'Remove Code' }) as HTMLButtonElement).disabled,
-      ).toBe(false),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Code' }));
+    await pick(/draft · Project/);
+    await enabled('Remove Draft');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Draft' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/Z\.ai/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Clear cells and remove' }));
@@ -161,7 +204,8 @@ describe('the tab «Roles»', () => {
       name: 'Z.ai',
       models: { think: 'x' },
     });
-    expect(vi.mocked(api.writeSetting).mock.calls[0]?.[1]).toEqual({ think: { name: 'Think' } });
+    expect(vi.mocked(api.writeSetting).mock.calls[0]?.[1]).toEqual({ extra: { name: 'Extra' } });
+    expect(levelsWritten(api).every((level) => level === 'project')).toBe(true);
   });
 
   it('stops at the first refusal and keeps the role', async () => {
@@ -172,13 +216,9 @@ describe('the tab «Roles»', () => {
         message: 'file changed',
       })),
     });
-    await pick(/code · Shared/);
-    await waitFor(() =>
-      expect(
-        (screen.getByRole('button', { name: 'Remove Code' }) as HTMLButtonElement).disabled,
-      ).toBe(false),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Code' }));
+    await pick(/draft · Project/);
+    await enabled('Remove Draft');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Draft' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Clear cells and remove' }));
     expect(await within(dialog).findByText(/zai: file changed/)).toBeTruthy();

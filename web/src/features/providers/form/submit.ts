@@ -75,3 +75,18 @@ export async function removeProvider(
     return general((error as Error).message);
   }
 }
+
+/** Writes the project copy of a shared provider; `null` once accepted, else why not. */
+export async function submitOverride(
+  api: Api,
+  slug: string,
+  raw: Record<string, unknown>,
+): Promise<FormProblems | null> {
+  try {
+    const result = await api.writeProvider(slug, raw, null, 'project');
+    if (result.ok) return null;
+    return general(editFailure(result));
+  } catch (error) {
+    return general((error as Error).message);
+  }
+}

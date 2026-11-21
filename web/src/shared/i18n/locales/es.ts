@@ -1025,7 +1025,8 @@ export const es: Dictionary = {
       autoDeliver: 'Entrega automática',
       autoDeliverHint: 'Se aplica a las tareas sin entrega automática propia cuando empiezan.',
       savedToProject: 'Se guarda en el archivo del proyecto: {{file}}',
-      savedToGlobal: 'Se guarda en el archivo compartido: {{file}}',
+      inheritedShared:
+        'Viene del archivo compartido; un cambio se guarda en el archivo del proyecto: {{file}}',
       autoDeliverInvalid: 'La configuración no es válida',
       deliveryMode: 'Modo de entrega',
       deliveryModeHint:
@@ -1714,6 +1715,8 @@ export const es: Dictionary = {
       usedBy: 'La acción aún se nombra aquí:',
       projectHint:
         'La acción se escribe en el proyecto; la compartida con el mismo id se conserva.',
+      sharedReadOnly:
+        'Una acción compartida aquí es solo de lectura. Anúlela en el proyecto para cambiarla en este proyecto.',
       name: 'Nombre',
       kind: 'Tipo',
       command: 'Comando',
@@ -1935,7 +1938,6 @@ export const es: Dictionary = {
       conflict: 'Conflicto: {{message}}. El archivo cambió después de abrir el formulario.',
       save: 'Guardar',
       overrideInProject: 'Sustituir en el proyecto',
-      makeGlobal: 'Hacer global',
       saveAs: 'Guardar como…',
       createCopy: 'Crear una copia',
     },
@@ -2136,7 +2138,8 @@ export const es: Dictionary = {
         project_over_global: 'Proyecto sobre compartido',
       },
     },
-    swarmNoteProject: 'El nivel se elige al guardar: proyecto o compartido.',
+    swarmNoteProject:
+      'Todo aquí se guarda en el proyecto. Las entradas compartidas son de solo lectura: anúlelas en el proyecto o cámbielas en la pestaña «Global».',
     group: {
       integrations: 'Integraciones',
       swarm: 'Enjambre',

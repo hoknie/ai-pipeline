@@ -22,6 +22,8 @@ function mount(options: {
   providers: ReturnType<typeof providerView>[];
   files?: Record<string, Record<string, unknown>>;
   overrides?: Parameters<typeof fakeApi>[0];
+  /** The level of the file of each provider; the project scope writes only «project». */
+  levels?: Record<string, 'global' | 'project'>;
 }) {
   counter += 1;
   const roles = [roleView('think', 'Think'), roleView('code', 'Code')];
@@ -32,7 +34,11 @@ function mount(options: {
     config: vi.fn(async () =>
       configView({
         providers: options.providers.map((provider) =>
-          editorProvider(provider.slug, files[provider.slug] ?? { name: provider.name }),
+          editorProvider(
+            provider.slug,
+            files[provider.slug] ?? { name: provider.name },
+            options.levels?.[provider.slug] ?? 'project',
+          ),
         ),
       }),
     ),
@@ -68,6 +74,21 @@ describe('the matrix role × provider', () => {
     expect(within(matrix).queryByText('Old')).toBeNull();
     fireEvent.click(within(matrix).getByRole('switch', { name: 'Show disabled' }));
     expect(within(matrix).getByText('Old')).toBeTruthy();
+  });
+
+  it('shows the models of a shared provider as text and writes nothing to it', async () => {
+    const api = mount({
+      providers: [claude, providerView('zai', { name: 'Z.ai' })],
+      levels: { anthropic: 'global' },
+    });
+    const matrix = await screen.findByRole('region', { name: 'Role × provider matrix' });
+    await screen.findByRole('combobox', { name: 'Code × Z.ai' });
+    // the shared column has no combobox and no options button; the project one is editable
+    expect(within(matrix).queryByRole('combobox', { name: 'Think × Anthropic' })).toBeNull();
+    expect(within(matrix).getByLabelText('Think × Anthropic').textContent).toBe('opus');
+    await chooseModel('glm-5.3', 'Code × Z.ai');
+    await waitFor(() => expect(api.writeProvider).toHaveBeenCalled());
+    for (const call of vi.mocked(api.writeProvider).mock.calls) expect(call[3]).toBe('project');
   });
 
   it('marks empty cells and shows the model of the filled ones', async () => {
@@ -110,7 +131,7 @@ describe('the matrix role × provider', () => {
       'zai',
       { name: 'Z.ai', models: { code: 'glm-5.3' } },
       'zai-r1',
-      'global',
+      'project',
     );
   });
 

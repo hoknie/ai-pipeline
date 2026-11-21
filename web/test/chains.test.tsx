@@ -625,7 +625,7 @@ describe('a chain in the By provider mode', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(writeProvider).toHaveBeenCalledWith('corp', expect.anything(), null, 'global'),
+      expect(writeProvider).toHaveBeenCalledWith('corp', expect.anything(), null, 'project'),
     );
     await waitFor(() => expect(providerButtons()[1]!.dataset.providerValue).toBe('corp'));
   });

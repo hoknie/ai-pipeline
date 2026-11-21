@@ -4,7 +4,13 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/types.ts';
 import { useProvidersScope } from '../page/scope.ts';
-import { sourceOf, type ProviderSource } from '../page/sources.ts';
+import {
+  overrideValue,
+  sourceOf,
+  writableSourceOf,
+  type ProviderSource,
+  type ProvidersScope,
+} from '../page/sources.ts';
 import { invalidateProviders } from '../page/useProviderRegistry.ts';
 import {
   draftOf,
@@ -14,7 +20,13 @@ import {
   type FormStep,
   type ProviderDraft,
 } from './draft.ts';
-import { NO_PROBLEMS, removeProvider, submitProvider, type FormProblems } from './submit.ts';
+import {
+  NO_PROBLEMS,
+  removeProvider,
+  submitOverride,
+  submitProvider,
+  type FormProblems,
+} from './submit.ts';
 
 export type { FormProblems };
 
@@ -29,15 +41,19 @@ function useDraft(
   slug: string | null,
   initial: ProviderDraft | null,
   source: ProviderSource | null,
+  scope: ProvidersScope,
 ) {
+  // a new provider is written at the level of the scope, never at the other one
   const [draft, setDraft] = useState<ProviderDraft | null>(
-    slug === null ? (initial ?? emptyDraft()) : null,
+    slug === null ? { ...(initial ?? emptyDraft()), level: scope } : null,
   );
   const [loaded, setLoaded] = useState<string | null>(null);
   useEffect(() => {
-    if (slug === null || source === null || loaded === slug) return;
+    // read again when the file that applies changes level: a shared provider just overridden
+    const key = source === null ? null : `${slug}:${source.level}`;
+    if (slug === null || source === null || loaded === key) return;
     setDraft(draftOf(slug, source.raw, source.level));
-    setLoaded(slug);
+    setLoaded(key);
   }, [slug, source, loaded]);
   return [draft, setDraft] as const;
 }
@@ -46,7 +62,11 @@ interface SubmitOptions {
   api: Api;
   repository: string | null;
   slug: string | null;
+  /** The file a write may change; null for a provider the scope may only look at. */
   source: ProviderSource | null;
+  /** The shared file shown read only, to copy into the project. */
+  shown: ProviderSource | null;
+  locked: boolean;
   draft: ProviderDraft | null;
   onSaved: (slug: string) => void;
   onDeleted: () => void;
@@ -56,14 +76,14 @@ interface SubmitOptions {
 
 /** Save and delete with the answers of the daemon: problems by field, the places that use it. */
 function useSubmit(options: SubmitOptions) {
-  const { api, repository, slug, source, draft } = options;
+  const { api, repository, slug, source, shown, locked, draft } = options;
   const { t } = useTranslation();
   const [problems, setProblems] = useState<FormProblems>(NO_PROBLEMS);
   const [busy, setBusy] = useState(false);
   // a new provider whose file is written: a second try only writes `default_provider`
   const created = useRef<string | null>(null);
   const save = async () => {
-    if (!draft) return;
+    if (!draft || locked) return;
     setBusy(true);
     const outcome =
       created.current === null
@@ -91,7 +111,7 @@ function useSubmit(options: SubmitOptions) {
     setBusy(false);
   };
   const remove = async () => {
-    if (slug === null || source === null) return;
+    if (slug === null || source === null || locked) return;
     setBusy(true);
     const failure = await removeProvider(api, slug, source);
     if (failure === null) {
@@ -100,7 +120,16 @@ function useSubmit(options: SubmitOptions) {
     } else setProblems(failure);
     setBusy(false);
   };
-  return { problems, clear: () => setProblems(NO_PROBLEMS), busy, save, remove };
+  /** Writes the project copy of a shared provider; the shared file stays as it is. */
+  const override = async () => {
+    if (slug === null || shown === null || !locked) return;
+    setBusy(true);
+    const failure = await submitOverride(api, slug, overrideValue(shown.raw).raw);
+    await invalidateProviders(repository);
+    setProblems(failure ?? NO_PROBLEMS);
+    setBusy(false);
+  };
+  return { problems, clear: () => setProblems(NO_PROBLEMS), busy, save, remove, override };
 }
 
 /**
@@ -123,25 +152,14 @@ export function useProviderForm(options: {
   const { slug, registry, editor } = options;
   const scope = useProvidersScope();
   const isNew = slug === null;
-  const source = useMemo(
-    () =>
-      slug === null
-        ? null
-        : sourceOf(
-            editor?.providers.find((item) => item.slug === slug),
-            scope,
-          ),
-    [slug, editor, scope],
-  );
-  const [draft, setDraft] = useDraft(
-    slug,
-    options.initial && scope === 'global'
-      ? { ...options.initial, level: 'global' }
-      : options.initial,
-    source,
-  );
+  const found = slug === null ? undefined : editor?.providers.find((item) => item.slug === slug);
+  const shown = useMemo(() => sourceOf(found, scope), [found, scope]);
+  const source = useMemo(() => writableSourceOf(found, scope), [found, scope]);
+  // the project scope may only look at a provider that exists at the shared level alone
+  const locked = shown !== null && source === null;
+  const [draft, setDraft] = useDraft(slug, options.initial, shown, scope);
   const [step, setStep] = useState<FormStep>('name');
-  const submit = useSubmit({ ...options, source, draft, onStep: setStep });
+  const submit = useSubmit({ ...options, source, shown, locked, draft, onStep: setStep });
   const taken = useMemo(
     () => new Set([...(registry?.providers.map((item) => item.slug) ?? []), ...RESERVED]),
     [registry],
@@ -167,5 +185,9 @@ export function useProviderForm(options: {
     stepValid: (which: FormStep) => Object.keys(errorsOf(which)).length === 0,
     save: submit.save,
     remove: submit.remove,
+    override: submit.override,
+    locked,
+    /** The shared file has `command`/`args` that the project copy leaves out. */
+    strips: locked && shown !== null && overrideValue(shown.raw).stripped,
   };
 }

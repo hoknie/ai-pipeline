@@ -732,6 +732,24 @@ describe('saving and deleting', () => {
     expect(window.localStorage.getItem('aip.web.canvasAnchors./repo.other')).not.toBeNull();
   });
 
+  it('never writes a copy to the shared level, even after the level was switched', async () => {
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    const both = entry('feature', {
+      level: 'project_over_global',
+      sources: {
+        project: { file: '/repo/aip/pipelines/feature.yaml', revision: 'p', raw: RAW },
+        global: { file: '/xdg/aip/pipelines/feature.yaml', revision: 'g', raw: RAW },
+      },
+    });
+    render(<Page api={api({ writePipeline }, [both])} start="feature" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Save as…' }));
+    fireEvent.change(screen.getByLabelText('New id'), { target: { value: 'feature-2' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Global' }));
+    await waitFor(() => expect(screen.queryByLabelText('New id')).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Create a copy' })).toBeNull();
+    expect(writePipeline).not.toHaveBeenCalled();
+  });
+
   it('saves a copy under a new id and creates a pipeline from an empty form', async () => {
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     render(<Page api={api({ writePipeline })} start="feature" />);
@@ -867,11 +885,12 @@ describe('global level', () => {
     expect(writePipeline).not.toHaveBeenCalled();
   });
 
-  it('makes a project pipeline global', async () => {
+  it('has no way to make a project pipeline global', async () => {
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
     render(<Page api={api({ writePipeline })} start="feature" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Make global' }));
-    await waitFor(() => expect(writePipeline).toHaveBeenCalledWith('feature', RAW, null, 'global'));
+    await screen.findByRole('button', { name: 'Save' });
+    expect(screen.queryByRole('button', { name: 'Make global' })).toBeNull();
+    expect(writePipeline).not.toHaveBeenCalled();
   });
 });
 
@@ -1355,7 +1374,7 @@ describe('pipeline sections and addresses', () => {
   it('falls back to the first action when the remembered one is deleted', async () => {
     let actions = [
       actionEntry('commit', { name: 'Commit', run: 'git commit -am x' }),
-      actionEntry('notify', { specialist: 'writer' }, 'global'),
+      actionEntry('notify', { specialist: 'writer' }, 'project'),
     ];
     const changing = api({
       config: vi.fn(async () =>
@@ -1419,7 +1438,7 @@ describe('pipeline sections and addresses', () => {
       deleteAction,
     });
     await open('#pipelines/actions/commit', changing);
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove the override' }));
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(deleteAction).toHaveBeenCalled());

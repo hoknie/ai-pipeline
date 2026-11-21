@@ -6,7 +6,7 @@ import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/ty
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { Switch } from '../../../shared/ui/forms/switch.tsx';
 import { useProvidersScope } from '../page/scope.ts';
-import { sourceOf } from '../page/sources.ts';
+import { sharedOnlyIn, writableSourceOf } from '../page/sources.ts';
 import { MatrixCellView } from './MatrixCell.tsx';
 import { MatrixCards, MatrixTable } from './MatrixLayouts.tsx';
 import { useCellWrite } from './useCellWrite.ts';
@@ -71,10 +71,10 @@ export function ProvidersMatrix({
         cell={view.matrix.find(
           (item) => item.role === role.slug && item.provider === provider.slug,
         )}
-        raw={sourceOf(found, scope)?.raw ?? null}
+        raw={writableSourceOf(found, scope)?.raw ?? null}
         error={errors[id]}
         busy={busy === id}
-        readOnly={readOnly}
+        readOnly={readOnly || sharedOnlyIn(found, scope)}
         onWrite={(change) => void write(id, provider.slug, change)}
       />
     );

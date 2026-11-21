@@ -26,7 +26,7 @@ export type GeneralSetting = Omit<Setting<boolean>, 'value'> & { value: boolean 
 
 /**
  * A setting of the merged configuration. A write goes to the file the value comes from: the
- * project `settings.yaml` when it sets the value, otherwise the global one. With `source` the values come from the caller (who then reads them again in
+ * project `settings.yaml` when it sets the value, otherwise the global one; with `projectOnly` (a project's page) always the project one. With `source` the values come from the caller (who then reads them again in
  * `onChanged`); without it the hook reads the configuration itself.
  */
 export function useSetting<T extends boolean | string>(
@@ -35,6 +35,7 @@ export function useSetting<T extends boolean | string>(
   kind: 'boolean' | 'string',
   source?: Source,
   onChanged?: () => Promise<void> | void,
+  projectOnly = false,
 ): Setting<T> {
   const { t } = useTranslation();
   const [read, setRead] = useState<Source | null>(null);
@@ -57,7 +58,7 @@ export function useSetting<T extends boolean | string>(
   const raw: unknown = setting?.value;
   const overridden =
     setting !== undefined && files !== undefined && setting.file === files.project.file;
-  const level = overridden ? 'project' : 'global';
+  const level = overridden || projectOnly ? 'project' : 'global';
 
   const set = async (value: T) => {
     if (!api || !files) return;
@@ -98,7 +99,8 @@ export function useGeneralSetting(
   path: string,
   source?: Source,
   onChanged?: () => Promise<void> | void,
+  projectOnly = false,
 ): GeneralSetting {
-  const setting = useSetting<boolean>(api, path, 'boolean', source, onChanged);
+  const setting = useSetting<boolean>(api, path, 'boolean', source, onChanged, projectOnly);
   return { ...setting, value: setting.value === true };
 }

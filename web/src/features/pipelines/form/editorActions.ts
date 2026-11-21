@@ -36,7 +36,7 @@ export function useWriteActions(
 ) {
   const { pipeline, sharedOnly } = input;
   const { level, saveAs, setBusy } = fields;
-  const { value, source, id } = derived;
+  const { value, source, id, readOnly } = derived;
   const report = (result: Awaited<ReturnType<Api['writePipeline']>>): boolean => {
     if (result.ok) return true;
     if (result.reason === 'conflict') feedback.setConflict(result.message);
@@ -58,23 +58,26 @@ export function useWriteActions(
       setBusy(false);
     }
   };
-  const write = (target: string, revision: string | null) =>
+  // outside the shared page a copy is always written to the project
+  const copyLevel: WriteLevel = sharedOnly ? level : 'project';
+  const write = (target: string, revision: string | null, into: WriteLevel = level) =>
     attempt(async () => {
+      if (readOnly) return;
       feedback.setConflict(null);
-      const result = await api.writePipeline(target, value, revision, level);
+      const result = await api.writePipeline(target, value, revision, into);
       if (report(result)) await onSaved(target);
     });
   const save = () => write(id, pipeline ? (source?.revision ?? null) : null);
-  const saveCopy = () => write(saveAs ?? '', null);
-  /** Copies the file that applies to the other level, which has none. */
-  const copyTo = (target: WriteLevel) =>
+  const saveCopy = () => write(saveAs ?? '', null, copyLevel);
+  /** Copies the shared file into the project, which has none; nothing is ever written to the shared level this way. */
+  const copyToProject = () =>
     attempt(async () => {
       // tags belong to the file they are written in: the copy starts without them
       const { tags: _tags, ...rest } = pipeline?.raw ?? {};
-      const result = await api.writePipeline(id, rest, null, target);
+      const result = await api.writePipeline(id, rest, null, 'project');
       if (report(result)) await onSaved(id);
     });
-  return { report, attempt, save, saveCopy, copyTo };
+  return { report, attempt, save, saveCopy, copyToProject };
 }
 
 /** Actions that ask the person first: switch the level, delete, read the file again. */
@@ -115,6 +118,7 @@ export function useGuardedActions(
     feedback.setErrors([]);
     feedback.setConflict(null);
     setDraft(draftOf(pipeline?.sources[next]?.raw ?? pipeline?.raw ?? {}));
+    fields.setSaveAs(null);
     setLevel(next);
   };
   const remove = () =>

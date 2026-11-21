@@ -1005,7 +1005,8 @@ export const en = {
       autoDeliver: 'Auto delivery by default',
       autoDeliverHint: 'Applies to tasks without their own auto delivery, when they start.',
       savedToProject: 'Saved to the project file: {{file}}',
-      savedToGlobal: 'Saved to the shared file: {{file}}',
+      inheritedShared:
+        'Taken from the shared file; a change is saved to the project file: {{file}}',
       autoDeliverInvalid: 'The configuration is not valid',
       deliveryMode: 'Delivery mode',
       deliveryModeHint:
@@ -1682,6 +1683,8 @@ export const en = {
       reread: 'Reread the action',
       usedBy: 'The action is still named here:',
       projectHint: 'The action is written to the project; a shared one with the same id stays.',
+      sharedReadOnly:
+        'A shared action is view only here. Override it in the project to change it for this project.',
       name: 'Name',
       kind: 'Type',
       command: 'Command',
@@ -1898,7 +1901,6 @@ export const en = {
       conflict: 'Conflict: {{message}}. The file was changed after you opened the form.',
       save: 'Save',
       overrideInProject: 'Override in the project',
-      makeGlobal: 'Make global',
       saveAs: 'Save as…',
       createCopy: 'Create a copy',
     },
@@ -2097,7 +2099,8 @@ export const en = {
         project_over_global: 'Project over shared',
       },
     },
-    swarmNoteProject: 'The level is chosen when saving: project or shared.',
+    swarmNoteProject:
+      'Everything here is saved to the project. Shared entries are view only: override them in the project, or change them in the «Global» tab.',
     group: {
       integrations: 'Integrations',
       swarm: 'Swarm',

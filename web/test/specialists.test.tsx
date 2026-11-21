@@ -451,28 +451,22 @@ describe('creating, copying and deleting', () => {
     expect(screen.getAllByText('project over global').length).toBeGreaterThan(1);
   });
 
-  it('makes a project specialist global', async () => {
+  it('has no way to make a project specialist global', async () => {
     const writeSpecialist = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
     render(<Page api={fakeApi({ writeSpecialist })} start="coder" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Make global' }));
-    await waitFor(() =>
-      expect(writeSpecialist).toHaveBeenCalledWith(
-        'coder',
-        expect.objectContaining({ name: expect.any(String) }),
-        null,
-        'global',
-      ),
-    );
+    await screen.findByLabelText('Name');
+    expect(screen.queryByRole('button', { name: 'Make global' })).toBeNull();
+    expect(writeSpecialist).not.toHaveBeenCalled();
   });
 
-  it('creates a new specialist on the global level', async () => {
+  it('creates a new specialist in the project, with no level to choose', async () => {
     const writeSpecialist = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
     render(<Page api={fakeApi({ writeSpecialist })} start="new" />);
     fireEvent.change(await screen.findByLabelText('Slug'), { target: { value: 'qa' } });
-    fireEvent.click(screen.getByRole('radio', { name: 'Global' }));
+    expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(writeSpecialist).toHaveBeenCalledWith('qa', expect.anything(), null, 'global'),
+      expect(writeSpecialist).toHaveBeenCalledWith('qa', expect.anything(), null, 'project'),
     );
   });
 
@@ -519,6 +513,34 @@ describe('creating, copying and deleting', () => {
       await screen.findByRole('button', { name: /Remove the override|Delete/, hidden: false }),
     );
     await waitFor(() => expect(deleteSpecialist).toHaveBeenCalledWith('qa', 'p', 'project'));
+  });
+
+  it('never writes a copy to the shared level, even after the level was switched', async () => {
+    const writeSpecialist = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    const config = vi.fn(async () =>
+      configView({
+        specialists: [
+          specialistEntry('qa', {
+            level: 'project_over_global',
+            raw: { name: 'Project coder' },
+            sources: {
+              project: { file: '/repo/aip/specialists/qa.yaml', revision: 'p', raw: { name: 'P' } },
+              global: { file: '/xdg/aip/specialists/qa.yaml', revision: 'g', raw: { name: 'G' } },
+            },
+          }),
+        ],
+      }),
+    );
+    render(<Page api={fakeApi({ config, writeSpecialist })} start="qa" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Save as…' }));
+    fireEvent.change(screen.getByLabelText('New slug'), { target: { value: 'qa-copy' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Global' }));
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('G'),
+    );
+    expect(screen.queryByLabelText('New slug')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create a copy' })).toBeNull();
+    expect(writeSpecialist).not.toHaveBeenCalled();
   });
 
   it('asks before switching the level with unsaved edits', async () => {

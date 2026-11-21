@@ -20,6 +20,7 @@ import { StepIndicator, useErrorText } from './FormParts.tsx';
 import { ModelsStep } from './ModelsStep.tsx';
 import { NameStep } from './NameStep.tsx';
 import { useDefaultProvider } from '../editor/useDefaultProvider.ts';
+import { overriddenOf } from '../page/sources.ts';
 import { presetDraft, type PresetId } from './presets.ts';
 import { useProviderForm, type FormProblems } from './useProviderForm.ts';
 
@@ -152,6 +153,39 @@ function WizardBody(
   return <ProviderSections sections={sections} />;
 }
 
+/** The line while the draft is not here: loading, or the provider does not exist. */
+function Waiting({ missing, slug }: { missing: boolean; slug: string | null }) {
+  const { t } = useTranslation();
+  return (
+    <p role="status" className="text-sm text-muted-foreground">
+      {missing ? t('providers.form.notFound', { slug: slug ?? '' }) : t('providers.loading')}
+    </p>
+  );
+}
+
+/** The question before a delete, and the delete itself when it is confirmed. */
+function deleteAsk(
+  confirm: ReturnType<typeof useConfirm>,
+  t: TFunction,
+  name: string,
+  remove: () => Promise<void>,
+  overriding: boolean,
+) {
+  return () =>
+    void confirm({
+      title: t(overriding ? 'providers.form.removeOverrideTitle' : 'providers.form.deleteTitle', {
+        name,
+      }),
+      description: t(
+        overriding
+          ? 'providers.form.removeOverrideDescription'
+          : 'providers.form.deleteDescription',
+      ),
+      confirmLabel: overriding ? t('providers.removeOverride') : t('providers.form.delete'),
+      destructive: true,
+    }).then((ok) => (ok ? remove() : undefined));
+}
+
 /**
  * The form of a provider. A new one goes through the steps «General», «Access», «Models»; an existing one is
  * one page with the three parts, its slug and level read only. The same component is the page
@@ -185,24 +219,11 @@ export function ProviderWizard(props: {
     Object.assign({}, ...FORM_STEPS.map((step) => form.errorsOf(step))),
     form.problems.fields,
   );
-  if (!draft) {
-    const text =
-      editor && slug !== null ? t('providers.form.notFound', { slug }) : t('providers.loading');
-    return (
-      <p role="status" className="text-sm text-muted-foreground">
-        {text}
-      </p>
-    );
-  }
+  if (!draft) return <Waiting missing={editor !== null && slug !== null} slug={slug} />;
   const live = registry?.providers.find((item) => item.slug === slug);
   const allValid = FORM_STEPS.every((step) => form.stepValid(step));
-  const onDelete = () =>
-    void confirm({
-      title: t('providers.form.deleteTitle', { name: draft.name }),
-      description: t('providers.form.deleteDescription'),
-      confirmLabel: t('providers.form.delete'),
-      destructive: true,
-    }).then((ok) => (ok ? form.remove() : undefined));
+  const overriding = overriddenOf(editor?.providers.find((item) => item.slug === slug));
+  const onDelete = deleteAsk(confirm, t, draft.name, form.remove, overriding);
   return (
     <form
       className="flex flex-col gap-4"
@@ -219,10 +240,21 @@ export function ProviderWizard(props: {
           onSave={() => void form.save()}
           onDelete={onDelete}
           defaults={defaults}
+          locked={form.locked}
+          overriding={overriding}
+          strips={form.strips}
+          onOverride={() => void form.override()}
         />
       ) : null}
       <Problems problems={form.problems} />
-      <WizardBody {...props} form={form} errorOf={errorOf} onNameChange={onNameChange} />
+      {/* a disabled fieldset turns off every field and button inside: a shared provider is view only */}
+      <fieldset
+        disabled={form.locked}
+        className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0"
+        data-locked={form.locked ? 'true' : undefined}
+      >
+        <WizardBody {...props} form={form} errorOf={errorOf} onNameChange={onNameChange} />
+      </fieldset>
       {form.isNew ? (
         <Footer
           step={form.step}

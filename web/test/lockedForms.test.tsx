@@ -238,6 +238,7 @@ describe('the form of an action with locked', () => {
   it('stays editable without locked', () => {
     mountAction();
     expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Global' })).toBeTruthy();
+    // an action that has only a project file has no level to switch
+    expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
   });
 });

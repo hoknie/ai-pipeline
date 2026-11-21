@@ -82,19 +82,18 @@ function headerOf(
     specialist,
     level: editor.level,
     file: specialist ? (source?.file ?? specialist.file) : undefined,
-    levelChoice: !sharedOnly && !locked && (!specialist || editor.bothLevels),
+    levelChoice: !sharedOnly && !locked && Boolean(specialist) && editor.bothLevels,
     readOnly,
     busy: editor.busy,
     canSave: Boolean(specialist) || editor.slug !== '',
     overrideInProject: copyOnly && Boolean(sources.global) && !sources.project,
-    makeGlobal: copyOnly && Boolean(sources.project) && !sources.global && !readOnly,
     canRemove: Boolean(specialist && source) && !readOnly && !locked,
     removeBlocked: editor.removeBlocked,
     removeBlockedReason: editor.removeBlockedReason,
     removeLabel: editor.removeLabel,
     onLevel: (next) => (specialist ? void editor.switchLevel(next) : editor.setLevel(next)),
     onSave: () => void editor.save(),
-    onCopyTo: (target) => void editor.copyTo(target),
+    onOverride: () => void editor.copyToProject(),
     onSaveAs: () => editor.setSaveAs(editor.saveAs === null ? '' : null),
     onRemove: () => void editor.remove(),
   };
@@ -155,7 +154,7 @@ export function SpecialistForm(props: SpecialistFormProps) {
       aria-label={t('specialists.section', { id: editor.id || t('specialists.newName') })}
     >
       <SpecialistHeader {...headerOf(editor, specialist, sharedOnly, locked)} />
-      {saveAs !== null ? (
+      {saveAs !== null && !readOnly ? (
         <SaveAsRow
           slug={saveAs}
           disabled={busy}

@@ -50,6 +50,13 @@ export const providersZh: Dictionary['providers'] = {
   search: '搜索提供商',
   detailsEmpty: '请在列表中选择提供商，或新建一个。',
   globalWarning: '共享提供商对所有仓库生效。',
+  sharedReadOnly:
+    '共享提供商在此仅可查看。在项目中覆盖它即可仅为本项目修改，或在设置中为所有仓库编辑。',
+  override: '在项目中覆盖',
+  overrideStrips: '项目副本不含 command 和 args：项目文件不能运行自己的程序。',
+  removeOverride: '移除覆盖',
+  editInSettings: '在设置中编辑',
+  cellShared: '共享提供商：在项目中覆盖后才能修改模型。',
   header: '提供商',
   default: {
     mark: '默认',
@@ -107,6 +114,8 @@ export const providersZh: Dictionary['providers'] = {
     delete: '删除',
     deleteTitle: '删除提供商“{{name}}”？',
     deleteDescription: '提供商文件将被永久删除。',
+    removeOverrideTitle: '移除“{{name}}”的覆盖？',
+    removeOverrideDescription: '将删除该提供商的项目文件；共享提供商保留。',
     usedBy: '该提供商仍被以下位置使用：',
     refChain: '链 {{chain}}，第 {{item}} 项',
     refDefault: '默认提供商设置',

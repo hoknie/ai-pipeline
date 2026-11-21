@@ -46,7 +46,7 @@ export function useWriteActions(
 ) {
   const { specialist, sharedOnly } = input;
   const { level, draft, slug, saveAs, setBusy } = fields;
-  const { raw, revision, source } = derived;
+  const { raw, revision, source, readOnly } = derived;
   const report = (result: Awaited<ReturnType<Api['writeSpecialist']>>): boolean => {
     if (result.ok) return true;
     if (result.reason === 'conflict') feedback.setConflict(result.message);
@@ -68,11 +68,19 @@ export function useWriteActions(
       setBusy(false);
     }
   };
-  const write = (target: string, stored: Record<string, unknown> | null, rev: string | null) =>
+  // outside the shared page a copy is always written to the project
+  const copyLevel: WriteLevel = sharedOnly ? level : 'project';
+  const write = (
+    target: string,
+    stored: Record<string, unknown> | null,
+    rev: string | null,
+    into: WriteLevel = level,
+  ) =>
     attempt(async () => {
+      if (readOnly) return;
       feedback.clear();
-      const value = forLevel(valueOf(draft, raw), level, stored);
-      if (report(await api.writeSpecialist(target, value, rev, level))) await onSaved(target);
+      const value = forLevel(valueOf(draft, raw), into, stored);
+      if (report(await api.writeSpecialist(target, value, rev, into))) await onSaved(target);
     });
   const save = () =>
     write(
@@ -80,16 +88,16 @@ export function useWriteActions(
       specialist && source ? raw : null,
       specialist ? revision : null,
     );
-  const saveCopy = () => write(saveAs ?? '', null, null);
-  /** Copies the file that applies to the other level, which has none. */
-  const copyTo = (target: WriteLevel) =>
+  const saveCopy = () => write(saveAs ?? '', null, null, copyLevel);
+  /** Copies the shared file into the project, which has none; nothing is ever written to the shared level this way. */
+  const copyToProject = () =>
     attempt(async () => {
       // the copy has no tags: the tags of the source level stay there
       const { tags: _tags, ...copy } = specialist?.raw ?? {};
-      const result = await api.writeSpecialist(specialist?.slug ?? '', copy, null, target);
+      const result = await api.writeSpecialist(specialist?.slug ?? '', copy, null, 'project');
       if (report(result)) await onSaved(specialist?.slug ?? '');
     });
-  return { report, attempt, save, saveCopy, copyTo };
+  return { report, attempt, save, saveCopy, copyToProject };
 }
 
 /** Actions that ask the person first: switch the level, delete, read the file again. */
@@ -130,6 +138,7 @@ export function useGuardedActions(
     feedback.clear();
     feedback.setReferences([]);
     setDraft(draftOf(specialist?.sources[next]?.raw ?? specialist?.raw ?? {}));
+    fields.setSaveAs(null);
     setLevel(next);
   };
   const remove = () =>

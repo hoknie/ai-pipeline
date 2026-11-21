@@ -102,7 +102,7 @@ With the [global queue mode](../usage/queue.md#global-queue) the section "Queue"
 The modes of the queue are in the group "Queue" of the [project settings](settings.md#project-groups) (`#settings/project/queue`). They switch at once, without "Save".
 
 - The switches "Keep running when empty", "Answer questions" and "Skip failed", the answer text and the "On a usage limit" selector are the [queue settings](../usage/queue.md#queue-settings).
-- "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`. The file is shown under the control.
+- "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` only to the project `aip/settings.yaml`. A value that comes from the shared `settings.yaml` is shown as it is; changing it sets the project file. The file is shown under the control.
 
 A queue stopped by a [usage limit](../usage/queue.md#usage-limit) shows which agent ran out, when the limit resets and, with `wait`, when the queue resumes by itself. "Pause" cancels the automatic start. A group waiting for the reset shows "Limit until HH:MM".
 

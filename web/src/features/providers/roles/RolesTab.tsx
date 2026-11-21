@@ -1,11 +1,9 @@
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/types.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
-import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
 import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
 import { ReadOnlyHint } from '../../repositories/index.ts';
 import { useProvidersScope } from '../page/scope.ts';
@@ -19,34 +17,18 @@ import { useRoleActions, type Level } from './useRoleActions.ts';
 function RolesSide({
   view,
   editor,
-  level,
   readOnly,
   actions,
-  onLevel,
 }: {
   view: ProvidersView;
   editor: ConfigEditorResponse | null;
-  level: Level;
   readOnly: boolean;
   actions: ReturnType<typeof useRoleActions>;
-  onLevel: (level: Level) => void;
 }) {
   const { t } = useTranslation();
-  const scope = useProvidersScope();
   return (
     <section aria-label={t('providers.roles.label')} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {scope === 'project' && !readOnly ? (
-          <ToggleGroup
-            type="single"
-            value={level}
-            aria-label={t('providers.roles.level')}
-            onValueChange={(next) => next && onLevel(next as Level)}
-          >
-            <ToggleGroupItem value="global">{t('providers.level.global')}</ToggleGroupItem>
-            <ToggleGroupItem value="project">{t('providers.level.project')}</ToggleGroupItem>
-          </ToggleGroup>
-        ) : null}
         {readOnly ? null : (
           <Button size="sm" disabled={!editor} onClick={() => actions.setDialog({ kind: 'add' })}>
             <Plus /> {t('providers.roles.add')}
@@ -95,8 +77,8 @@ export function RolesTab({
 }) {
   const { t } = useTranslation();
   const scope = useProvidersScope();
-  const [chosen, setLevel] = useState<Level>('global');
-  const level: Level = readOnly || scope === 'global' ? 'global' : chosen;
+  // the level written is the one of the scope: the project scope never writes the shared roles
+  const level: Level = readOnly || scope === 'global' ? 'global' : 'project';
   const actions = useRoleActions({
     api,
     repository,
@@ -107,16 +89,7 @@ export function RolesTab({
   const role = view.roles.find((item) => item.slug === actions.selected);
   return (
     <SplitPage
-      side={
-        <RolesSide
-          view={view}
-          editor={editor}
-          level={level}
-          readOnly={readOnly}
-          actions={actions}
-          onLevel={setLevel}
-        />
-      }
+      side={<RolesSide view={view} editor={editor} readOnly={readOnly} actions={actions} />}
     >
       <RolesFailure message={actions.failure} />
       {role ? (

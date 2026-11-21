@@ -7,7 +7,7 @@ import { Button } from '../../../shared/ui/forms/button.tsx';
 import { MatrixCellView } from '../matrix/MatrixCell.tsx';
 import { useCellWrite } from '../matrix/useCellWrite.ts';
 import { useProvidersScope } from '../page/scope.ts';
-import { sourceOf } from '../page/sources.ts';
+import { sharedOnlyIn, writableSourceOf } from '../page/sources.ts';
 
 export interface RoleActions {
   ready: boolean;
@@ -63,10 +63,10 @@ function RoleModels({
                   cell={view.matrix.find(
                     (item) => item.role === role.slug && item.provider === provider.slug,
                   )}
-                  raw={sourceOf(found, scope)?.raw ?? null}
+                  raw={writableSourceOf(found, scope)?.raw ?? null}
                   error={errors[id]}
                   busy={busy === id}
-                  readOnly={readOnly}
+                  readOnly={readOnly || sharedOnlyIn(found, scope)}
                   onWrite={(change) => void write(id, provider.slug, change)}
                 />
               </li>

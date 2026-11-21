@@ -27,7 +27,10 @@ export interface ActionEditorInput {
 
 /** What the person is editing, and what the last write said. */
 function useActionState(action: ActionEntry | null) {
-  const [level, setLevel] = useState<WriteLevel>(action?.level === 'global' ? 'global' : 'project');
+  // a new action is written in the project; a shared one is shown, not written
+  const [level, setLevel] = useState<WriteLevel>(
+    action !== null && action.level === 'global' ? 'global' : 'project',
+  );
   const sources = action?.sources ?? {};
   const source = sources[level];
   const raw = source?.raw ?? action?.raw ?? {};
@@ -119,6 +122,44 @@ function optionsOf(view: ConfigEditorResponse): SpecialistOption[] {
   return specialistOptions(view.specialists);
 }
 
+/** «Override in the project»: writes the project copy of a shared action as it is. */
+function overrideAction(
+  api: Api,
+  action: ActionEntry | null,
+  canOverride: boolean,
+  state: ReturnType<typeof useActionState>,
+  report: (result: WriteResult) => boolean,
+  onSaved: (id: string) => Promise<void>,
+) {
+  return () =>
+    state.attempt(async () => {
+      if (!canOverride || !action) return;
+      state.clearAnswer();
+      const result = await api.writeAction(action.id, { ...action.raw }, null, 'project');
+      if (report(result)) {
+        // the project copy exists now: show it, not the shared file
+        state.setLevel('project');
+        state.setDraft(draftOfAction(action.raw));
+        await onSaved(action.id);
+      }
+    });
+}
+
+/**
+ * A shared action is view only in the project: `canOverride` copies it into the project, and the
+ * level switch exists only for an action that has a file at both levels.
+ */
+function sharedStateOf(action: ActionEntry | null, level: WriteLevel) {
+  const sources = action?.sources ?? {};
+  const bothLevels = Boolean(sources.global) && Boolean(sources.project);
+  return {
+    readOnly: action !== null && level === 'global',
+    canOverride: action !== null && Boolean(sources.global) && !sources.project,
+    bothLevels,
+    overriding: bothLevels && level === 'project',
+  };
+}
+
 /** The state and the actions (save, delete, switch the level, read again) of the action form. */
 export function useActionEditor(input: ActionEditorInput) {
   const { api, view, action, onDirty, onReload, onSaved, onDeleted } = input;
@@ -130,8 +171,12 @@ export function useActionEditor(input: ActionEditorInput) {
   const { value, dirty } = useDirty(raw, draft, action === null && newId !== '', onDirty);
 
   const report = (result: WriteResult): boolean => reportWrite(state, result);
+  const shared = sharedStateOf(action, level);
+  const { readOnly } = shared;
+  const override = overrideAction(api, action, shared.canOverride, state, report, onSaved);
   const save = () =>
     attempt(async () => {
+      if (readOnly) return;
       state.clearAnswer();
       const result = await api.writeAction(
         id,
@@ -143,7 +188,7 @@ export function useActionEditor(input: ActionEditorInput) {
     });
   const remove = () =>
     attempt(async () => {
-      if (!action || !source) return;
+      if (!action || !source || readOnly) return;
       const yes = await confirm({
         title: t('settings.editor.removeTitle', {
           action: t('settings.editor.remove'),
@@ -179,16 +224,17 @@ export function useActionEditor(input: ActionEditorInput) {
     state.setDraft(draftOfAction(action?.sources[next]?.raw ?? action?.raw ?? {}));
     state.setLevel(next);
   };
-  const options = optionsOf(view);
   const fieldErrors = (field: Field) => errors.filter((error) => fieldOf(error.path, id) === field);
   const otherErrors = errors.filter((error) => fieldOf(error.path, id) === null);
   return {
     ...state,
     id,
-    options,
+    options: optionsOf(view),
     dirty,
     fieldErrors,
     otherErrors,
+    ...shared,
+    override,
     save,
     remove,
     reread,

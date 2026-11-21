@@ -39,7 +39,20 @@ export function ActionHeader({
         <Badge variant="outline">{t(`settings.editor.levels.${level}`)}</Badge>
       </div>
       {file ? <FilePath variant="line" path={file} /> : null}
-      {locked ? null : (
+      {locked ? null : editor.readOnly ? (
+        <div className="flex flex-col gap-2">
+          <p role="status" className="text-sm text-muted-foreground">
+            {t('pipeline.actions.sharedReadOnly')}
+          </p>
+          {editor.canOverride ? (
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={busy} onClick={() => void editor.override()}>
+                {t('settings.editor.overrideInProject')}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : (
         <div className="flex flex-wrap gap-2">
           <Button disabled={busy || (!action && !editor.newId)} onClick={() => void editor.save()}>
             {t('settings.editor.save')}
@@ -51,7 +64,9 @@ export function ActionHeader({
           ) : null}
           {action && source ? (
             <Button variant="destructive" disabled={busy} onClick={() => void editor.remove()}>
-              {t('settings.editor.remove')}
+              {editor.overriding
+                ? t('settings.editor.removeOverride')
+                : t('settings.editor.remove')}
             </Button>
           ) : null}
         </div>

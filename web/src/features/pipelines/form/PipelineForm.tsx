@@ -225,16 +225,13 @@ export function PipelineForm(props: PipelineFormProps) {
             busy={busy}
             canSave={(Boolean(pipeline) || editor.newId !== '') && !hasDuplicateIds(draft.variants)}
             overrideInProject={copyOnly && Boolean(sources.global) && !sources.project}
-            makeGlobal={
-              pipeline !== null && Boolean(sources.project) && !sources.global && !readOnly
-            }
             canRemove={Boolean(pipeline && source) && !readOnly}
             removeBlocked={editor.removeBlocked}
             removeBlockedReason={editor.removeBlockedReason}
             removeLabel={editor.removeLabel}
             saveAs={editor.saveAs}
             onSave={() => void editor.save()}
-            onCopyTo={(target) => void editor.copyTo(target)}
+            onOverride={() => void editor.copyToProject()}
             onSaveAs={editor.setSaveAs}
             onSaveCopy={() => void editor.saveCopy()}
             onRemove={() => void editor.remove()}

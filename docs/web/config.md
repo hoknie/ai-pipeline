@@ -32,7 +32,7 @@ The "Specialists" tab edits the `aip/specialists/<slug>.yaml` files of the proje
 - The runtime selector includes Claude Code, OpenCode, Antigravity CLI (`agy`), Codex CLI, Kilo Code CLI, Cline CLI and GitHub Copilot CLI. The tools and skills picker follows the selected runtime.
 - The page filters specialists by tags, search text, level, `runtime`, `model`, `skills`, `tools` and `allow_commands`; values are taken after `defaults`.
 - Delete is refused with a list of references while steps use the specialist.
-- "Override in the project", "Make global" and "Remove the override" move a specialist between the levels. A "Project / Global" switch chooses the level when files exist on both.
+- "Override in the project" and "Remove the override" move a specialist between the project and the shared level; the project never writes a shared file. A new specialist is always a project one. A "Project / Global" switch shows the shared file, view only, when files exist on both.
 - "Import" copies specialists of another repository.
 
 The addresses are `#specialists`, `#specialists/<slug>` and `#specialists/new`.
@@ -69,6 +69,8 @@ The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Sha
 - Running runs continue from their snapshot after the pipeline is deleted. A new run of a deleted pipeline is rejected.
 
 The "Actions" tab edits one action. A sticky header shows its name, the level, the file and the buttons "Save", "Discard changes" (after an edit) and "Delete".
+
+A shared action opens view only: "Override in the project" copies it into the project, and "Remove the override" deletes the project copy. A new action is always a project one. The "Project / Global" switch appears only when the action has files at both levels.
 
 Below, the card "Main" holds the id of a new action, the name, the type and "On failure"; next to it (two columns on a wide window, one on a narrow one) is the card "Command" with a single script field that grows with the text, and the timeout, or the card "Specialist".
 

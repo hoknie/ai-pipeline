@@ -982,7 +982,7 @@ export const zh: Dictionary = {
       autoDeliver: '自动交付',
       autoDeliverHint: '对没有自己自动交付设置的任务在其启动时生效。',
       savedToProject: '保存到项目文件：{{file}}',
-      savedToGlobal: '保存到共享文件：{{file}}',
+      inheritedShared: '取自共享文件；修改保存到项目文件：{{file}}',
       autoDeliverInvalid: '配置无效',
       deliveryMode: '交付方式',
       deliveryModeHint:
@@ -1639,6 +1639,7 @@ export const zh: Dictionary = {
       reread: '重新读取动作',
       usedBy: '这个动作仍在以下位置被引用：',
       projectHint: '动作写入项目；同 id 的共享动作保持不变。',
+      sharedReadOnly: '共享动作在此仅可查看。在项目中覆盖后即可仅为本项目修改。',
       name: '名称',
       kind: '类型',
       command: '命令',
@@ -1852,7 +1853,6 @@ export const zh: Dictionary = {
       conflict: '冲突：{{message}}。打开表单后文件已被修改。',
       save: '保存',
       overrideInProject: '在项目中覆盖',
-      makeGlobal: '设为全局',
       saveAs: '另存为…',
       createCopy: '创建副本',
     },
@@ -2042,7 +2042,8 @@ export const zh: Dictionary = {
         project_over_global: '项目覆盖共享',
       },
     },
-    swarmNoteProject: '层级在保存时选择：项目或共享。',
+    swarmNoteProject:
+      '此处的所有内容都保存到项目。共享条目仅可查看：在项目中覆盖，或在「全局」标签页中修改。',
     group: {
       integrations: '集成',
       swarm: '集群',
