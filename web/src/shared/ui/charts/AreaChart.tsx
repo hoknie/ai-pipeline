@@ -11,6 +11,7 @@ import {
 } from './AreaParts.tsx';
 import { Legend } from './BarParts.tsx';
 import { DataTable } from './DataTable.tsx';
+import { tipLeft } from './ChartTooltip.tsx';
 import { columnTotals, type ChartSeries } from './scale.ts';
 import {
   areaNiceTicks,
@@ -189,7 +190,7 @@ function AreaActiveTipOverlay(props: {
       series={props.series}
       index={props.active}
       total={props.format(props.totals[props.active] ?? 0)}
-      left={Math.min(Math.max(MARGIN.left + props.activeX, 80), props.width - 80)}
+      left={tipLeft(MARGIN.left + props.activeX, props.width)}
       format={props.format}
     />
   );

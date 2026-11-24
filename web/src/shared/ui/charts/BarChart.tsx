@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import { ActiveTip, Legend, Plot, type ChartCategory } from './BarParts.tsx';
 import { DataTable } from './DataTable.tsx';
+import { tipLeft } from './ChartTooltip.tsx';
 import { barLayout, columnTotals, niceTicks, thinLabels, type ChartSeries } from './scale.ts';
 
 export type { ChartCategory };
@@ -103,7 +104,7 @@ export function BarChart({
             series={series}
             index={active}
             total={format(totals[active] ?? 0)}
-            left={Math.min(Math.max(MARGIN.left + slot.slotX + slot.slot / 2, 80), width - 80)}
+            left={tipLeft(MARGIN.left + slot.slotX + slot.slot / 2, width)}
             format={format}
           />
         ) : null}

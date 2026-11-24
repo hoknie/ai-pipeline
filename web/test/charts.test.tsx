@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { tipLeft } from '../src/shared/ui/charts/ChartTooltip.tsx';
 import { AreaChart, BarChart, ShareBars, StackBar } from '../src/shared/ui/charts/index.ts';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
@@ -244,7 +245,7 @@ describe('ShareBars', () => {
 });
 
 describe('StackBar', () => {
-  it('names every part and gives a table', () => {
+  it('writes the value and the percent of every row', () => {
     render(
       <StackBar
         label="Task outcomes"
@@ -261,5 +262,37 @@ describe('StackBar', () => {
     expect(screen.getByTestId('stack-finished').style.width).toBe('75%');
     expect(screen.queryByTestId('stack-cancelled')).toBeNull();
     expect(screen.getByRole('table', { name: 'Task outcomes' })).toBeTruthy();
+  });
+});
+
+describe('the tip stays inside the chart', () => {
+  /** Half of the widest tip (`max-w-64` = 256px): the room the left keeps on each side. */
+  const HALF = 128;
+  /** The chart of the tests: jsdom measures no width, so the default 640 stands. */
+  const WIDTH = 640;
+
+  it('pulls the left of the tip inside the chart, a narrow chart centers it', () => {
+    expect(tipLeft(0, WIDTH)).toBe(HALF);
+    expect(tipLeft(WIDTH, WIDTH)).toBe(WIDTH - HALF);
+    expect(tipLeft(300, WIDTH)).toBe(300);
+    expect(tipLeft(WIDTH / 2, WIDTH)).toBe(WIDTH / 2);
+    expect(tipLeft(10, 200)).toBe(100);
+    expect(tipLeft(190, 256)).toBe(128);
+  });
+
+  it('keeps the tip of the last bar of the BarChart in the chart', () => {
+    const chart = mount();
+    fireEvent.focus(chart);
+    fireEvent.keyDown(chart, { key: 'End' });
+    const left = Number.parseFloat(screen.getByTestId('chart-tooltip').style.left);
+    expect(left).toBe(WIDTH - HALF);
+  });
+
+  it('keeps the tip of the last slot of the AreaChart in the chart', () => {
+    const chart = mountArea();
+    fireEvent.focus(chart);
+    fireEvent.keyDown(chart, { key: 'End' });
+    const left = Number.parseFloat(screen.getByTestId('chart-tooltip').style.left);
+    expect(left).toBe(WIDTH - HALF);
   });
 });

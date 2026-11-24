@@ -5,6 +5,19 @@ export interface TooltipRow {
   value: string;
 }
 
+/** Half of the widest tip (`max-w-64` = 256px): the room the left of the tip keeps on each side. */
+export const TIP_HALF = 128;
+
+/**
+ * The left of a tip centered on `x` in a chart of `width`, pulled inside so that even the widest
+ * tip stays in the chart: a tip past the chart is past the page and scrolls it horizontally.
+ * A chart narrower than the widest tip centers the tip.
+ */
+export function tipLeft(x: number, width: number): number {
+  if (width <= TIP_HALF * 2) return width / 2;
+  return Math.min(Math.max(x, TIP_HALF), width - TIP_HALF);
+}
+
 /**
  * The tip of a chart: the heading (a day), the total and a row with a dot of the color for every
  * series. It is a live region, so a screen reader hears it when the focus moves.

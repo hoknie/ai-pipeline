@@ -254,6 +254,16 @@ describe('daily chart', () => {
     ]);
   });
 
+  it('keeps the tip of the last day inside the chart, so the page gains no horizontal scroll', async () => {
+    mount(twoProjects());
+    const chart = await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    fireEvent.focus(chart);
+    fireEvent.keyDown(chart, { key: 'End' });
+    // Half of the widest tip (`max-w-64`) is pulled in from the right edge of the chart: the tip
+    // of 256px ends at the edge instead of past it and past the scrollable area of the page.
+    expect(Number.parseFloat(screen.getByTestId('chart-tooltip').style.left)).toBe(512);
+  });
+
   it('lists the tip rows from the largest value to the smallest', async () => {
     const base = twoProjects();
     mount({
