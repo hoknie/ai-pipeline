@@ -53,7 +53,9 @@ function queueKit(program: Command, io: CliIo, style: Style) {
         '--after <id>',
         'queue item or run that must be done first; repeat for several',
         collect,
-      );
+      )
+      .option('--inherit-tags', 'the task takes the tags of its predecessors (the default)')
+      .option('--no-inherit-tags', 'the task takes no tags of its predecessors, now and later');
   const common = (command: Command): Command =>
     command
       .option('-r, --repo <path>', 'repository path or project slug', '.')

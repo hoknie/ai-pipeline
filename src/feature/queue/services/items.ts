@@ -58,10 +58,10 @@ function fields(
   request: TaskFields & Pick<ItemFields, 'postponed' | 'author' | 'createdBySystem'>,
 ): ItemFields {
   const { pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode } = request;
-  const { skip, after, postponed, author, createdBySystem } = request;
+  const { skip, after, inheritTags, postponed, author, createdBySystem } = request;
   return {
     ...{ pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode },
-    ...{ skip, after, postponed, author, createdBySystem },
+    ...{ skip, after, inheritTags, postponed, author, createdBySystem },
   };
 }
 
@@ -99,7 +99,7 @@ export class QueueItems {
     const own = mergeTags(parentTag ? [parentTag.id] : [], manual);
     const item = await this.addWithAttachments(
       queue,
-      { ...task, tags: this.dependencies.taskTags.inherit(queue, own, after) },
+      { ...task, tags: this.dependencies.taskTags.inherit(queue, own, after, task.inheritTags) },
       params.attachments,
       moment,
     );
@@ -260,7 +260,7 @@ export class QueueItems {
     }
     const item = await this.addWithAttachments(
       queue,
-      { ...task, tags: taskTags.inherit(queue, own, after) },
+      { ...task, tags: taskTags.inherit(queue, own, after, task.inheritTags) },
       params.attachments,
       moment,
     );

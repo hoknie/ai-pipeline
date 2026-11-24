@@ -63,6 +63,7 @@ function taskFields(pipeline: string, options: AddOptions) {
     ...(options.provider === false ? { provider: null } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
+    ...(options.inheritTags !== undefined ? { inheritTags: options.inheritTags } : {}),
     ...(links !== undefined ? { links } : {}),
     ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
     ...(options.postpone ? { postponed: true } : {}),

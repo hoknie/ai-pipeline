@@ -17,6 +17,7 @@ import {
   topologyOf,
   pipelineOf,
   pipelinesView,
+  splitOf,
 } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
@@ -293,7 +294,7 @@ describe('opening a split from the topology', () => {
   it('opens the runs section with the split screen', async () => {
     const pipeline = pipelineOf({
       id: 'feature',
-      split: { specialist: 'plan', maxGroups: 3, pipeline: null, pipelineName: null },
+      split: splitOf(),
     });
     const run = runView({
       split: {

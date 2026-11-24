@@ -56,6 +56,10 @@ export function registerQueueAdd(kit: HostKit): void {
         provider: kit.provider,
         skip,
         after,
+        inheritTags: z
+          .boolean()
+          .optional()
+          .describe('false: the task takes no tags of its predecessors, now and later'),
         links: linkInputs,
         attachments,
         postponed: z
@@ -79,6 +83,7 @@ export function registerQueueAdd(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      inheritTags,
       links: taskLinks,
       attachments: files,
       postponed,
@@ -98,6 +103,7 @@ export function registerQueueAdd(kit: HostKit): void {
               ...(tagNames !== undefined ? { tags: tagNames } : {}),
               ...(parentRef !== undefined ? { parent: parentRef } : {}),
               ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),
+              ...(inheritTags !== undefined ? { inheritTags } : {}),
               ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
               ...(postponed !== undefined ? { postponed } : {}),
               ...(allowDuplicate !== undefined ? { allowDuplicate } : {}),
@@ -114,45 +120,57 @@ const postponedEdit = z
   .optional()
   .describe('true: a running queue does not take the task until you clear the flag');
 
+/** Fields of swarm_queue_edit; most of them repeat swarm_queue_add on a waiting task. */
+function queueEditInput(kit: HostKit) {
+  const { tags, parent, variant, skip, after, repo, item, queueGroups } = kit;
+  return {
+    item,
+    pipeline: z.string().optional(),
+    variant,
+    provider: kit.provider,
+    task: z.string().optional(),
+    groups: queueGroups.optional(),
+    title: z.string().nullable().optional().describe('null removes the title'),
+    position: z.number().int().min(1).optional().describe('New position, from 1'),
+    autoDeliver: z
+      .boolean()
+      .nullable()
+      .optional()
+      .describe('Automatic delivery of this task; null follows delivery.auto again'),
+    deliveryMode: z
+      .enum(DELIVERY_MODES)
+      .nullable()
+      .optional()
+      .describe('Delivery mode of this task; null follows delivery.mode again'),
+    tags,
+    parent: parent
+      .nullable()
+      .describe(
+        'Run id or task number of this repository: replaces the linked task tags of the task with the tag of that run; null removes them',
+      ),
+    skip,
+    after,
+    inheritTags: z
+      .boolean()
+      .optional()
+      .describe(
+        'false: the task stops taking the tags of its predecessors; true: it takes them again',
+      ),
+    links: linkInputs,
+    postponed: postponedEdit,
+    repo,
+  };
+}
+
 export function registerQueueEdit(kit: HostKit): void {
-  const { server, tags, parent, variant, skip, after, repo, item, queueGroups, showQueue } = kit;
+  const { server, showQueue } = kit;
   server.registerTool(
     'swarm_queue_edit',
     {
       title: 'Change a queued task',
       description:
         'Change fields of a waiting task, or move it to a position (1 starts first). A task that already became a run cannot be changed, except `skip`: for a returned run it skips or restores the steps of the run at once.',
-      inputSchema: {
-        item,
-        pipeline: z.string().optional(),
-        variant,
-        provider: kit.provider,
-        task: z.string().optional(),
-        groups: queueGroups.optional(),
-        title: z.string().nullable().optional().describe('null removes the title'),
-        position: z.number().int().min(1).optional().describe('New position, from 1'),
-        autoDeliver: z
-          .boolean()
-          .nullable()
-          .optional()
-          .describe('Automatic delivery of this task; null follows delivery.auto again'),
-        deliveryMode: z
-          .enum(DELIVERY_MODES)
-          .nullable()
-          .optional()
-          .describe('Delivery mode of this task; null follows delivery.mode again'),
-        tags,
-        parent: parent
-          .nullable()
-          .describe(
-            'Run id or task number of this repository: replaces the linked task tags of the task with the tag of that run; null removes them',
-          ),
-        skip,
-        after,
-        links: linkInputs,
-        postponed: postponedEdit,
-        repo,
-      },
+      inputSchema: queueEditInput(kit),
     },
     ({
       item: id,
@@ -169,6 +187,7 @@ export function registerQueueEdit(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      inheritTags,
       links: taskLinks,
       postponed,
       repo: where,
@@ -187,6 +206,7 @@ export function registerQueueEdit(kit: HostKit): void {
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(parentRef !== undefined ? { parent: parentRef } : {}),
             ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),
+            ...(inheritTags !== undefined ? { inheritTags } : {}),
             ...(postponed !== undefined ? { postponed } : {}),
           },
           where,

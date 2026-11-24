@@ -45,6 +45,7 @@ const VIEW: QueueView & { item: string } = {
       autoDeliver: null,
       deliveryMode: null,
       tags: [],
+      inheritTags: true,
       skip: [],
       readiness: 'ready',
       after: [],

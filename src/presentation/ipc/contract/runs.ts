@@ -77,6 +77,7 @@ const runParams = z
     parent: parentRef.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    inheritTags: z.boolean().optional(),
     links: linkInputs.optional(),
     attachments: attachmentSources.optional(),
     allowDuplicate: z.boolean().optional(),

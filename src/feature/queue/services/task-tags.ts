@@ -72,18 +72,23 @@ export class TaskTags {
     return repository;
   }
 
-  /** Own tags plus the tags of the predecessors in `after`, only those still in the catalog. */
-  inherit(queue: Queue, own: string[], after: string[]): string[] {
+  /**
+   * Own tags plus the tags of the predecessors in `after`, only those still in the catalog.
+   * With `inheritTags` off the task takes none: the dependency stays execution only.
+   */
+  inherit(queue: Queue, own: string[], after: string[], inheritTags = true): string[] {
     const { runs, tags } = this.dependencies;
-    const inherited = dependencyTags(
-      queue,
-      after,
-      (id) => {
-        const run = runs.states.lookup(id)?.run;
-        return run?.repository === queue.repository ? run.tags : undefined;
-      },
-      this.dependencies.store.findItem,
-    );
+    const inherited = inheritTags
+      ? dependencyTags(
+          queue,
+          after,
+          (id) => {
+            const run = runs.states.lookup(id)?.run;
+            return run?.repository === queue.repository ? run.tags : undefined;
+          },
+          this.dependencies.store.findItem,
+        )
+      : [];
     return knownTags(tags.of(queue.repository), mergeTags(own, inherited));
   }
 

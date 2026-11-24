@@ -25,6 +25,7 @@ export function returnItem(state: RunState, id: string, now: number): QueueItem 
     autoDeliver: null,
     deliveryMode: null,
     tags: [...state.run.tags],
+    inheritTags: true,
     skip: [],
     after: [],
     createdAt: now,

@@ -104,6 +104,10 @@ describe('pipeline topology', () => {
       model: null,
       permissions: 'read',
       onReject: { goto: 'code', maxRounds: 3 },
+      runtimeChain: null,
+      runtimeSource: 'unknown',
+      modelSource: 'runtime',
+      launch: null,
     });
     expect(all[0]).toMatchObject({ split: null, delivery: { mode: 'worktree', resolver: null } });
     expect(pipelineTopology(config(), 'missing')).toBeNull();
@@ -149,6 +153,12 @@ describe('topology of a pipeline that splits into another', () => {
       maxGroups: 5,
       pipeline: 'explore',
       pipelineName: 'explore',
+      runtime: 'claude',
+      model: null,
+      runtimeChain: null,
+      runtimeSource: 'unknown',
+      modelSource: 'runtime',
+      launch: null,
     });
     expect(view?.steps.map((entry) => entry.id)).toEqual(['research', 'write']);
   });

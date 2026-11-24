@@ -7,6 +7,9 @@ These sections show and edit the [specialists](../configuration/specialists.md) 
 The list shows the pipelines of the repository with the number of active runs. The graph shows the steps with specialist, runtime, model and permissions, the split, the merge, the delivery and the resolver.
 
 - A pipeline with [variants](../configuration/pipelines.md) has a choice of the variant above the graph, with the number of active runs of each. The graph then shows the steps of that variant (skipped ones marked) and only the groups of its runs. The address is `#pipelines/topology/<id>/<variant>`; an unknown variant falls back to `default`.
+- For a runtime chain, the graph lists its candidates and mode; the actual choice is made at launch.
+  Hover over a step or split to see the executor's source. When the resolved configuration cannot
+  distinguish an explicit runtime from an inherited default, the source is shown as unknown.
 - Dashed arcs are `on_reject` returns with their round limit.
 - The groups of active runs sit at their current step. A click on a group opens it in "Runs".
 - A node whose specialist has a limit shows "busy N of M · in other runs: K". It is highlighted when the limit is reached.

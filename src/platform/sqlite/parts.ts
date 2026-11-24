@@ -74,4 +74,6 @@ export const LATER_MIGRATIONS: string[] = [
   SERVICE_REGISTRY_LINKS_MIGRATION,
   // when the worktrees and service refs of a run were removed; old rows stay NULL
   `ALTER TABLE runs ADD COLUMN cleaned_at INTEGER`,
+  // whether a queue item takes the tags of its predecessors in `after`; old rows inherit them
+  `ALTER TABLE queue_items ADD COLUMN inherit_tags INTEGER NOT NULL DEFAULT 1`,
 ];

@@ -65,6 +65,8 @@ interface StartOptions {
   provider?: string | false;
   skip?: string[];
   after?: string[];
+  /** `false` after `--no-inherit-tags`. */
+  inheritTags?: boolean;
   attach?: string[];
   link?: string[];
   allowDuplicate?: boolean;
@@ -98,6 +100,7 @@ function startParams(pipeline: string, options: StartOptions) {
     ...(options.provider === false ? { provider: null } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
+    ...(options.inheritTags === false ? { inheritTags: false } : {}),
     ...(links !== undefined ? { links } : {}),
     ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
     ...(options.allowDuplicate ? { allowDuplicate: true } : {}),
@@ -151,6 +154,7 @@ function addStart(kit: RunKit): void {
       'queue item or run that must be done first; repeat for several',
       collect,
     )
+    .option('--no-inherit-tags', 'the task takes no tags of its predecessors, now and later')
     .option(
       '--link <kind>:<task>',
       'link of the task, e.g. related:#12; repeat for several',

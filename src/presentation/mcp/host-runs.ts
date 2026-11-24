@@ -35,6 +35,10 @@ export function registerRun(kit: HostKit): void {
         provider: kit.provider,
         skip,
         after,
+        inheritTags: z
+          .boolean()
+          .optional()
+          .describe('false: the task takes no tags of its predecessors, now and later'),
         links: linkInputs,
         attachments,
         allowDuplicate: z.boolean().optional().describe(ALLOW_DUPLICATE),
@@ -54,6 +58,7 @@ export function registerRun(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      inheritTags,
       links: taskLinks,
       attachments: files,
       allowDuplicate,
@@ -73,6 +78,7 @@ export function registerRun(kit: HostKit): void {
             ...(parentRef !== undefined ? { parent: parentRef } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
+            ...(inheritTags !== undefined ? { inheritTags } : {}),
             ...(taskLinks !== undefined ? { links: taskLinks } : {}),
             ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
             ...(allowDuplicate !== undefined ? { allowDuplicate } : {}),

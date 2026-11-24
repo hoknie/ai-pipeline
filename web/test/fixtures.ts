@@ -31,6 +31,7 @@ import type {
   Topology,
   Transcript,
   PipelineTopology,
+  SplitTopology,
   PipelinesView,
   SystemView,
   SpecialistTagFolderView,
@@ -66,6 +67,10 @@ export function topologyOf(overrides: Partial<Topology> = {}): Topology {
     model: 'sonnet',
     permissions: 'edit' as const,
     onReject: null,
+    runtimeChain: null,
+    runtimeSource: 'defaults' as const,
+    modelSource: 'specialist' as const,
+    launch: null,
     groups: [],
     attempts: 0,
     rejections: 0,
@@ -288,6 +293,23 @@ export function variantOf(
     skip,
     steps: steps.map((step) => ({ ...step, skipped: skip.includes(step.id) })),
     split: null,
+  };
+}
+
+/** The split of a pipeline with the launch plan of its specialist. */
+export function splitOf(overrides: Partial<SplitTopology> = {}): SplitTopology {
+  return {
+    specialist: 'plan',
+    maxGroups: 3,
+    pipeline: null,
+    pipelineName: null,
+    runtime: 'claude',
+    model: null,
+    runtimeChain: null,
+    runtimeSource: 'specialist',
+    modelSource: 'runtime',
+    launch: null,
+    ...overrides,
   };
 }
 
@@ -524,6 +546,7 @@ export function queueItem(
     autoDeliver: null,
     deliveryMode: null,
     tags: [],
+    inheritTags: true,
     skip: [],
     readiness: 'ready' as const,
     after: [],

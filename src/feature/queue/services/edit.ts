@@ -98,12 +98,13 @@ export class QueueEdit {
       autoDeliver,
       deliveryMode,
       postponed,
+      inheritTags,
     } = params;
     const patch = {
       ...{ pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode },
       position: global ? undefined : position,
     };
-    const fields = { ...patch, skip, after, postponed };
+    const fields = { ...patch, skip, after, inheritTags, postponed };
     const tags = await this.tagsOf(queue, existing, params, fields, moment);
     if (existing && changesAttachments) {
       // The edit is checked on a copy first: no file is stored for an edit that is refused.
@@ -266,8 +267,8 @@ export class QueueEdit {
 
   /**
    * The tags of the edited item: the named ones keep the linked tags, a new parent replaces its
-   * linked tag, new predecessors give theirs. Every check of the edit runs on a copy before the
-   * tag of the parent is created.
+   * linked tag, new predecessors give theirs unless the item inherits no tags. Every check of the
+   * edit runs on a copy before the tag of the parent is created.
    */
   private async tagsOf(
     queue: Queue,
@@ -299,7 +300,7 @@ export class QueueEdit {
       const rest = withoutLinkedTags(catalog(), tags ?? existing.tags);
       tags = mergeTags(parentTag ? [parentTag.id] : [], rest);
     }
-    if (existing && fields.after !== undefined) {
+    if (existing && fields.after !== undefined && (fields.inheritTags ?? existing.inheritTags)) {
       const fresh = fields.after.filter((ref) => !existing.after.includes(ref));
       const inherited = knownTags(
         catalog(),

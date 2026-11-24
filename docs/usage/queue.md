@@ -287,6 +287,9 @@ aip queue edit <item> --no-after                       # clears the list
 - A predecessor from another project shows its project slug: `after lib:q1 (waiting)`. A problem in its run blocks the task but does not stop the queue of its project. A task whose predecessor waits in a disabled project keeps waiting until the project is enabled and the predecessor is delivered.
 - A reference to the task itself, a cycle (also one through two projects) and an unknown id are refused.
 - `aip run start` with an unmet dependency leaves the task in the queue and answers with `run: null`.
+- By default the task also takes the [tags of its predecessors](tags.md#tags-of-tasks-with-after). Pass `--no-inherit-tags` (or `inheritTags: false`) to order the execution only: the task keeps its own tags when it is added or edited, and later tags of the predecessors do not reach it or the tasks behind it.
+- `aip queue edit --inherit-tags` turns the taking back on; the tags that a predecessor already had are not pulled in, the next new tag of a predecessor is.
+- `aip queue list --json` shows the flag of every task as `inheritTags`.
 
 ## One task in several projects
 

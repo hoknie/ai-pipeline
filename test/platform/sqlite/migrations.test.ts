@@ -48,7 +48,7 @@ describe('migrations', () => {
       'DROP INDEX attempts_history_order; DROP INDEX runs_history_repository;',
     );
     dropQueueFilter(previous.database.connection);
-    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 24}`);
+    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 25}`);
     previous.database.close();
 
     const migrated = openStorage(path);
@@ -115,7 +115,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(53);
+    expect(SCHEMA_VERSION).toBe(54);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -128,8 +128,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -28).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 28}`);
+    MIGRATIONS.slice(0, -29).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 29}`);
     prepare(database);
     migrate(database);
     return database;
@@ -248,7 +248,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 26}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 27}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -278,7 +278,7 @@ describe('project attributes', () => {
     old.known.addRepository('/a/app', 9);
     dropQueueFilter(old.database.connection);
     dropProjectAttributes(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 25}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 26}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(
@@ -304,7 +304,7 @@ describe('migration to the usage journal', () => {
     old.runs.saveRun(state);
     old.database.exec('DROP TABLE stats_attempts; DROP TABLE stats_runs; DROP TABLE stats_meta;');
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 23}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 24}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const names = (type: string) =>
@@ -339,7 +339,7 @@ describe('migration to pipeline variants', () => {
     old.queues.saveQueue(queue);
     // a database written before the variants: the column is not there, the rows are
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 22}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 23}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun('variant-run')?.run.variant).toBe('default');
@@ -355,7 +355,7 @@ describe('migration to attachments', () => {
     const state = run(1);
     old.runs.saveRun(state);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 20}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 21}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.attachments).toEqual([]);
@@ -391,9 +391,9 @@ describe('migration that removes the cost', () => {
          'claude', 'finished', 1, 2, 1, 12, 4, 0.5);`,
     );
     old.database.exec(
-      'ALTER TABLE runs DROP COLUMN cleaned_at; DROP TABLE notification_attempts; ALTER TABLE notification_subscriptions DROP COLUMN failure_streak; ALTER TABLE notification_subscriptions DROP COLUMN disabled_reason; ALTER TABLE runs DROP COLUMN pinned_skills_json; ALTER TABLE runs DROP COLUMN remote_branch_json; DROP INDEX stats_attempts_by_author; DROP INDEX stats_runs_by_author; ALTER TABLE stats_attempts DROP COLUMN author; ALTER TABLE stats_runs DROP COLUMN author; ALTER TABLE stats_meta DROP COLUMN author_backfilled_at; DROP TABLE audit_events; ALTER TABLE queue_items DROP COLUMN created_by_system; ALTER TABLE runs DROP COLUMN created_by_system; ALTER TABLE queue_items DROP COLUMN author_id; ALTER TABLE runs DROP COLUMN author_id; ALTER TABLE attempts DROP COLUMN chain_index; ALTER TABLE attempts DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN requested_provider; ALTER TABLE runs DROP COLUMN provider; ALTER TABLE queue_items DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN generation; DROP TABLE saml_assertions; DROP TABLE sso_requests; DROP INDEX users_by_subject; ALTER TABLE users DROP COLUMN source_issuer; ALTER TABLE users DROP COLUMN source_subject',
+      'ALTER TABLE queue_items DROP COLUMN inherit_tags; ALTER TABLE runs DROP COLUMN cleaned_at; DROP TABLE notification_attempts; ALTER TABLE notification_subscriptions DROP COLUMN failure_streak; ALTER TABLE notification_subscriptions DROP COLUMN disabled_reason; ALTER TABLE runs DROP COLUMN pinned_skills_json; ALTER TABLE runs DROP COLUMN remote_branch_json; DROP INDEX stats_attempts_by_author; DROP INDEX stats_runs_by_author; ALTER TABLE stats_attempts DROP COLUMN author; ALTER TABLE stats_runs DROP COLUMN author; ALTER TABLE stats_meta DROP COLUMN author_backfilled_at; DROP TABLE audit_events; ALTER TABLE queue_items DROP COLUMN created_by_system; ALTER TABLE runs DROP COLUMN created_by_system; ALTER TABLE queue_items DROP COLUMN author_id; ALTER TABLE runs DROP COLUMN author_id; ALTER TABLE attempts DROP COLUMN chain_index; ALTER TABLE attempts DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN requested_provider; ALTER TABLE runs DROP COLUMN provider; ALTER TABLE queue_items DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN generation; DROP TABLE saml_assertions; DROP TABLE sso_requests; DROP INDEX users_by_subject; ALTER TABLE users DROP COLUMN source_issuer; ALTER TABLE users DROP COLUMN source_subject',
     );
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 18}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 19}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -415,8 +415,8 @@ describe('migration to task links', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -17).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 17}`);
+    MIGRATIONS.slice(0, -18).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 18}`);
     prepare(database);
     migrate(database);
     return database;
@@ -502,8 +502,8 @@ describe('migration to task links', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const legacy = new DatabaseSync(path);
-    MIGRATIONS.slice(0, -17).forEach((sql) => legacy.exec(sql));
-    legacy.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 17}`);
+    MIGRATIONS.slice(0, -18).forEach((sql) => legacy.exec(sql));
+    legacy.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 18}`);
     addQueue(legacy, '/a');
     addItemRow(legacy, 'q1', '/a', 0, ['q0'], []);
     addTag(legacy, 'foreign', 'r2');
@@ -532,7 +532,7 @@ describe('migration to the global queue', () => {
     addItem(queue, { pipeline: 'feature', task: 'task' }, 'q1', 2);
     old.queues.saveQueue(queue);
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 21}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 22}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const row = store.database.prepare('SELECT * FROM global_queue').all() as Record<
@@ -553,7 +553,7 @@ describe('migration to the global queue', () => {
 describe('migration to the chain item of an attempt', () => {
   async function before(
     prepare: (database: import('node:sqlite').DatabaseSync) => void,
-    back = 15,
+    back = 16,
   ) {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
@@ -614,8 +614,8 @@ describe('migration to the generation of a conversation', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -14).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 14}`);
+    MIGRATIONS.slice(0, -15).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 15}`);
     prepare(database);
     migrate(database);
     return database;
@@ -728,8 +728,8 @@ describe('migration of an identity database to sign-in by a provider', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -11).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 11}`);
+    MIGRATIONS.slice(0, -12).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 12}`);
     old
       .prepare(
         "INSERT INTO users (id, email, email_key, name, created_at) VALUES ('u1', 'a@x.io', 'a@x.io', 'a', 1)",
@@ -762,8 +762,8 @@ describe('migration of a database to sign-in by SAML', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -10).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10}`);
+    MIGRATIONS.slice(0, -11).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 11}`);
     old
       .prepare(
         "INSERT INTO users (id, email, email_key, name, created_at) VALUES ('u1', 'a@x.io', 'a@x.io', 'a', 1)",
@@ -788,8 +788,8 @@ describe('migration of a database to the author and the audit journal', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -9).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9}`);
+    MIGRATIONS.slice(0, -10).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10}`);
     old
       .prepare(
         "INSERT INTO runs (id, repository, pipeline, base_commit, branch, created_at, config_json, dirty_warning, next_merge_seq) VALUES ('old-run', '/repo', 'f', 'abc', 'b', 1, '{}', 0, 0)",
@@ -836,8 +836,8 @@ describe('migration of the usage journal to the author', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -8).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
+    MIGRATIONS.slice(0, -9).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9}`);
     old
       .prepare(
         "INSERT INTO stats_runs (run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome) VALUES ('r1', '/repo', 'f', 1, 2, 1, 'finished')",
@@ -865,8 +865,8 @@ describe('migration to the remote branch of a run', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -7).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
+    MIGRATIONS.slice(0, -8).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
     old
       .prepare(
         "INSERT INTO runs (id, repository, pipeline, base_commit, branch, created_at, config_json, dirty_warning, next_merge_seq) VALUES ('old-run', '/repo', 'f', 'abc', 'b', 1, '{}', 0, 0)",
@@ -885,8 +885,8 @@ describe('migration of a database to the notifications', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -6).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    MIGRATIONS.slice(0, -7).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     old
       .prepare(
         "INSERT INTO runs (id, repository, pipeline, base_commit, branch, created_at, config_json, dirty_warning, next_merge_seq) VALUES ('old-run', '/repo', 'f', 'abc', 'b', 1, '{}', 0, 0)",

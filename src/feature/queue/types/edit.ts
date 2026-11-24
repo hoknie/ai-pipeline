@@ -85,6 +85,7 @@ export function addItem(
     autoDeliver: fields.autoDeliver ?? null,
     deliveryMode: cleanDeliveryMode(fields.deliveryMode) ?? null,
     tags: [...new Set(fields.tags ?? [])],
+    inheritTags: fields.inheritTags ?? true,
     skip: cleanSkip(fields.skip ?? []),
     after,
     postponed: fields.postponed ?? false,
@@ -108,6 +109,7 @@ export interface ItemPatch {
   autoDeliver?: boolean | null | undefined;
   deliveryMode?: DeliveryMode | null | undefined;
   tags?: string[] | undefined;
+  inheritTags?: boolean | undefined;
   skip?: string[] | undefined;
   after?: string[] | undefined;
   postponed?: boolean | undefined;
@@ -153,6 +155,7 @@ export function editItem(
   if (patch.autoDeliver !== undefined) item.autoDeliver = patch.autoDeliver;
   if (deliveryMode !== undefined) item.deliveryMode = deliveryMode;
   if (patch.tags !== undefined) item.tags = [...new Set(patch.tags)];
+  if (patch.inheritTags !== undefined) item.inheritTags = patch.inheritTags;
   if (patch.skip !== undefined) item.skip = cleanSkip(patch.skip);
   if (after !== undefined) item.after = after;
   if (patch.postponed !== undefined) item.postponed = patch.postponed;

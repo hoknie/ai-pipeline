@@ -10,8 +10,11 @@ import {
   groupUsage,
   limitResetsAt,
   parseActionSlug,
+  runTitle,
 } from '../../../feature/runs/types/index.ts';
 import type { ActionPoint } from '../../../feature/swarm-config/types/index.ts';
+import type { QueueItem } from '../../../feature/queue/types/index.ts';
+import { dependencyState, type ItemLookup } from '../../../feature/queue/types/index.ts';
 import type {
   ArtifactCounts,
   DiffLookup,
@@ -22,6 +25,7 @@ import type {
   SystemStepRow,
   WaitLookup,
 } from '../contract/responses/runs.ts';
+import type { DependencyView, QueueItemView } from '../contract/responses/queue.ts';
 
 export const NO_DIFFS: DiffLookup = () => null;
 
@@ -190,4 +194,99 @@ export function systemGroups(state: RunState): { kind: SystemStepKind; group: Gr
     ...(state.repair ? [{ kind: 'repair' as const, group: state.repair }] : []),
     ...actions('after_delivery'),
   ];
+}
+
+/** The task of an item; a returned run shows the task of the run. */
+function itemBody(
+  item: QueueItem,
+  lookup: (id: string) => RunState | undefined,
+): Pick<QueueItemView, 'task' | 'groups'> {
+  if (item.run === null) return { task: item.task, groups: item.groups };
+  const state = lookup(item.run);
+  if (!state) return { task: null, groups: null };
+  if (state.split) return { task: state.split.task, groups: null };
+  if (state.groups.length === 1) return { task: state.groups[0]!.task, groups: null };
+  return {
+    task: null,
+    groups: state.groups.map((group) => ({ title: group.title, task: group.task })),
+  };
+}
+
+/** The pipeline, variant and provider an item stands for: a returned run keeps its own variant and provider. */
+function itemTarget(
+  item: QueueItem,
+  lookup: (id: string) => RunState | undefined,
+  names: (id: string) => string,
+  variantNames: (pipeline: string, variant: string) => string,
+  providerNames: (slug: string) => string | null,
+): Pick<
+  QueueItemView,
+  'pipeline' | 'pipelineName' | 'variant' | 'variantName' | 'provider' | 'providerName'
+> {
+  const variant = (item.run === null ? undefined : lookup(item.run)?.run.variant) ?? item.variant;
+  const provider =
+    item.run === null ? item.provider : (lookup(item.run)?.run.provider ?? item.provider);
+  return {
+    pipeline: item.pipeline,
+    pipelineName: names(item.pipeline),
+    variant,
+    variantName: variantNames(item.pipeline, variant),
+    provider,
+    providerName: provider === null ? null : providerNames(provider),
+  };
+}
+
+/** A predecessor of a queue item: another item of the queue, or a run. */
+export function dependencyView(
+  find: ItemLookup,
+  ref: string,
+  lookup: (id: string) => RunState | undefined,
+): DependencyView {
+  const found = find(ref);
+  const state = dependencyState(find, ref, lookup);
+  if (found) {
+    const other = found.item;
+    const label = other.title ?? (other.task ? other.task.trim().split('\n')[0] : null);
+    return {
+      kind: 'item',
+      id: ref,
+      number: other.number,
+      title: label ?? other.pipeline,
+      state,
+      repository: found.queue.repository,
+    };
+  }
+  const run = lookup(ref);
+  return {
+    kind: 'run',
+    id: ref,
+    number: run ? run.run.number : null,
+    title: run ? runTitle(run) : ref,
+    state,
+    repository: run ? run.run.repository : null,
+  };
+}
+
+/** Body and target of a queue item card; the caller fills the rest of the fields. */
+export function itemCard(
+  item: QueueItem,
+  lookup: (id: string) => RunState | undefined,
+  names: (id: string) => string,
+  variantNames: (pipeline: string, variant: string) => string,
+  providerNames: (slug: string) => string | null,
+): Pick<
+  QueueItemView,
+  | 'task'
+  | 'groups'
+  | 'pipeline'
+  | 'pipelineName'
+  | 'variant'
+  | 'variantName'
+  | 'provider'
+  | 'providerName'
+> {
+  return {
+    ...itemTarget(item, lookup, names, variantNames, providerNames),
+    ...itemBody(item, lookup),
+  };
 }

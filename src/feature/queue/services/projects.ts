@@ -60,6 +60,7 @@ function fields(
     deliveryMode,
     skip,
     after,
+    inheritTags,
   } = request;
   return {
     pipeline,
@@ -72,6 +73,7 @@ function fields(
     deliveryMode,
     skip,
     after,
+    inheritTags,
     ...(request.postponed !== undefined ? { postponed: request.postponed } : {}),
     ...(request.author !== undefined ? { author: request.author } : {}),
     ...(request.createdBySystem !== undefined ? { createdBySystem: request.createdBySystem } : {}),
@@ -145,7 +147,7 @@ export class QueueProjects {
           });
           const item = addItem(
             queue,
-            { ...task, tags: taskTags.inherit(queue, own, waits) },
+            { ...task, tags: taskTags.inherit(queue, own, waits, task.inheritTags) },
             id,
             moment,
             store.findItem,

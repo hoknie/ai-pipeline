@@ -3,7 +3,6 @@ import {
   type QueueItem,
   DEFAULT_AUTOPILOT_ANSWER,
   canReturn,
-  dependencyState,
   freezeCandidate,
   itemReadiness,
   lookupIn,
@@ -33,22 +32,19 @@ import {
   variantNameOf,
 } from '../../../feature/swarm-config/types/index.ts';
 import type { Tag } from '../../../feature/tags/types/index.ts';
-import type {
-  DependencyView,
-  QueueItemView,
-  QueueRunView,
-  QueueView,
-} from '../contract/responses/queue.ts';
+import type { QueueItemView, QueueRunView, QueueView } from '../contract/responses/queue.ts';
 import type { WaitLookup } from '../contract/responses/runs.ts';
+import { itemRunMarks } from './cleanup/index.ts';
 import {
   NO_WAITS,
+  dependencyView,
   displayStatus,
   groupHold,
   groupLimitUntil,
+  itemCard,
   serviceStatus,
   systemGroups,
 } from './rows.ts';
-import { itemRunMarks } from './cleanup/index.ts';
 import { deliveryStage } from './runs.ts';
 import { tagViews } from './tags.ts';
 
@@ -133,86 +129,6 @@ function queueRunView(
   };
 }
 
-/** The task of an item; a returned run shows the task of the run. */
-function itemBody(
-  item: QueueItem,
-  lookup: (id: string) => RunState | undefined,
-): Pick<QueueItemView, 'task' | 'groups'> {
-  if (item.run === null) return { task: item.task, groups: item.groups };
-  const state = lookup(item.run);
-  if (!state) return { task: null, groups: null };
-  if (state.split) return { task: state.split.task, groups: null };
-  if (state.groups.length === 1) return { task: state.groups[0]!.task, groups: null };
-  return {
-    task: null,
-    groups: state.groups.map((group) => ({ title: group.title, task: group.task })),
-  };
-}
-
-/** The pipeline, variant and provider an item stands for: a returned run keeps its own variant and provider. */
-function itemTarget(
-  item: QueueItem,
-  lookup: (id: string) => RunState | undefined,
-  names: (id: string) => string,
-  variantNames: (pipeline: string, variant: string) => string,
-  providerNames: (slug: string) => string | null,
-): Pick<
-  QueueItemView,
-  'pipeline' | 'pipelineName' | 'variant' | 'variantName' | 'provider' | 'providerName'
-> {
-  const variant = variantOf(item, lookup);
-  const provider = providerOf(item, lookup);
-  return {
-    pipeline: item.pipeline,
-    pipelineName: names(item.pipeline),
-    variant,
-    variantName: variantNames(item.pipeline, variant),
-    provider,
-    providerName: provider === null ? null : providerNames(provider),
-  };
-}
-
-/** The variant of an item; a returned run keeps its own, which is changed in the run details. */
-function variantOf(item: QueueItem, lookup: (id: string) => RunState | undefined): string {
-  return (item.run === null ? undefined : lookup(item.run)?.run.variant) ?? item.variant;
-}
-
-/** The provider of an item; a returned run keeps its own. */
-function providerOf(item: QueueItem, lookup: (id: string) => RunState | undefined): string | null {
-  return item.run === null ? item.provider : (lookup(item.run)?.run.provider ?? item.provider);
-}
-
-/** A predecessor of a queue item: another item of the queue, or a run. */
-function dependencyView(
-  find: ItemLookup,
-  ref: string,
-  lookup: (id: string) => RunState | undefined,
-): DependencyView {
-  const found = find(ref);
-  const state = dependencyState(find, ref, lookup);
-  if (found) {
-    const other = found.item;
-    const label = other.title ?? (other.task ? other.task.trim().split('\n')[0] : null);
-    return {
-      kind: 'item',
-      id: ref,
-      number: other.number,
-      title: label ?? other.pipeline,
-      state,
-      repository: found.queue.repository,
-    };
-  }
-  const run = lookup(ref);
-  return {
-    kind: 'run',
-    id: ref,
-    number: run ? run.run.number : null,
-    title: run ? runTitle(run) : ref,
-    state,
-    repository: run ? run.run.repository : null,
-  };
-}
-
 /** The stop of a queue; a usage limit of a provider also names the provider by the run's configuration. */
 function stopView(
   stop: Queue['stop'],
@@ -222,6 +138,53 @@ function stopView(
   const config = lookup(stop.run)?.run.config;
   const name = config === undefined ? null : providerName(config, stop.provider);
   return name === null ? stop : { ...stop, providerName: name };
+}
+
+/** Card of one waiting task of the queue. */
+function itemView(
+  queue: Queue,
+  item: QueueItem,
+  index: number,
+  context: {
+    lookup: (id: string) => RunState | undefined;
+    names: (id: string) => string;
+    variantNames: (pipeline: string, variant: string) => string;
+    providerNames: (slug: string) => string | null;
+    find: ItemLookup;
+    catalog: readonly Tag[];
+    attachments: (item: string) => RunAttachment[];
+    links: (ids: string[]) => Pick<QueueItemView, 'links' | 'linkedBy'>;
+  },
+): QueueItemView {
+  const { lookup, names, variantNames, providerNames, find, catalog, attachments, links } = context;
+  return {
+    id: item.id,
+    number: item.number,
+    position: index + 1,
+    // the snapshots fill the author in: the views do not read the accounts
+    author: null,
+    createdBySystem: item.createdBySystem,
+    ...itemCard(item, lookup, names, variantNames, providerNames),
+    title: item.title,
+    autoDeliver: item.autoDeliver,
+    deliveryMode: item.deliveryMode,
+    tags: tagViews(catalog, item.tags),
+    inheritTags: item.inheritTags,
+    skip: [...(item.run === null ? item.skip : (lookup(item.run)?.run.skippedSteps ?? []))],
+    readiness: itemReadiness(find, item, lookup),
+    after: item.after.map((ref) => dependencyView(find, ref, lookup)),
+    ...links(item.run === null ? [item.id] : [item.id, item.run]),
+    postponed: item.postponed,
+    filtered: !matchesFilter(queue.filter, item),
+    createdAt: item.createdAt,
+    error: item.error,
+    run: item.run,
+    ...itemRunMarks(item, lookup),
+    attachments:
+      item.run === null
+        ? attachments(item.id)
+        : (lookup(item.run)?.run.attachments ?? []).map((file) => ({ ...file })),
+  };
 }
 
 export function queueView(
@@ -248,6 +211,16 @@ export function queueView(
     });
   const runs = cards(queue.runs, false);
   const skipped = cards(queue.skipped, true);
+  const context = {
+    lookup,
+    names,
+    variantNames,
+    providerNames,
+    find,
+    catalog,
+    attachments,
+    links,
+  };
   return {
     scope: 'project',
     repository: queue.repository,
@@ -272,34 +245,7 @@ export function queueView(
             null,
           )
         : null,
-    items: queue.items.map((item, index) => ({
-      id: item.id,
-      number: item.number,
-      position: index + 1,
-      // the snapshots fill the author in: the views do not read the accounts
-      author: null,
-      createdBySystem: item.createdBySystem,
-      ...itemTarget(item, lookup, names, variantNames, providerNames),
-      ...itemBody(item, lookup),
-      title: item.title,
-      autoDeliver: item.autoDeliver,
-      deliveryMode: item.deliveryMode,
-      tags: tagViews(catalog, item.tags),
-      skip: [...(item.run === null ? item.skip : (lookup(item.run)?.run.skippedSteps ?? []))],
-      readiness: itemReadiness(find, item, lookup),
-      after: item.after.map((ref) => dependencyView(find, ref, lookup)),
-      ...links(item.run === null ? [item.id] : [item.id, item.run]),
-      postponed: item.postponed,
-      filtered: !matchesFilter(queue.filter, item),
-      createdAt: item.createdAt,
-      error: item.error,
-      run: item.run,
-      ...itemRunMarks(item, lookup),
-      attachments:
-        item.run === null
-          ? attachments(item.id)
-          : (lookup(item.run)?.run.attachments ?? []).map((file) => ({ ...file })),
-    })),
+    items: queue.items.map((item, index) => itemView(queue, item, index, context)),
     runs,
     skipped,
     updatedAt: queue.updatedAt,

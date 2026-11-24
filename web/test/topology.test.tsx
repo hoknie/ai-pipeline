@@ -30,6 +30,7 @@ import {
   topologyOf,
   pipelineOf,
   pipelinesView,
+  splitOf,
 } from './fixtures.ts';
 
 beforeAll(() => {
@@ -180,7 +181,7 @@ describe('topology page', () => {
       pipelines: [
         pipelineOf({
           id: 'epic',
-          split: { specialist: 'plan', maxGroups: 3, pipeline: 'explore', pipelineName: 'explore' },
+          split: splitOf({ pipeline: 'explore', pipelineName: 'explore' }),
           steps: pipelineOf().steps.map((step) => ({ ...step, id: `explore-${step.id}` })),
         }),
       ],
@@ -206,7 +207,7 @@ describe('topology page', () => {
         pipelineOf(),
         pipelineOf({
           id: 'epic',
-          split: { specialist: 'plan', maxGroups: 3, pipeline: null, pipelineName: null },
+          split: splitOf(),
         }),
       ],
     });
@@ -803,7 +804,7 @@ describe('pipeline stages', () => {
   });
 
   const splitBase = pipelineOf({
-    split: { specialist: 'planner', maxGroups: 3, pipeline: null, pipelineName: null },
+    split: splitOf({ specialist: 'planner' }),
     delivery: { mode: 'worktree', resolver: 'coder' },
   });
   const engineStages = (pipeline: typeof splitBase): PipelineStage[] => [

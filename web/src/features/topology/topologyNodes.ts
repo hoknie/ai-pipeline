@@ -8,7 +8,8 @@ import {
   type StageSection,
 } from '../../shared/lib/pipeline/pipelineStages.ts';
 import { conditionText, performerText } from '../../shared/lib/pipeline/stageText.ts';
-import type { PipelineTopology } from '../../shared/api/types.ts';
+import type { LaunchCandidate, ModelSource, RuntimeSource } from '../../shared/api/types.ts';
+import type { PipelineTopology, StepInfo } from '../../shared/api/types.ts';
 import type { Live, LiveGroup } from './liveState.ts';
 import type { Busy, Size, StageData } from './topologyTypes.ts';
 
@@ -81,6 +82,44 @@ const EMPTY = {
   busy: null,
 };
 
+/** The executor and the model of a chain item, as the plan shows them. */
+function candidateText(candidate: LaunchCandidate): string {
+  return `${candidate.runtime}${candidate.model ? ` ${candidate.model}` : ''}`;
+}
+
+/**
+ * What a node with a specialist launches with: the fixed executor and model, or the chain whose
+ * item the launch picks by its mode. `line` is short for the node, `title` names the sources.
+ */
+export function launchText(
+  step: Pick<StepInfo, 'runtime' | 'model' | 'runtimeSource' | 'modelSource' | 'launch'>,
+  t: TFunction,
+): { line: string; title: string } {
+  const launch = step.launch;
+  const from = (source: RuntimeSource | ModelSource): string => t(`topology.launchFrom.${source}`);
+  if (!launch) {
+    const line = `${step.runtime}${step.model ? ` ${step.model}` : ''}`;
+    const title =
+      `${step.runtime} (${from(step.runtimeSource)})` +
+      (step.model ? ` · ${step.model} (${from(step.modelSource)})` : ` · ${from('runtime')}`);
+    return { line, title };
+  }
+  const enabled = launch.candidates.filter((candidate) => candidate.enabled);
+  const line = launch.active
+    ? `${t('topology.launchChain', { chain: launch.chain, mode: launch.mode })}: ${enabled
+        .map(candidateText)
+        .join(' · ')}`
+    : t('topology.launchChainOff', { chain: launch.chain, runtime: step.runtime });
+  const candidates = launch.candidates
+    .map((candidate) =>
+      candidate.enabled
+        ? candidateText(candidate)
+        : `${candidateText(candidate)} (${t('topology.launchOff')})`,
+    )
+    .join(' · ');
+  return { line, title: `${line} · ${candidates} · ${from('chain')}` };
+}
+
 type Common = Pick<
   StageData,
   'stageId' | 'section' | 'sectionStart' | 'performer' | 'condition' | 'link'
@@ -113,6 +152,7 @@ function splitNode({ pipeline, live, load, t }: NodeContext, common: Common): No
   const pipelineText = split.pipeline
     ? [t('topology.splitPipeline', { id: split.pipelineName ?? split.pipeline })]
     : [];
+  const launch = launchText(split, t);
   return {
     id: 'split',
     data: {
@@ -120,7 +160,16 @@ function splitNode({ pipeline, live, load, t }: NodeContext, common: Common): No
       title: t('topology.split'),
       subtitle: splitName,
       ...(splitName === split.specialist ? {} : { subtitleHint: split.specialist }),
-      detail: [t('topology.splitDetail', { n: split.maxGroups }), ...pipelineText].join(' · '),
+      detail: [
+        t('topology.splitDetail', { n: split.maxGroups }),
+        ...pipelineText,
+        launch.line,
+      ].join(' · '),
+      detailTitle: [
+        t('topology.splitDetail', { n: split.maxGroups }),
+        ...pipelineText,
+        launch.title,
+      ].join(' · '),
       groups: live.splitting,
       active: live.splitting.some((group) => group.status === 'running'),
       ...EMPTY,
@@ -132,17 +181,20 @@ function splitNode({ pipeline, live, load, t }: NodeContext, common: Common): No
 }
 
 function stepNode(ctx: NodeContext, stage: PipelineStage, common: Common): NodeSpec | null {
-  const { pipeline, live, load } = ctx;
+  const { pipeline, live, load, t } = ctx;
   const step = pipeline.steps.find((candidate) => `step:${candidate.id}` === stage.id);
   if (!step) return null;
   const groups = live.steps.get(step.id) ?? [];
+  const launch = launchText(step, t);
+  const permissions = ` · ${step.permissions}`;
   return {
     id: `step:${step.id}`,
     data: {
       kind: 'step',
       title: step.name,
       subtitle: step.specialist,
-      detail: `${step.runtime}${step.model ? ` ${step.model}` : ''} · ${step.permissions}`,
+      detail: `${launch.line}${permissions}`,
+      detailTitle: `${launch.title}${permissions}`,
       groups,
       attempts: live.attempts.get(step.id) ?? 0,
       inputTokens: live.inputTokens.get(step.id) ?? 0,

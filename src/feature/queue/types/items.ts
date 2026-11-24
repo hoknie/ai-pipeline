@@ -30,6 +30,8 @@ export interface QueueItem {
   deliveryMode: DeliveryMode | null;
   /** Ids of catalog tags. */
   tags: string[];
+  /** `false`: the task takes no tags of its predecessors in `after`, now and later. */
+  inheritTags: boolean;
   /** Ids of pipeline steps the task skips. */
   skip: string[];
   /** Ids of queue items or runs of the repository that must be done first. */
@@ -111,6 +113,7 @@ export interface ItemFields {
   autoDeliver?: boolean | undefined;
   deliveryMode?: DeliveryMode | undefined;
   tags?: string[] | undefined;
+  inheritTags?: boolean | undefined;
   skip?: string[] | undefined;
   after?: string[] | undefined;
   postponed?: boolean | undefined;

@@ -148,6 +148,18 @@ describe('items', () => {
     expect(ids(queue)).toEqual(['q1', 'q2']);
   });
 
+  it('stores whether a task inherits the tags of its predecessors', () => {
+    const queue = emptyQueue('/repo', 1);
+    expect(addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2).inheritTags).toBe(true);
+    expect(
+      addItem(queue, { pipeline: 'feature', task: 'B', inheritTags: false }, 'q2', 2).inheritTags,
+    ).toBe(false);
+    editItem(queue, 'q2', { inheritTags: true }, 3);
+    expect(queue.items[1]?.inheritTags).toBe(true);
+    editItem(queue, 'q1', {}, 4);
+    expect(queue.items[0]?.inheritTags).toBe(true);
+  });
+
   it('refuses an unknown item', () => {
     const queue = queueOf('A');
     expect(() => editItem(queue, 'nope', {}, 1)).toThrow('unknown queue item');
@@ -179,6 +191,12 @@ describe('returned run patch', () => {
     expect(() => checkReturnedPatch({ postponed: true })).not.toThrow();
     expect(() => checkReturnedPatch({ postponed: false })).not.toThrow();
     expect(() => checkReturnedPatch({ postponed: true, task: 'x' })).toThrow(
+      'a returned run keeps its own task',
+    );
+  });
+
+  it('refuses a change of the tag inheritance', () => {
+    expect(() => checkReturnedPatch({ inheritTags: false })).toThrow(
       'a returned run keeps its own task',
     );
   });
@@ -1140,6 +1158,14 @@ describe('tags along dependencies', () => {
     addItem(queue, { pipeline: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
     expect(spreadTags(queue, 'r1', ['tg-x'], 9)).toEqual(['q2']);
     expect(queue.items[1]?.tags).toEqual(['tg-x']);
+  });
+
+  it('spreadTags stops at a task that inherits no tags', () => {
+    const queue = tagged();
+    queue.items[1]!.inheritTags = false;
+    expect(spreadTags(queue, 'q1', ['tg-x'], 9)).toEqual([]);
+    expect(queue.items.map((item) => item.tags)).toEqual([['tg-a'], [], [], []]);
+    expect(queue.updatedAt).toBe(2);
   });
 
   it('spreadTags changes nothing for empty tags and leaves updatedAt alone', () => {

@@ -42,7 +42,15 @@ function StageLines({ data, testId }: { data: StageData; testId: string }) {
           {data.condition}
         </div>
       ) : null}
-      {data.detail ? <div className="truncate text-muted-foreground">{data.detail}</div> : null}
+      {data.detail ? (
+        <div
+          className="truncate text-muted-foreground"
+          title={data.detailTitle ?? data.detail}
+          data-testid={`detail-${testId}`}
+        >
+          {data.detail}
+        </div>
+      ) : null}
       {data.groups.length > 0 ? (
         <div className="flex min-w-0 flex-wrap gap-1">
           {data.groups.map((group) => (

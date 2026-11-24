@@ -56,7 +56,9 @@ export function spreadTags(
   while (grew) {
     grew = false;
     for (const item of queue.items) {
-      if (reached.has(item.id) || !item.after.some((ref) => reached.has(ref))) continue;
+      // A task that inherits no tags also forwards none: the chain of tags stops here.
+      if (reached.has(item.id) || item.inheritTags === false) continue;
+      if (!item.after.some((ref) => reached.has(ref))) continue;
       reached.add(item.id);
       grew = true;
       const next = mergeTags(item.tags, added);

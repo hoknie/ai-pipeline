@@ -81,9 +81,11 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
   }
 }
 
-/** Takes away the columns of the newest migrations (the variants and the take filter), when they are there. */
+/** Takes away the columns of the newest migrations (the tag inheritance and the cleanup time), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
-  // The newest migration adds the cleanup time of a run.
+  // The newest migration adds the tag inheritance of a queue item.
+  dropColumn(database, 'queue_items', 'inherit_tags');
+  // The one before adds the cleanup time of a run.
   dropColumn(database, 'runs', 'cleaned_at');
   // The one before adds the versions of the registry skills of a run.
   dropColumn(database, 'runs', 'pinned_skills_json');

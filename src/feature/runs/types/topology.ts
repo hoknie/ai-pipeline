@@ -19,6 +19,12 @@ import {
 import type { Attempt } from './attempt.ts';
 import type { GroupStatus, RunHold } from './constants.ts';
 import { type Group, actionOf, isRepairGroup, stepsOf } from './group.ts';
+import {
+  launchOf,
+  type LaunchPlan,
+  type ModelSource,
+  type RuntimeSource,
+} from './launch/launch.ts';
 import { type RunState, runPipeline } from './run.ts';
 import { actionName } from './stage-status.ts';
 import { type PipelineStage, pipelineStages } from './stages.ts';
@@ -37,6 +43,14 @@ export interface StepInfo {
   model: string | null;
   permissions: Permissions;
   onReject: OnReject | null;
+  /** Slug of the chain that picks the executor at the launch; null when both are fixed. */
+  runtimeChain: string | null;
+  /** Where `runtime` comes from. */
+  runtimeSource: RuntimeSource;
+  /** Where `model` comes from; `runtime` — the model of the runtime itself. */
+  modelSource: ModelSource;
+  /** What the launch picks from the chain; null when the executor and the model are fixed. */
+  launch: LaunchPlan | null;
 }
 
 export interface StepTopology extends StepInfo {
@@ -49,15 +63,24 @@ export interface StepTopology extends StepInfo {
   skipped: boolean;
 }
 
+/** The split of a pipeline: the specialist that divides the task, and whose steps follow. */
+export interface SplitTopology {
+  specialist: string;
+  maxGroups: number;
+  pipeline: string | null;
+  /** Display name of `pipeline`; null without it. */
+  pipelineName: string | null;
+  /** The executor and the model of the split, with their sources and the launch choice. */
+  runtime: Runtime;
+  model: string | null;
+  runtimeChain: string | null;
+  runtimeSource: RuntimeSource;
+  modelSource: ModelSource;
+  launch: LaunchPlan | null;
+}
+
 export interface Topology {
-  split: {
-    specialist: string;
-    maxGroups: number;
-    pipeline: string | null;
-    /** Display name of `pipeline`; null without it. */
-    pipelineName: string | null;
-    status: GroupStatus | 'waiting' | RunHold | null;
-  } | null;
+  split: (SplitTopology & { status: GroupStatus | 'waiting' | RunHold | null }) | null;
   steps: StepTopology[];
   /** Groups waiting for or in the merge queue, or in conflict. */
   merging: StepGroup[];
@@ -103,12 +126,7 @@ export interface PipelineTopology {
   id: string;
   /** Display name: `name` of the pipeline, else the id. */
   name: string;
-  split: {
-    specialist: string;
-    maxGroups: number;
-    pipeline: string | null;
-    pipelineName: string | null;
-  } | null;
+  split: SplitTopology | null;
   steps: StepInfo[];
   delivery: { mode: string; resolver: string | null };
   /** `max` of the specialists of the split, the steps and the resolver, by slug. */
@@ -159,14 +177,22 @@ export function attemptStepLabel(state: RunState, group: Group, attempt: Attempt
 
 function stepInfo(config: ResolvedConfig, steps: readonly Step[], step: Step): StepInfo {
   const specialist = stepSpecialist(config, step);
+  const plan = launchOf(config, step, specialist);
   return {
     id: step.id,
     specialist: step.specialist,
     name: stepLabel(config, steps, step),
-    runtime: specialist?.runtime ?? config.defaults.runtime,
-    model: specialist?.model ?? null,
+    runtime:
+      specialist?.runtimeChain && !plan.launch?.active
+        ? config.defaults.runtime
+        : (specialist?.runtime ?? config.defaults.runtime),
+    model: specialist?.runtimeChain && !plan.launch?.active ? null : (specialist?.model ?? null),
     permissions: specialist?.permissions ?? config.defaults.permissions,
     onReject: step.onReject,
+    runtimeChain: plan.runtimeChain,
+    runtimeSource: plan.runtimeSource,
+    modelSource: plan.modelSource,
+    launch: plan.launch,
   };
 }
 
@@ -200,15 +226,26 @@ function splitTargetName(config: ResolvedConfig, pipeline: Pipeline): string | n
   return target === null ? null : pipelineNameOf(config, target);
 }
 
-function splitInfo(config: ResolvedConfig, pipeline: Pipeline): PipelineTopology['split'] {
-  return pipeline.split
-    ? {
-        specialist: pipeline.split.specialist,
-        maxGroups: pipeline.split.maxGroups,
-        pipeline: pipeline.split.pipeline ?? null,
-        pipelineName: splitTargetName(config, pipeline),
-      }
-    : null;
+function splitInfo(config: ResolvedConfig, pipeline: Pipeline): SplitTopology | null {
+  const split = pipeline.split;
+  if (!split) return null;
+  const specialist = stepSpecialist(config, split);
+  const plan = launchOf(config, split, specialist);
+  return {
+    specialist: split.specialist,
+    maxGroups: split.maxGroups,
+    pipeline: split.pipeline ?? null,
+    pipelineName: splitTargetName(config, pipeline),
+    runtime:
+      specialist?.runtimeChain && !plan.launch?.active
+        ? config.defaults.runtime
+        : (specialist?.runtime ?? config.defaults.runtime),
+    model: specialist?.runtimeChain && !plan.launch?.active ? null : (specialist?.model ?? null),
+    runtimeChain: plan.runtimeChain,
+    runtimeSource: plan.runtimeSource,
+    modelSource: plan.modelSource,
+    launch: plan.launch,
+  };
 }
 
 function variantTopology(
@@ -234,14 +271,7 @@ function shape(config: ResolvedConfig, pipeline: Pipeline): PipelineTopology {
   return {
     id: pipeline.id,
     name: pipelineName(pipeline),
-    split: pipeline.split
-      ? {
-          specialist: pipeline.split.specialist,
-          maxGroups: pipeline.split.maxGroups,
-          pipeline: pipeline.split.pipeline ?? null,
-          pipelineName: splitTargetName(config, pipeline),
-        }
-      : null,
+    split: splitInfo(config, pipeline),
     steps: steps.map((step) => stepInfo(config, steps, step)),
     delivery: { mode: config.delivery.mode, resolver: config.delivery.resolver },
     limits: limitsOf(config, pipeline, steps),
@@ -289,16 +319,9 @@ export function topology(state: RunState): Topology {
       skipped: state.run.skippedSteps.includes(step.id),
     };
   });
+  const split = splitInfo(config, pipeline);
   return {
-    split: pipeline.split
-      ? {
-          specialist: pipeline.split.specialist,
-          maxGroups: pipeline.split.maxGroups,
-          pipeline: pipeline.split.pipeline ?? null,
-          pipelineName: splitTargetName(config, pipeline),
-          status: state.split?.status ?? null,
-        }
-      : null,
+    split: split && { ...split, status: state.split?.status ?? null },
     steps,
     merging: state.groups.filter((group) => AT_MERGE.includes(group.status)).map(brief),
     merged: state.groups.filter((group) => group.status === 'merged').map(brief),

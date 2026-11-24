@@ -21,6 +21,8 @@ export interface StageData extends Record<string, unknown> {
   /** The tooltip of the subtitle, when it is a name and the slug stands behind it. */
   subtitleHint?: string;
   detail: string | null;
+  /** The full plan behind `detail`: the sources of the executor and the model. */
+  detailTitle?: string;
   groups: LiveGroup[];
   attempts: number | null;
   inputTokens: number | null;

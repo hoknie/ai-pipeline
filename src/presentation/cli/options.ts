@@ -38,6 +38,8 @@ export interface QueueTaskOptions {
   tag?: string[];
   parent?: string | false;
   after?: string[];
+  /** `false` after `--no-inherit-tags`; `undefined` when neither flag of the pair is passed. */
+  inheritTags?: boolean;
   skip?: string[];
   variant?: string;
   /** A provider id; `false` after `--no-provider` of `queue edit`. */

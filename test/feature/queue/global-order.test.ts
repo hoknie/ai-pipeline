@@ -26,6 +26,7 @@ function item(id: string, createdAt: number, extra: Partial<QueueItem> = {}): Qu
     autoDeliver: null,
     deliveryMode: null,
     tags: [],
+    inheritTags: true,
     skip: [],
     after: [],
     postponed: false,

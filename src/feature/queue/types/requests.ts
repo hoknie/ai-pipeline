@@ -21,6 +21,8 @@ export interface TaskFields {
   skip?: string[] | undefined;
   /** Ids of queue items or runs this task waits for. */
   after?: string[] | undefined;
+  /** `false`: the task takes no tags of its predecessors, now and later; default: it takes them. */
+  inheritTags?: boolean | undefined;
   /** Links of the task: `{kind, target}`; not together with `after` or `parent`. */
   links?: LinkInput[] | undefined;
 }
@@ -79,7 +81,7 @@ export interface WorkerTaskRequest extends TaskFields {
 /** `worker_queue_edit`: the fields of a waiting task of its run a specialist changes. */
 export interface WorkerTaskEditRequest extends Omit<
   ItemPatch,
-  'tags' | 'after' | 'position' | 'postponed'
+  'tags' | 'after' | 'position' | 'postponed' | 'inheritTags'
 > {
   token: string;
   item: string;

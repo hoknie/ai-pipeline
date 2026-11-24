@@ -47,6 +47,8 @@ export interface QueueItemView {
   /** `null`: follows `delivery.mode` when the task starts. */
   deliveryMode: DeliveryMode | null;
   tags: TagView[];
+  /** `false`: the task takes no tags of its predecessors in `after`, now and later. */
+  inheritTags: boolean;
   skip: string[];
   /** Whether the task can start now: its predecessors are done, still pending or blocked. */
   readiness: ItemReadiness;

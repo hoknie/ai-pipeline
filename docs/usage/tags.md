@@ -79,3 +79,11 @@ aip queue edit <item> --parent 115       # replace the linked task tags of the t
 - A predecessor from another project gives no tags: the tag catalogs are per project.
 - A tag added later to a predecessor is appended to the waiting tasks that depend on it directly or through a chain.
 - Removing a tag, removing a link and runs that already exist do not change other tags.
+
+A task can wait for a predecessor without taking its tags: add it with `--no-inherit-tags` (`inheritTags: false` in `queue_add`, `run` and `queue_add_projects`), or change a waiting task with `aip queue edit --no-inherit-tags`.
+
+- Such a task keeps its own tags when it is added or edited: no tag of any predecessor joins them. The linked task tag of a `parent` is not affected: it comes from the parent, not from `after`.
+- A tag that a predecessor gets later does not reach the task, and it does not flow on to the tasks that wait behind it: the chain of tags stops there.
+- The dependency itself works as always: the task still waits until every predecessor is merged and delivered.
+- `aip queue edit --inherit-tags` turns the taking back on. The task's tags do not change at that moment; the next tag that a predecessor gets is appended again.
+- A returned run keeps its task: `inheritTags` is refused for it like the other fields of the task.

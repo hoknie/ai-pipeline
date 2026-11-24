@@ -845,6 +845,48 @@ describe('tags along dependencies', () => {
     expect(await tagsOfItem(h, second)).toEqual(['auth']);
   });
 
+  it('gives no tags of predecessors when the task inherits none, on add and on edit', async () => {
+    const h = await twoTags();
+    const first = await add(h, { tags: ['auth'] });
+    const plain = await add(h, { after: [first], inheritTags: false });
+    const own = await add(h, { after: [first], tags: ['ui'], inheritTags: false });
+    expect(await tagsOfItem(h, plain)).toEqual([]);
+    expect(await tagsOfItem(h, own)).toEqual(['ui']);
+    const edited = await add(h, {});
+    await h.call('queue_edit', {
+      repository: h.repo,
+      item: edited,
+      after: [first],
+      tags: [],
+      inheritTags: false,
+    });
+    expect(await tagsOfItem(h, edited)).toEqual([]);
+  });
+
+  it('does not spread a new tag of a predecessor to a task that inherits none', async () => {
+    const h = await twoTags();
+    const first = await add(h, {});
+    const guarded = await add(h, { after: [first], inheritTags: false });
+    const behind = await add(h, { after: [guarded] });
+    await h.call('queue_edit', { repository: h.repo, item: first, tags: ['auth'] });
+    expect(await tagsOfItem(h, first)).toEqual(['auth']);
+    expect(await tagsOfItem(h, guarded)).toEqual([]);
+    expect(await tagsOfItem(h, behind)).toEqual([]);
+  });
+
+  it('takes the tags of predecessors again after inheritTags turns on', async () => {
+    const h = await twoTags();
+    const first = await add(h, {});
+    const second = await add(h, { after: [first], inheritTags: false });
+    await h.call('queue_edit', { repository: h.repo, item: first, tags: ['auth'] });
+    expect(await tagsOfItem(h, second)).toEqual([]);
+    await h.call('queue_edit', { repository: h.repo, item: second, inheritTags: true });
+    // the flag alone pulls nothing back: inheritance needs a new tag of the predecessor
+    expect(await tagsOfItem(h, second)).toEqual([]);
+    await h.call('queue_edit', { repository: h.repo, item: first, tags: ['auth', 'v2'] });
+    expect(await tagsOfItem(h, second)).toEqual(['v2']);
+  });
+
   it('spreads a tag added to an item along the chain, but not a removal', async () => {
     const h = await twoTags();
     const first = await add(h, {});
