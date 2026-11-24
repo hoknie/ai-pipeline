@@ -14,6 +14,7 @@ import {
   skillHandlers,
 } from './integrations/index.ts';
 import { observerHandlers } from './observers.ts';
+import { lessonsHandlers } from './lessons.ts';
 import { providerHandlers } from './providers.ts';
 import { queueHandlers } from './queue.ts';
 import { repositoryHandlers } from './repositories.ts';
@@ -36,6 +37,7 @@ export const handlers: HandlerTable = {
   ...configHandlers,
   ...providerHandlers,
   ...runHandlers,
+  ...lessonsHandlers,
   ...groupHandlers,
   ...queueHandlers,
   ...statsHandlers,

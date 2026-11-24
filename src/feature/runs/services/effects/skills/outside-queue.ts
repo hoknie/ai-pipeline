@@ -1,13 +1,13 @@
 import type { Runtime } from '../../../../agents/types/index.ts';
 import type { Specialist } from '../../../../swarm-config/types/index.ts';
-import { findGroup, type RunState } from '../../../types/index.ts';
+import { findGroup, type LessonBlock, type RunState } from '../../../types/index.ts';
 
 import type { AttemptKey, EffectDependencies } from '../context.ts';
 
+import { withLessons } from './lessons.ts';
 import {
   heldPins,
   layOutSkills,
-  NO_SKILLS,
   pinsEvent,
   planSkills,
   type AttemptSkills,
@@ -73,7 +73,8 @@ export async function startWithRegistrySkills(
 
 /**
  * Starts an attempt with the skills its specialist needs: at once when there are none to fetch,
- * else through `startWithRegistrySkills` (the caller does not wait for the network).
+ * else through `startWithRegistrySkills` (the caller does not wait for the network). The lessons of
+ * the specialist go into the same folder; without lessons the attempt starts exactly as before.
  */
 export async function startWithSkills(
   dependencies: Pick<EffectDependencies, 'context' | 'registrySkills'>,
@@ -81,16 +82,24 @@ export async function startWithSkills(
   key: AttemptKey,
   specialist: Specialist,
   runtime: Pick<Runtime, 'name' | 'loadsExtraSkills'>,
+  lessons: LessonBlock | null,
   directory: string,
   begin: (skills: AttemptSkills) => Promise<void>,
   fail: (message: string) => Promise<void>,
 ): Promise<void> {
   const plan = planSkills(state, specialist, runtime);
   if (plan.kind === 'registry') {
-    void startWithRegistrySkills(dependencies, state, key, plan, directory, begin, fail);
+    void startWithRegistrySkills(
+      dependencies,
+      state,
+      key,
+      plan,
+      directory,
+      (skills) => begin(withLessons(directory, runtime, lessons, skills)),
+      fail,
+    );
     return;
   }
-  await begin(
-    plan.kind === 'unsupported' ? { directory: null, warnings: plan.warnings } : NO_SKILLS,
-  );
+  const warnings = plan.kind === 'unsupported' ? plan.warnings : [];
+  await begin(withLessons(directory, runtime, lessons, { directory: null, warnings }));
 }

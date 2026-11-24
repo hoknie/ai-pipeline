@@ -3,6 +3,7 @@ import type { Command } from 'commander';
 import { DELIVERY_MODES } from '../../../feature/swarm-config/types/index.ts';
 import {
   filterByTags,
+  formatLessons,
   formatRun,
   formatRunList,
   formatRunQueued,
@@ -10,7 +11,7 @@ import {
   type Style,
 } from '../../format/index.ts';
 import { repositoryArgument } from '../../ipc/client/index.ts';
-import type { RunQueued, RunView } from '../../ipc/contract/index.ts';
+import type { LessonSummaryView, RunQueued, RunView } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
 import { linkInputsOf } from '../links.ts';
@@ -262,6 +263,20 @@ function addShow(kit: RunKit): void {
     });
 }
 
+function addLessons(kit: RunKit): void {
+  const { output, examples, context, activeStyle, run } = kit;
+  run
+    .command('lessons')
+    .description('Show the lessons a run leaves to later attempts of its repository')
+    .argument('<run-id>', 'run id')
+    .option('--json', 'print JSON')
+    .addHelpText('after', examples(['aip run lessons 0mh3k2ab1x9z']))
+    .action(async (runId: string, options: { json?: boolean }) => {
+      const view = (await call(context(), 'run_lessons', { runId })) as LessonSummaryView;
+      output(options.json, formatLessons(view, activeStyle), view);
+    });
+}
+
 function addWatch(kit: RunKit): void {
   const { examples, context, io, run } = kit;
   run
@@ -289,7 +304,8 @@ function addCancel(kit: RunKit): void {
 
 export function registerRun(program: Command, io: CliIo, style: Style): void {
   const kit = runKit(program, io, style);
-  for (const add of [addStart, addList, addTag, addUntag, addShow, addWatch, addCancel]) add(kit);
+  for (const add of [addStart, addList, addTag, addUntag, addShow, addWatch, addCancel, addLessons])
+    add(kit);
   for (const add of [addPause, addApply, addMarkDelivered, addSkip, addVariant, addClean]) add(kit);
   addProvider(kit);
 }

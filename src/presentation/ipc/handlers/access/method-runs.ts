@@ -26,6 +26,7 @@ export const runMethods = {
   },
   finished_runs: onProject('project.read'),
   run_patch: onRun('run.read'),
+  run_lessons: onRun('run.read'),
   cancel: onRun('run.cancel'),
   run_clean: onRun('run.cancel'),
   retry: onRun('run.retry'),

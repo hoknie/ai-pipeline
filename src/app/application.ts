@@ -179,6 +179,7 @@ function createRuns(context: Context, lower: Lower) {
   runs = createRunsServices({
     ...context,
     ...lower,
+    stateDirectory: options.stateDirectory,
     entry: options.entry,
     graceMs: options.graceMs ?? timings.stopGraceMs,
     queue: ports.queue.port,

@@ -14,7 +14,11 @@ function skillLabel(skill: string): string {
   return parsed.ok ? parsed.ref.name : skill;
 }
 
-export function systemPrompt(specialist: Specialist, input: StepInput): string {
+export function systemPrompt(
+  specialist: Specialist,
+  input: StepInput,
+  lessonsSkill: string | null = null,
+): string {
   const lines = [
     `You are "${specialist.name}", a specialist in an aip swarm. Group: "${input.groupTitle}". Step: "${input.stepId}".`,
     'You work in an isolated git worktree: the current directory. Change files only inside it. Never run git push, git checkout or git switch, and never touch other directories.',
@@ -29,6 +33,11 @@ export function systemPrompt(specialist: Specialist, input: StepInput): string {
   ];
   if (specialist.skills.length > 0) {
     lines.push(`Use these skills for this step: ${specialist.skills.map(skillLabel).join(', ')}.`);
+  }
+  if (lessonsSkill) {
+    lines.push(
+      `Before you start, read the skill \`${lessonsSkill}\`: it lists objective lessons from earlier runs of this repository and says how often each pattern happened.`,
+    );
   }
   if (input.registryProject) {
     const { path, server } = input.registryProject;

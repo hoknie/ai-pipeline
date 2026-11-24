@@ -81,7 +81,7 @@ function launchOptions(context: LaunchContext, mcpConfigPath: string): string[] 
     ...(!context.attachmentsDirectory ? [] : ['--add-dir', context.attachmentsDirectory]),
     ...(!context.skillsDirectory ? [] : ['--add-dir', context.skillsDirectory]),
     '--append-system-prompt',
-    systemPrompt(context.specialist, context.input),
+    systemPrompt(context.specialist, context.input, context.lessonsSkill),
     '--tools',
     claudeTools(context).join(','),
     '--mcp-config',

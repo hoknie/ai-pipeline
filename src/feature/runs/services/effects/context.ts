@@ -17,6 +17,7 @@ import type {
   RunsPublishPort,
 } from '../../ports/index.ts';
 import type { Attempt, Group, RunState } from '../../types/index.ts';
+import type { RunLessons } from '../lessons/index.ts';
 
 /** What the effects take from the engine: the queue, `apply` and `save`. */
 export interface EffectContext {
@@ -71,6 +72,8 @@ export interface EffectDependencies {
   remoteMcp: RemoteMcpPort;
   /** The skills of a service registry for the specialists. */
   registrySkills: RegistrySkillsPort;
+  /** The lessons of the earlier runs of the repository for the specialists. */
+  lessons: RunLessons;
   /** The project of the service registry the project of a run is linked to. */
   registryProject: RegistryProjectPort;
   commits: RunCommitsPort;

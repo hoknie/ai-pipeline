@@ -41,7 +41,8 @@ export function ownMcpServers(context: LaunchContext): Record<string, object> {
 export function claudeTools(context: LaunchContext): string[] {
   const { permissions, skills, tools } = context.specialist;
   const base = permissions === 'read' ? READ_TOOLS : [...READ_TOOLS, ...EDIT_TOOLS, 'Bash'];
-  return [...new Set([...base, ...(skills.length > 0 ? ['Skill'] : []), ...tools])];
+  const hasSkills = skills.length > 0 || Boolean(context.lessonsSkill);
+  return [...new Set([...base, ...(hasSkills ? ['Skill'] : []), ...tools])];
 }
 
 /**

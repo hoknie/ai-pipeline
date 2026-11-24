@@ -8,6 +8,7 @@ import { auditRequests } from './identity/audit.ts';
 import { identityRequests } from './identity/identity.ts';
 import { integrationsRequests } from './integrations/integrations.ts';
 import { mcpRemoteRequests } from './integrations/remote.ts';
+import { lessonsRequests } from './lessons/index.ts';
 import { notificationsRequests } from './notifications/notifications.ts';
 import { observersRequests } from './observers.ts';
 import { networkStatusSchema, panelRequests } from './panel.ts';
@@ -22,6 +23,7 @@ import { z } from 'zod';
 
 export const requestSchema = z.discriminatedUnion('method', [
   ...runsRequests,
+  ...lessonsRequests,
   ...groupsRequests,
   ...artifactsRequests,
   ...queueRequests,

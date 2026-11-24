@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import type { Database } from '../../../platform/sqlite/index.ts';
 import type { AgentsService } from '../../agents/services/index.ts';
 import type { NetworkMonitor } from '../../network/services/index.ts';
@@ -21,6 +23,8 @@ import type {
 import {
   AttemptHistoryRepository,
   FinishedRunRepository,
+  LessonStorage,
+  LessonsRepository,
   RunRepository,
 } from '../repositories/index.ts';
 
@@ -29,6 +33,7 @@ import type { EffectTimings } from './effects/context.ts';
 import { RunEffects } from './effects/effects.ts';
 import { RunCleanup } from './cleanup/index.ts';
 import { RunEngine } from './engine.ts';
+import { RunLessons } from './lessons/index.ts';
 import { RunReads } from './reads.ts';
 import { RunRequests } from './requests.ts';
 import { RunStates } from './states.ts';
@@ -36,6 +41,8 @@ import { RunAttemptHistoryService } from './attempt-history.ts';
 
 export interface RunsDependencies {
   database: Database;
+  /** The state directory: the lessons files live under `lessons/` in it. */
+  stateDirectory: string;
   now: () => number;
   agents: AgentsService;
   config: ConfigService;
@@ -63,6 +70,7 @@ export interface RunsDependencies {
 
 export interface RunsServices {
   attemptHistory: RunAttemptHistoryService;
+  lessons: RunLessons;
   states: RunStates;
   engine: RunEngine;
   effects: RunEffects;
@@ -101,11 +109,17 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
       };
     },
   });
-  const effects = new RunEffects({ ...dependencies, context: engine });
+  const lessons = new RunLessons({
+    runs: new LessonsRepository(database),
+    storage: new LessonStorage(join(dependencies.stateDirectory, 'lessons')),
+    now,
+  });
+  const effects = new RunEffects({ ...dependencies, lessons, context: engine });
   engine.attach(effects);
   const { registry, config, agents } = dependencies;
   return {
     attemptHistory: new RunAttemptHistoryService(new AttemptHistoryRepository(database)),
+    lessons,
     states,
     engine,
     effects,

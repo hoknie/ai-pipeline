@@ -6,6 +6,7 @@ export * from './history/attempt-history.ts';
 export * from './launch/launch.ts';
 export * from './input.ts';
 export * from './chains/chain-select.ts';
+export * from './lessons/index.ts';
 export * from './limits.ts';
 export * from './pools/pools.ts';
 export * from './problems.ts';

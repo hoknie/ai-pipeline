@@ -27,6 +27,11 @@ export interface LaunchContext {
    * runtime with `loadsExtraSkills` is given one.
    */
   skillsDirectory?: string | null;
+  /**
+   * The name of the skill that carries the lessons of earlier runs when the attempt got one at
+   * `skillsDirectory`; null or absent: no lessons, the launch stays exactly as before.
+   */
+  lessonsSkill?: string | null;
   workerCommand: string[];
   /** The generation of the conversation of a CLI with its own history; null for the others. */
   generation?: number | null;

@@ -14,6 +14,7 @@ import {
 } from '../../../swarm-config/types/index.ts';
 import { attemptDirectory } from '../../../../platform/git/index.ts';
 import {
+  LESSON_SKILL_NAME,
   findGroup,
   isRepairGroup,
   specialistOfStep,
@@ -73,6 +74,7 @@ export class AttemptStarter {
     const { key, specialist, runtime } = prepared;
     const directory = attemptDirectory(workspaceOf(state), state.run.id, slug, seq);
     mkdirSync(directory, { recursive: true });
+    const lessons = this.dependencies.lessons.block(state.run.repository, specialist.slug);
     // the network of the registry runs outside the serial queue, inside `startWithSkills`
     await startWithSkills(
       this.dependencies,
@@ -80,6 +82,7 @@ export class AttemptStarter {
       key,
       specialist,
       runtime,
+      lessons,
       directory,
       (skills) => this.begin(prepared, directory, logPath(state, slug, seq), skills),
       (message) => this.fail(state, key, { kind: 'spawn', message }),
@@ -99,7 +102,7 @@ export class AttemptStarter {
     await this.parts.outside.begin(state, key);
     let process: SupervisedProcess;
     try {
-      process = this.launch(prepared, directory, token, skills.directory);
+      process = this.launch(prepared, directory, token, skills.directory, skills.lessons === true);
     } catch (error) {
       this.release(token);
       await this.fail(state, key, { kind: 'spawn', message: (error as Error).message });
@@ -227,6 +230,7 @@ export class AttemptStarter {
     directory: string,
     token: string,
     skillsDirectory: string | null,
+    lessons: boolean,
   ): SupervisedProcess {
     const { state, group, attempt, key, runtime, worktree, specialist } = prepared;
     const { context, entry, socket, environment, graceMs, timings } = this.dependencies;
@@ -238,6 +242,7 @@ export class AttemptStarter {
       attemptDirectory: directory,
       attachmentsDirectory: prepared.attachments,
       skillsDirectory,
+      lessonsSkill: lessons ? LESSON_SKILL_NAME : null,
       workerCommand: workerCommand(entry, token, socket, group, specialist),
       generation: attempt.generation,
       conversationDirectory: conversationFolder(state, group.slug, attempt),

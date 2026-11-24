@@ -23,6 +23,8 @@ export interface AttemptSkills {
   directory: string | null;
   /** Warnings for the log of the step. */
   warnings: string[];
+  /** Whether the folder holds the skill with the lessons of earlier runs; absent: it does not. */
+  lessons?: boolean;
 }
 
 export const NO_SKILLS: AttemptSkills = { directory: null, warnings: [] };

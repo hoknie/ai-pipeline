@@ -50,6 +50,7 @@ describe('RunAttemptHistoryService', () => {
     const store = temporaryStorage();
     const services = createRunsServices({
       database: store.database,
+      stateDirectory: '/tmp/aip-test-state',
       now: () => 1,
       agents: {} as never,
       config: {} as never,

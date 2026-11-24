@@ -47,6 +47,20 @@ aip group show <run-id> <group> # attempts, verdicts, remarks, tokens, changed f
 
 For a live stream of changes, `aip events --json` prints a snapshot and then one JSON line per change.
 
+## Lessons from earlier runs
+
+Every attempt of a specialist gets the objective lessons of the last 50 finished runs of the repository: failed deliveries, changes outside the worktree, denied tool calls and rejected results. A lesson says how often it happened, on which tasks (`#7`, `#8`) and when it was last seen; a pattern never replaces a look at the current code.
+
+```sh
+aip run lessons <run-id>        # what the lessons of this run say, for every specialist
+aip run lessons <run-id> --json
+```
+
+- The lesson of a specialist is written under the state directory as `lessons/<repository-hash>/<specialist>.md` and reaches an attempt as the `aip-lessons` skill: the attempt gets the `Skill` tool and a line in its system prompt to read the skill before it starts, even when the specialist has no skills of its own. A runtime that does not load extra skills logs a warning instead.
+- The block is capped at 4000 characters and 12 lessons: the most frequent and severe come first, and a lesson that does not fit whole is dropped, never cut.
+- A specialist without lessons gets no skill and runs unchanged; a version and a date in the file change only when the text changes.
+- The command answers for any run and reads the finished runs of the same repository.
+
 ## Answering a specialist
 
 A group in `needs_human` waits for you. Its question is in `aip run list` and `aip group show`.

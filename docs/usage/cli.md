@@ -9,6 +9,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | `aip run start <pipeline>` | [Queues a task](runs.md#starting-a-task) and starts a stopped queue; `--attach <path>` (repeatable) adds [attachments](queue.md#attachments) |
 | `aip run list [run-id] [--tag <name>] [--mine\|--author <email>]` | Active and recent runs; with a run id, the table of that run's groups |
 | `aip run show <run-id>` | The groups of one run and the `System:` line |
+| `aip run lessons <run-id> [--json]` | [Lessons](runs.md#lessons-from-earlier-runs) a run leaves to later attempts of its repository, for every specialist |
 | `aip run watch [run-id]` | Redraws the state of a run in place until it finishes |
 | `aip run cancel <run-id>` | Stops a whole run |
 | `aip run pause <run-id>` | [Pauses a run](queue.md#pausing-a-run) |

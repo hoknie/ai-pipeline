@@ -7,6 +7,7 @@ export * from './groups.ts';
 export * from './identity/index.ts';
 export * from './integrations/integrations.ts';
 export * from './integrations/remote.ts';
+export * from './lessons/index.ts';
 export * from './notifications/notifications.ts';
 export * from './observers.ts';
 export * from './panel.ts';

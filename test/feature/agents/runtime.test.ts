@@ -65,6 +65,13 @@ function after(args: string[], flag: string): string | undefined {
 }
 
 describe('message to the specialist', () => {
+  it('mentions the lessons skill only when the attempt got one', () => {
+    expect(systemPrompt(specialist(), input, 'aip-lessons')).toContain(
+      'read the skill `aip-lessons`',
+    );
+    expect(systemPrompt(specialist(), input)).not.toContain('aip-lessons');
+  });
+
   it('lists previous steps, feedback and the answer after the prompt', () => {
     expect(userMessage(input)).toBe(
       [
@@ -862,6 +869,19 @@ describe('claude tool set', () => {
     expect(
       tools({ permissions: 'read', skills: ['grill-me'], tools: ['WebFetch', 'Read'] }).tools,
     ).toEqual(['Read', 'Grep', 'Glob', 'Skill', 'WebFetch']);
+  });
+
+  it('gives the lessons skill to a specialist without skills and keeps the launch otherwise', () => {
+    const { tools: withLessons, launch } = tools(
+      { permissions: 'read' },
+      { lessonsSkill: 'aip-lessons' },
+    );
+    expect(withLessons).toContain('Skill');
+    expect(after(launch.args, '--append-system-prompt')).toContain('read the skill `aip-lessons`');
+
+    const plain = tools({ permissions: 'read' });
+    expect(plain.tools).not.toContain('Skill');
+    expect(after(plain.launch.args, '--append-system-prompt')).not.toContain('aip-lessons');
   });
 
   it('loads the report tool without a tool search and keeps the permissions', () => {

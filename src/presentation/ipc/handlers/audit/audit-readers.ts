@@ -5,6 +5,7 @@ export const readingMethods: readonly Method[] = [
   'status',
   'finished_runs',
   'run_patch',
+  'run_lessons',
   'group',
   'group_spec',
   'group_file_diff',
