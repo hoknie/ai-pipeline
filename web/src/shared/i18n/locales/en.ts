@@ -733,7 +733,7 @@ export const en = {
       changeProvider: 'Change provider…',
       changeProviderTitle: 'Change the provider of the run',
       changeProviderDescription:
-        'A step on a tier that is running now stops without a commit and starts again on the item of the new provider if the item differs. Changes it already made stay in the working copy. Resetting to “Not selected” does not stop a running step.',
+        'A step with a chain that is running now stops without a commit and starts again on the item of the new provider if the item differs. Changes it already made stay in the working copy. The provider applies to every step with a chain and never switches to another provider: a step whose chain has no item of the provider fails. Resetting to “Not selected” does not stop a running step.',
       changeProviderConfirm: 'Change provider',
       changeProviderKeep: 'Keep as is',
       providerChanged: 'Provider changed',
@@ -1192,7 +1192,8 @@ export const en = {
       noPipeline: 'no pipeline',
       provider: 'Provider',
       noProvider: 'Not chosen',
-      providerHint: 'The provider the task runs on: every step on a tier uses its model',
+      providerHint:
+        'The provider of the run: every step with a chain takes its item from this provider, and a step with no such item fails; the run never switches to another provider',
       variant: 'Variant',
       skipByVariant: 'Skipped by the variant: {{id}}',
       kind: 'kind of task',

@@ -22,7 +22,8 @@ export function dispatch(
   network: NetworkSnapshot = OFF_NETWORK,
   limit: DispatchLimit = REPOSITORY_LIMIT,
 ): Effect[] {
-  return planDispatch(states, now, network, limit).start.map(({ state, group, selected }) => {
+  const plan = planDispatch(states, now, network, limit);
+  const started = plan.start.map(({ state, group, selected }) => {
     const attempt = isCommandAction(state, group)
       ? startCommand(state, group, now)
       : startAttempt(state, group, now, selected);
@@ -31,8 +32,15 @@ export function dispatch(
       run: state.run.id,
       group: group.slug,
       seq: attempt.seq,
-    };
+    } as const;
   });
+  const failed = plan.fail.map(({ state, group, reason }) => ({
+    kind: 'provider_unavailable' as const,
+    run: state.run.id,
+    group: group.slug,
+    reason,
+  }));
+  return [...started, ...failed];
 }
 
 /** The attempt of a command action: no specialist, no session; the daemon runs `run`. */
@@ -104,6 +112,7 @@ function startAttempt(
     pending.resume,
     selected.runtime,
     seq,
+    selected.provider,
   );
   const attempt: Attempt = {
     seq,
@@ -122,9 +131,6 @@ function startAttempt(
       ? { chainIndex: selected.chainIndex }
       : {}),
     ...(selected.provider !== undefined ? { provider: selected.provider } : {}),
-    ...(selected.requestedProvider !== undefined
-      ? { requestedProvider: selected.requestedProvider }
-      : {}),
     status: 'running',
     input: buildInput(state.run, group, pending),
     resumeSession,
@@ -148,24 +154,37 @@ function startAttempt(
  * The conversation of a new attempt. A CLI with its own history inherits the generation and the exact
  * session of the last attempt of the step only on a resume on the same runtime; otherwise the attempt
  * opens a generation of its own (`seq`), so no id or private state crosses a runtime or a retry.
- * The other runtimes keep `generation = null` and the session of any earlier attempt.
+ * The other runtimes keep `generation = null` and the session of any earlier attempt. When the chosen
+ * item belongs to a provider, only attempts of the same provider are reused: a session never crosses
+ * a provider, even on the same runtime.
  */
 function conversationOf(
   previousOfStep: Attempt[],
   resume: boolean,
   runtime: string,
   seq: number,
+  provider?: string,
 ): { generation: number | null; resumeSession: string | null } {
+  const sameProvider = (attempt: Attempt): boolean =>
+    provider === undefined || attempt.provider === provider;
   const sessionOf = (attempt: Attempt): string | null => attempt.sessionId ?? attempt.resumeSession;
   if (keepsConversation(runtime)) {
     const last = previousOfStep.at(-1);
-    if (resume && last && last.runtime === runtime && last.generation !== null) {
+    if (
+      resume &&
+      last &&
+      last.runtime === runtime &&
+      last.generation !== null &&
+      sameProvider(last)
+    ) {
       return { generation: last.generation, resumeSession: sessionOf(last) };
     }
     return { generation: seq, resumeSession: null };
   }
   if (!resume) return { generation: null, resumeSession: null };
-  const usable = previousOfStep.filter((attempt) => !keepsConversation(attempt.runtime));
+  const usable = previousOfStep.filter(
+    (attempt) => !keepsConversation(attempt.runtime) && sameProvider(attempt),
+  );
   const resumeSession =
     usable.findLast((attempt) => sessionOf(attempt) !== null)?.sessionId ??
     usable.findLast((attempt) => attempt.resumeSession !== null)?.resumeSession ??

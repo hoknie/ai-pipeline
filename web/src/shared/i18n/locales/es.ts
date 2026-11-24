@@ -746,7 +746,7 @@ export const es: Dictionary = {
       changeProvider: 'Cambiar proveedor…',
       changeProviderTitle: 'Cambiar el proveedor de la ejecución',
       changeProviderDescription:
-        'El paso de un nivel que se está ejecutando se detiene sin commit y empieza de nuevo con el elemento del nuevo proveedor si este es distinto. Los cambios que ya hizo quedan en la copia de trabajo. Restablecer a «Sin elegir» no detiene un paso en curso.',
+        'El paso con cadena que se está ejecutando se detiene sin commit y empieza de nuevo con el elemento del nuevo proveedor si este es distinto. Los cambios que ya hizo quedan en la copia de trabajo. El proveedor se aplica a cada paso con cadena y nunca cambia a otro proveedor: un paso cuya cadena no tiene su elemento falla. Restablecer a «Sin elegir» no detiene un paso en curso.',
       changeProviderConfirm: 'Cambiar proveedor',
       changeProviderKeep: 'Dejar como está',
       providerChanged: 'Proveedor cambiado',
@@ -1217,7 +1217,8 @@ export const es: Dictionary = {
       noPipeline: 'sin pipeline',
       provider: 'Proveedor',
       noProvider: 'Sin elegir',
-      providerHint: 'El proveedor en el que corre la tarea: cada paso de un nivel usa su modelo',
+      providerHint:
+        'El proveedor de la ejecución: cada paso con cadena corre en su elemento; si no hay tal elemento, el paso falla y la ejecución nunca cambia a otro proveedor',
       variant: 'Variante',
       skipByVariant: 'Omitido por la variante: {{id}}',
       kind: 'tipo de tarea',

@@ -54,7 +54,7 @@ export const attachmentSources = z
 /** Id of a variant of a pipeline. */
 export const variantId = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
 
-/** Id of a provider of the tiers; the daemon checks that it is known. */
+/** Id of a provider of the run; the daemon checks that it is known. */
 export const providerId = z.string().min(1);
 
 export const parentRef = z.union([z.string().trim().min(1), z.number().int().positive()]);

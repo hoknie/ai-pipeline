@@ -105,11 +105,14 @@ describe('switching the provider of a run', () => {
     expect(state.run.provider).toBe('openai');
   });
 
-  it('lets a step go on when the new provider gives the same item', () => {
-    const state = running('zai', ['code', 'review']);
+  it('refuses a provider with no item in the chain of the running step', () => {
+    const state = running('zai');
     const first = group(state).attempts[0]!;
-    expect(first).toMatchObject({ stepId: 'qa', provider: 'anthropic' });
-    expect(switchTo(state, 'openai')).toEqual([]);
+    expect(first).toMatchObject({ stepId: 'code', provider: 'zai' });
+    expect(() => switchTo(state, 'deepseek')).toThrow(
+      'cannot switch run run000000001 to provider `deepseek`: chain `thinking` has no enabled item of provider `deepseek`',
+    );
+    expect(state.run.provider).toBe('zai');
     expect(first.status).toBe('running');
   });
 
@@ -208,5 +211,80 @@ describe('the reason of a provider change', () => {
     expect(describeFailReason({ kind: 'provider', from: 'zai', to: null })).toBe(
       'provider changed: zai → none',
     );
+    expect(
+      describeFailReason({ kind: 'provider_missing', provider: 'zai', chain: 'thinking' }),
+    ).toBe('no enabled item of provider `zai` in chain `thinking`');
+  });
+});
+
+const CHAIN = `swarm:
+  max: 5
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
+  chains:
+    fallback:
+      name: Fallback
+      mode: on_error
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+        - { provider: openai, runtime: opencode, model: openai/gpt-6.1-sol }
+  specialists:
+    worker: { name: Worker, runtime_chain: fallback }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: worker }
+`;
+
+/** A run whose only attempt is running on the `on_error` chain. */
+function chained(provider: string | null = null): RunState {
+  const state = run(1, {
+    configText: CHAIN,
+    ...(provider === null ? {} : { provider }),
+  });
+  step(state);
+  return state;
+}
+
+describe('switching the provider of an on_error chain', () => {
+  it('stops and restarts the running step when the item of the new provider differs', () => {
+    const state = chained('zai');
+    const first = group(state).attempts[0]!;
+    expect(first).toMatchObject({ provider: 'zai', chainIndex: 1 });
+    expect(switchTo(state, 'openai')).toEqual([
+      { kind: 'stop_attempt', run: 'run000000001', group: 'group-1', seq: first.seq },
+    ]);
+    expect(first).toMatchObject({
+      status: 'cancelled',
+      reason: { kind: 'provider', from: 'zai', to: 'openai' },
+    });
+    step(state, 3500);
+    expect(group(state).attempts[1]).toMatchObject({
+      provider: 'openai',
+      chainIndex: 2,
+      resumeSession: null,
+    });
+  });
+
+  it('lets the running step go on when it already runs on an item of the new provider', () => {
+    const state = chained();
+    const first = group(state).attempts[0]!;
+    expect(first).toMatchObject({ provider: 'anthropic', chainIndex: 0 });
+    expect(switchTo(state, 'anthropic')).toEqual([]);
+    expect(first.status).toBe('running');
+    expect(state.run.provider).toBe('anthropic');
+  });
+
+  it('refuses a provider with no item in an on_error chain', () => {
+    const state = chained('zai');
+    const first = group(state).attempts[0]!;
+    expect(() => switchTo(state, 'deepseek')).toThrow(
+      'cannot switch run run000000001 to provider `deepseek`: chain `fallback` has no enabled item of provider `deepseek`',
+    );
+    expect(first.status).toBe('running');
+    expect(state.run.provider).toBe('zai');
   });
 });

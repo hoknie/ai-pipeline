@@ -1,11 +1,6 @@
 import type { Defaults, RuntimeChain, Specialist } from '../../swarm-config/types/index.ts';
 import type { Attempt } from './attempt.ts';
-import {
-  type SelectedRuntime,
-  holdKey,
-  pickChainItem,
-  pickProviderItem,
-} from './chains/chain-select.ts';
+import { type SelectedRuntime, holdKey, pickChainItem } from './chains/chain-select.ts';
 import { COMMAND_RUNTIME, USAGE_LIMIT_FALLBACK_MS, type AttemptRuntime } from './constants.ts';
 import { NETWORK_RETRY_MS } from '../../network/types/index.ts';
 import { type Group } from './group.ts';
@@ -126,12 +121,12 @@ export interface SelectAttemptOptions {
   resume: boolean;
   /** The attempt before it failed because of the network: keep its runtime even without a session. */
   keepRuntime?: boolean;
-  /** The provider of the run: a `by_provider` tier then picks its item strictly. */
+  /** The provider of the run: candidates of every chain mode are then its enabled items only. */
   provider?: string | null;
   seed?: number;
 }
 
-export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRuntime {
+export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRuntime | null {
   const { specialist, chains, defaults, limitHolds, attempts, stepIndex, resume, seed } = options;
   const keepRuntime = options.keepRuntime ?? false;
   if (!specialist.runtimeChain) {
@@ -144,10 +139,11 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
         : {}),
     };
   }
-  // A resumed attempt keeps its runtime and model even when the chain is off or has no items.
+  // A resumed attempt keeps its runtime and model even when the chain is off or has no items, but
+  // only while it belongs to the provider of the run.
   if (resume || keepRuntime) {
     const prev = [...attempts].reverse().find((a) => a.stepIndex === stepIndex);
-    if (prev) {
+    if (prev && (options.provider == null || prev.provider === options.provider)) {
       return {
         runtime: prev.runtime,
         model: prev.model,
@@ -157,9 +153,6 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
           ? { chainIndex: prev.chainIndex }
           : {}),
         ...(prev.provider !== undefined ? { provider: prev.provider } : {}),
-        ...(prev.requestedProvider !== undefined
-          ? { requestedProvider: prev.requestedProvider }
-          : {}),
       };
     }
   }
@@ -173,12 +166,14 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
   if (enabledItems.length === 0) {
     return { runtime: defaults.runtime, model: null };
   }
-  if (chain.mode === 'by_provider' && options.provider) {
-    return pickProviderItem(chain, enabledItems, options.provider);
-  }
+  const candidates =
+    options.provider == null
+      ? enabledItems
+      : enabledItems.filter(({ item }) => item.provider === options.provider);
+  if (candidates.length === 0) return null;
   return pickChainItem(
     chain.mode,
-    enabledItems,
+    candidates,
     limitHolds,
     attempts,
     specialist.slug,

@@ -236,24 +236,27 @@ aip queue edit <item> --variant strong
 ## Provider
 
 ```
-aip queue add feature --task "Fix a typo" --provider zai   # every step on a tier runs on zai
+aip queue add feature --task "Fix a typo" --provider zai   # every step of a chain runs on zai
 aip queue edit <item> --provider anthropic
 aip queue edit <item> --no-provider                          # not chosen again
 ```
 
-`--provider <id>` (also on `aip run start`, MCP `provider`) names a [provider](../configuration/providers.md). The steps whose specialist uses a tier then run on the item of that provider. Without it a new task goes to the [default provider](../configuration/providers.md#default-provider) of the project, and with no default provider it has none and the tiers take their items in file order.
+`--provider <id>` (also on `aip run start`, MCP `provider`) names a [provider](../configuration/providers.md). The steps whose specialist uses a runtime chain then run on the enabled item of that provider, whatever the mode of the chain.
+Without it a new task goes to the [default provider](../configuration/providers.md#default-provider) of the project, and with no default provider it has none and the chains take their items by the rules of their modes.
 
 `--no-provider` (also on `aip run start`, MCP and IPC `provider: null`) keeps a task without a provider even when a default is set. A task a specialist adds also takes the default provider, not the provider of its own run, and a task for several projects takes the default of each project. An edit never changes the provider by itself.
 
 `aip queue list` shows `provider: zai (Z.ai)`, `aip run list` shows `feature@zai`.
 
 - An unknown provider is refused with the list of the known ones (`anthropic (Anthropic), zai (Z.ai)`), or `known: none`; a disabled one is refused with ``provider `zai` is disabled``. A task for several projects needs the provider, enabled, in every project; the answer names the first project that lacks it, and no queue changes.
-- The provider acts only on steps that use a tier. Steps with an explicit runtime and model, other chain modes, the name generator and the observers ignore it.
-- A tier without an enabled item of the provider uses its default item, and the attempt is marked `provider <default> instead of <chosen>`.
-- A run never moves to another provider: when the provider's limit is hit the group waits for the reset, or fails with `--on-limit stop`; other failures follow the usual rules. A network failure retries on the same item.
+- The provider acts on every step that uses a runtime chain, whatever its mode: `on_error`, `random`, `round_robin` and `by_provider`. Steps with an explicit runtime and model, the name generator and the observers ignore it.
+- Only enabled items with the provider are candidates. When the chain of a step has no such item, the group fails before an attempt with ``no enabled item of provider `<id>` in chain `<slug>` ``; the default item and other providers are not used. A missing, disabled or empty chain still gives `defaults.runtime`.
+- Attempts recorded before this restriction may carry `requestedProvider` and show `provider <actual> instead of <chosen>`; new attempts do not.
+- A run never moves to another provider: when the provider's limit is hit the group waits for the reset, or fails with `--on-limit stop`; other failures follow the usual rules. A network failure retries on the same item only when it belongs to the provider; otherwise the step starts on the provider's item in a new session.
 - A provider removed or switched off before the task starts gives the task an error; the queue stops and the run is not created.
 - `aip queue edit <item> --provider …` on an item whose run returned to the queue switches the provider of the run itself, as [Changing the provider](runs.md#changing-the-provider) of a running run does.
-- Resetting or changing the provider of a task that has not started changes nothing in a run. A group that waits for an answer keeps its session while the same step goes on with the answer; a step that starts again (a retry, a retry with the configuration refreshed) picks its item anew, and the session with the earlier conversation is not continued.
+- Resetting or changing the provider of a task that has not started changes nothing in a run. A group that waits for an answer keeps its session while the same step goes on with the answer only when that item belongs to the chosen provider; otherwise the step starts a new session on the item of the provider.
+  A step that starts again (a retry, a retry with the configuration refreshed) picks its item anew, and the session with the earlier conversation is not continued.
 
 ## Skipping steps
 

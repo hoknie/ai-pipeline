@@ -171,7 +171,7 @@ export interface QueueFields {
   pipeline: string;
   /** Id of a variant of the pipeline; absent: `default`. */
   variant?: string;
-  /** Id of a provider of the tiers; absent: none. */
+  /** Id of a provider of the run; absent: none. */
   provider?: string | null;
   task?: string;
   groups?: { title: string; task: string }[];
@@ -204,7 +204,7 @@ export interface QueuePatch {
   pipeline?: string;
   /** Id of a variant of the pipeline. */
   variant?: string;
-  /** Id of a provider of the tiers; `null` clears it. */
+  /** Id of a provider of the run; `null` clears it. */
   provider?: string | null;
   task?: string;
   groups?: { title: string; task: string }[];

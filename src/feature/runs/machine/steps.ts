@@ -32,9 +32,12 @@ export function groupOf(m: Ctx, slug: string): Group {
   return group;
 }
 
-export function runningAttempt(group: Group, seq: number): Attempt | undefined {
-  return group.attempts.find((attempt) => attempt.seq === seq && attempt.status === 'running');
-}
+/** The chain of the group has no enabled item of the provider of the run: the group fails without an attempt. */
+export const providerUnavailable = (m: Ctx, slug: string, reason: FailReason): void =>
+  failGroup(m, groupOf(m, slug), reason);
+
+export const runningAttempt = (group: Group, seq: number): Attempt | undefined =>
+  group.attempts.find((attempt) => attempt.seq === seq && attempt.status === 'running');
 
 export function askHuman(
   group: Group,
@@ -52,14 +55,13 @@ export function askHuman(
 
 export function restorePending(group: Group): void {
   const last = group.attempts.at(-1);
-  if (group.pending === null && last) {
-    group.pending = {
-      ...freshPending(last.stepIndex),
-      feedback: last.input.feedback,
-      humanAnswer: last.input.humanAnswer,
-      ...(last.input.reviewed ? { reviewed: true } : {}),
-    };
-  }
+  if (group.pending !== null || !last) return;
+  group.pending = {
+    ...freshPending(last.stepIndex),
+    feedback: last.input.feedback,
+    humanAnswer: last.input.humanAnswer,
+    ...(last.input.reviewed ? { reviewed: true } : {}),
+  };
 }
 
 /** The group waits in `queued` for the same step until the limit resets or the network is back. */

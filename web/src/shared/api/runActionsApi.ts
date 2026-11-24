@@ -11,7 +11,7 @@ export interface RunActionsApi {
   skipStep(runId: string, step: string, skip: boolean): Promise<unknown>;
   /** Switches an unfinished run to another variant of its pipeline; a running step whose definition changes starts again. */
   setRunVariant(runId: string, variant: string): Promise<RunView>;
-  /** Switches an unfinished run to another provider of the tiers (null: none); a running step on a tier whose item changes starts again. */
+  /** Switches an unfinished run to another provider of the run (null: none); a running step with a chain whose item changes starts again, and a switch to a provider with no item in its chain is refused. */
   setRunProvider(runId: string, provider: string | null): Promise<RunView>;
   cancel(runId: string, group?: string): Promise<unknown>;
   /** Removes the worktrees and service refs of a finished run; the patch, logs and the run stay. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type Attempt,
   type RunState,
   hasNextChainItem,
   selectAttemptRuntime,
@@ -140,21 +141,14 @@ describe('the strict choice of a tier item', () => {
     });
   });
 
-  it('takes the default item with the requested provider when the tier has none', () => {
+  it('returns null when the chain has no enabled item of the provider', () => {
     const state = run(1, { configText: TIERS, pipeline: 'light' });
-    expect(select(state, 'light', 'zai')).toMatchObject({
-      provider: 'anthropic',
-      chainIndex: 0,
-      requestedProvider: 'zai',
-    });
+    expect(select(state, 'light', 'zai')).toBeNull();
   });
 
-  it('takes the default item when the item of the provider is disabled', () => {
+  it('returns null when the only item of the provider is disabled', () => {
     const state = run(1, { configText: TIERS, pipeline: 'sleeper' });
-    expect(select(state, 'sleeper', 'zai')).toMatchObject({
-      provider: 'anthropic',
-      requestedProvider: 'zai',
-    });
+    expect(select(state, 'sleeper', 'zai')).toBeNull();
   });
 
   it('leaves a run without a provider to the usual order', () => {
@@ -170,24 +164,32 @@ describe('the strict choice of a tier item', () => {
     expect(chosen).toMatchObject({ provider: 'zai' });
   });
 
-  it('keeps the item of a continued session and of a network retry', () => {
+  it('does not keep the item of another provider on a continued session or a network retry', () => {
     const state = run(1, { configText: TIERS, pipeline: 'deep', provider: 'zai' });
     dispatch([state], 1000);
     const [first] = group(state).attempts;
     const keep = { attempts: [first!], resume: true };
-    expect(select(state, 'thinker', 'openai', keep)).toMatchObject({ provider: 'zai' });
+    expect(select(state, 'thinker', 'openai', keep)).toMatchObject({ provider: 'openai' });
     expect(
       select(state, 'thinker', 'openai', { ...keep, resume: false, keepRuntime: true }),
-    ).toMatchObject({
-      provider: 'zai',
-    });
+    ).toMatchObject({ provider: 'openai' });
   });
 
-  it('works only on by_provider chains', () => {
+  it('keeps the item of the same provider on a continued session and a network retry', () => {
+    const state = run(1, { configText: TIERS, pipeline: 'deep', provider: 'zai' });
+    dispatch([state], 1000);
+    const [first] = group(state).attempts;
+    const keep = { attempts: [first!], resume: true };
+    expect(select(state, 'thinker', 'zai', keep)).toMatchObject({ provider: 'zai' });
+    expect(
+      select(state, 'thinker', 'zai', { ...keep, resume: false, keepRuntime: true }),
+    ).toMatchObject({ provider: 'zai' });
+  });
+
+  it('filters a chain of every mode by the provider', () => {
     const state = run(1, { configText: TIERS, pipeline: 'failover' });
-    const chosen = select(state, 'failover', 'zai');
-    expect(chosen).toMatchObject({ runtime: 'claude', chainIndex: 0 });
-    expect(chosen).not.toHaveProperty('requestedProvider');
+    expect(select(state, 'failover', 'zai')).toBeNull();
+    expect(select(state, 'failover', null)).toMatchObject({ runtime: 'claude', chainIndex: 0 });
   });
 
   it('does not touch a specialist with an explicit runtime and model', () => {
@@ -201,16 +203,19 @@ describe('hasNextChainItem with a provider', () => {
     (c) => c.slug === 'thinking',
   );
 
-  it('finds another item without a provider and none with one', () => {
+  it('counts only the enabled items of the provider', () => {
     expect(hasNextChainItem(chain, [], 0, new Map())).toBe(true);
-    expect(hasNextChainItem(chain, [], 0, new Map(), 'zai')).toBe(false);
+    expect(hasNextChainItem(chain, [], 0, new Map(), 'zai')).toBe(true);
+    expect(hasNextChainItem(chain, [], 0, new Map(), 'nope')).toBe(false);
   });
 
-  it('still lets a chain of another mode switch', () => {
+  it('limits a chain of another mode by the provider', () => {
     const fallback = run(1, { configText: TIERS, pipeline: 'deep' }).run.config.chains.find(
       (c) => c.slug === 'fallback',
     );
-    expect(hasNextChainItem(fallback, [], 0, new Map(), 'zai')).toBe(true);
+    expect(hasNextChainItem(fallback, [], 0, new Map())).toBe(true);
+    // The items of the on_error chain have no provider, so none of `zai` counts.
+    expect(hasNextChainItem(fallback, [], 0, new Map(), 'zai')).toBe(false);
   });
 });
 
@@ -222,13 +227,37 @@ describe('a run with a provider in the scheduler', () => {
     expect(group(state).attempts[0]).not.toHaveProperty('requestedProvider');
   });
 
-  it('records the requested provider of an attempt on the default item', () => {
+  it('fails the group without an attempt when no item of the provider exists', () => {
     const state = run(1, { configText: TIERS, pipeline: 'light', provider: 'zai' });
-    dispatch([state], 1000);
-    expect(group(state).attempts[0]).toMatchObject({
-      provider: 'anthropic',
-      requestedProvider: 'zai',
+    const plan = planDispatch([state], 1000);
+    expect(plan.start).toEqual([]);
+    expect(plan.waits.size).toBe(0);
+    expect(plan.fail.map(({ group: failed, reason }) => ({ slug: failed.slug, reason }))).toEqual([
+      {
+        slug: 'group-1',
+        reason: { kind: 'provider_missing', provider: 'zai', chain: 'lite' },
+      },
+    ]);
+    const [effect] = dispatch([state], 1000);
+    expect(effect).toEqual({
+      kind: 'provider_unavailable',
+      run: state.run.id,
+      group: 'group-1',
+      reason: { kind: 'provider_missing', provider: 'zai', chain: 'lite' },
     });
+    expect(group(state).attempts).toHaveLength(0);
+    transition(
+      state,
+      {
+        kind: 'provider_unavailable',
+        group: 'group-1',
+        reason: { kind: 'provider_missing', provider: 'zai', chain: 'lite' },
+      },
+      1001,
+    );
+    expect(group(state).status).toBe('failed');
+    expect(group(state).reason).toBe('no enabled item of provider `zai` in chain `lite`');
+    expect(group(state).attempts).toHaveLength(0);
   });
 
   it('waits for the reset of the provider while other providers are free', () => {
@@ -271,5 +300,122 @@ describe('a run with a provider in the scheduler', () => {
     expect(state.run.provider).toBeNull();
     dispatch([state], 1000);
     expect(group(state).attempts[0]).toMatchObject({ provider: 'anthropic' });
+  });
+});
+
+const MODES = `swarm:
+  max: 5
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
+  chains:
+    failover:
+      name: Failover
+      mode: on_error
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+        - { provider: zai, runtime: opencode, model: zai/glm-4.6 }
+    lottery:
+      name: Lottery
+      mode: random
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+        - { provider: zai, runtime: opencode, model: zai/glm-4.6 }
+    cycle:
+      name: Cycle
+      mode: round_robin
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+        - { provider: zai, runtime: opencode, model: zai/glm-4.6 }
+  specialists:
+    failover: { name: Failover, runtime_chain: failover }
+    lottery: { name: Lottery, runtime_chain: lottery }
+    cycler: { name: Cycler, runtime_chain: cycle }
+  pipelines:
+    failover:
+      steps:
+        - { id: work, specialist: failover }
+    lottery:
+      steps:
+        - { id: work, specialist: lottery }
+    cycle:
+      steps:
+        - { id: work, specialist: cycler }
+`;
+
+function chainAttempt(seq: number, chainIndex: number): Attempt {
+  return {
+    seq,
+    stepId: 'work',
+    stepIndex: seq - 1,
+    round: 1,
+    specialist: 'cycler',
+    runtime: 'opencode',
+    model: null,
+    chainIndex,
+    generation: null,
+    status: 'finished',
+    input: {
+      prompt: 'test',
+      groupTitle: 'group-1',
+      stepId: 'work',
+      specialistName: 'Cycler',
+      skills: [],
+      previous: [],
+      feedback: null,
+      humanAnswer: null,
+      decisions: [],
+    },
+    resumeSession: null,
+    sessionId: null,
+    report: null,
+    reason: null,
+    startedAt: 1000,
+    finishedAt: 2000,
+    usage: null,
+    proposal: null,
+    denials: [],
+    outsideChanges: [],
+  };
+}
+
+describe('the provider filters every chain mode', () => {
+  it('on_error takes only the items of the provider', () => {
+    const state = run(1, { configText: MODES, pipeline: 'failover' });
+    expect(select(state, 'failover', 'zai')).toMatchObject({ provider: 'zai', chainIndex: 1 });
+    expect(select(state, 'failover', null)).toMatchObject({
+      provider: 'anthropic',
+      chainIndex: 0,
+    });
+  });
+
+  it('random picks only the items of the provider', () => {
+    const state = run(1, { configText: MODES, pipeline: 'lottery' });
+    for (const seed of [0, 1, 2, 3, 7]) {
+      const chosen = select(state, 'lottery', 'zai', { seed });
+      expect(chosen).toMatchObject({ provider: 'zai' });
+      expect([1, 2]).toContain(chosen!.chainIndex);
+    }
+  });
+
+  it('round_robin counts only the attempts of the items of the provider', () => {
+    const state = run(1, { configText: MODES, pipeline: 'cycle' });
+    // The attempt on chainIndex 0 belongs to another provider; it does not shift the cycle.
+    const attempts = [chainAttempt(1, 0), chainAttempt(2, 1)];
+    const chosen = select(state, 'cycler', 'zai', { attempts, stepIndex: 2 });
+    expect(chosen).toMatchObject({ provider: 'zai', chainIndex: 2 });
+  });
+
+  it('returns null when an empty filtered pool leaves no candidate', () => {
+    const failover = run(1, { configText: MODES, pipeline: 'failover' });
+    const lottery = run(1, { configText: MODES, pipeline: 'lottery' });
+    const cycle = run(1, { configText: MODES, pipeline: 'cycle' });
+    expect(select(failover, 'failover', 'openai')).toBeNull();
+    expect(select(lottery, 'lottery', 'openai')).toBeNull();
+    expect(select(cycle, 'cycler', 'openai')).toBeNull();
   });
 });

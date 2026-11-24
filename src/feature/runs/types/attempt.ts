@@ -40,6 +40,8 @@ export type FailReason =
   | { kind: 'runtime_not_found'; runtime: string }
   /** The runtime is switched off in the settings. */
   | { kind: 'runtime_disabled'; runtime: string }
+  /** The step's chain has no enabled item of the provider of the run; the step does not start. */
+  | { kind: 'provider_missing'; provider: string; chain: string }
   | { kind: 'spawn'; message: string }
   | { kind: 'git'; message: string }
   /** The step was skipped while its attempt ran. */
@@ -76,7 +78,9 @@ export function refundsRepair(reason: FailReason): boolean {
  * could not run to a report, so starting again at once would only spend calls.
  */
 export function pacesRepair(reason: FailReason): boolean {
-  return ['timeout', 'no_report', 'interrupted', 'spawn', 'network'].includes(reason.kind);
+  return ['timeout', 'no_report', 'interrupted', 'spawn', 'network', 'provider_missing'].includes(
+    reason.kind,
+  );
 }
 
 export function describeFailReason(reason: FailReason): string {
@@ -95,6 +99,8 @@ export function describeFailReason(reason: FailReason): string {
       return `runtime not found: ${reason.runtime}`;
     case 'runtime_disabled':
       return `runtime disabled: ${reason.runtime}`;
+    case 'provider_missing':
+      return `no enabled item of provider \`${reason.provider}\` in chain \`${reason.chain}\``;
     case 'spawn':
       return `spawn error: ${reason.message}`;
     case 'git':

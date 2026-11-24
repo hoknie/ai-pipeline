@@ -713,7 +713,7 @@ export const zh: Dictionary = {
       changeProvider: '更换提供方…',
       changeProviderTitle: '更换运行的提供方',
       changeProviderDescription:
-        '如果新提供方对应的档位条目不同，正在运行的档位步骤会在不提交的情况下停止，并在新条目上重新开始。它已做的修改会保留在工作副本中。重置为“未选择”不会停止正在运行的步骤。',
+        '如果新提供方对应的条目不同，正在运行的带链步骤会在不提交的情况下停止，并在新条目上重新开始。它已做的修改会保留在工作副本中。提供方适用于每个带链步骤，绝不会切换到其他提供方：链中没有该提供方条目的步骤会失败。重置为“未选择”不会停止正在运行的步骤。',
       changeProviderConfirm: '更换提供方',
       changeProviderKeep: '保持不变',
       providerChanged: '提供方已更换',
@@ -1164,7 +1164,8 @@ export const zh: Dictionary = {
       noPipeline: '没有 pipeline',
       provider: '提供商',
       noProvider: '未选择',
-      providerHint: '任务运行所用的提供商：层级上的每个步骤都使用其模型',
+      providerHint:
+        '运行的提供方：每个带链步骤都使用其条目；若链中没有它的条目，该步骤会失败，运行绝不会切换到其他提供方',
       variant: '变体',
       skipByVariant: '被变体跳过：{{id}}',
       kind: '任务类型',

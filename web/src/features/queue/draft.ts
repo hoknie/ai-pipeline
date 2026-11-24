@@ -20,7 +20,7 @@ export interface QueueDraft {
   pipeline: string;
   /** Id of the chosen variant of the pipeline; `default` is the pipeline as it is. */
   variant: string;
-  /** Id of the chosen provider of the tiers; `null`: not chosen. */
+  /** Id of the chosen provider of the run; `null`: not chosen. */
   provider: string | null;
   /**
    * `false`: the user has not chosen in the field, so the form follows the default provider of the

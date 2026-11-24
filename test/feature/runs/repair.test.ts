@@ -95,6 +95,7 @@ describe('what a failure of a repair does to the count', () => {
     { kind: 'no_groups' },
     { kind: 'runtime_not_found', runtime: 'claude' },
     { kind: 'runtime_disabled', runtime: 'claude' },
+    { kind: 'provider_missing', provider: 'zai', chain: 'thinking' },
     { kind: 'spawn', message: 'boom' },
     { kind: 'git', message: 'boom' },
     { kind: 'skipped' },
@@ -111,6 +112,7 @@ describe('what a failure of a repair does to the count', () => {
       'interrupted',
       'runtime_not_found',
       'runtime_disabled',
+      'provider_missing',
       'spawn',
       'usage_limit',
       'network',
@@ -121,7 +123,7 @@ describe('what a failure of a repair does to the count', () => {
   });
 
   it('paces only the failures where the agent could not run to a report', () => {
-    const paced = ['timeout', 'no_report', 'interrupted', 'spawn', 'network'];
+    const paced = ['timeout', 'no_report', 'interrupted', 'spawn', 'network', 'provider_missing'];
     for (const reason of reasons) {
       expect(pacesRepair(reason)).toBe(paced.includes(reason.kind));
     }

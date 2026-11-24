@@ -145,7 +145,7 @@ function addStart(kit: RunKit): void {
     )
     .option(
       '--provider <id>',
-      'provider of the tiers: every step on a tier runs on the model of this provider; default: the default provider of the project',
+      'provider of the run: every step with a chain takes its item from this provider; default: the default provider of the project',
     )
     .option('--no-provider', 'no provider, even when the configuration has a default provider')
     .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)

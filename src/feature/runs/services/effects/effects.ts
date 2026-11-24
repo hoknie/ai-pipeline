@@ -85,6 +85,12 @@ export class RunEffects implements EffectRunner {
         return this.running.stop({ run: effect.run, group: effect.group, seq: effect.seq });
       case 'run_action':
         return this.actions.run(state, effect.group, effect.seq);
+      case 'provider_unavailable':
+        return this.dependencies.context.apply(state, {
+          kind: 'provider_unavailable',
+          group: effect.group,
+          reason: effect.reason,
+        });
       case 'commit':
         return this.git.commit(state, effect.group, effect.stepId, effect.summary);
       case 'merge':

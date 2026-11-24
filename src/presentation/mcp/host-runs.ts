@@ -212,7 +212,7 @@ export function registerProvider(kit: HostKit): void {
     {
       title: 'Switch a run to another provider',
       description:
-        'Switch a run that is not finished to another provider of the tiers, or pass null for none. A running step on a tier whose item changes with the provider is stopped without a commit and starts again in a new session; the other steps go on. A waiting group takes the new item with its next attempt. Resetting to none does not stop a running step.',
+        'Switch a run that is not finished to another provider of the run, or pass null for none. A running step with a chain whose item changes with the provider is stopped without a commit and starts again in a new session; the other steps go on. The provider applies to every chain item and never falls back to another provider: switching to a provider with no item in the chain of a running step is refused. A waiting group takes the new item with its next attempt. Resetting to none does not stop a running step.',
       inputSchema: {
         run_id: runId,
         provider: z.string().min(1).nullable().describe('Id of a provider, or null for none'),

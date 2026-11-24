@@ -1,5 +1,6 @@
 import {
   type DispatchLimit,
+  type FailReason,
   type Group,
   type GroupWait,
   type RunState,
@@ -38,6 +39,8 @@ export interface DispatchPlan {
   start: { state: RunState; group: Group; selected?: SelectedRuntime }[];
   /** Queued groups that stay queued, keyed by `waitKey(run, slug)`. */
   waits: Map<string, GroupWait>;
+  /** Groups that fail at once: the chain has no enabled item of the provider of the run. */
+  fail: { state: RunState; group: Group; reason: FailReason }[];
 }
 
 export function waitKey(run: string, slug: string): string {
@@ -98,7 +101,7 @@ function plannedRuntime(
   specialist: Specialist,
   stepId: string,
   holds: Map<string, number>,
-): SelectedRuntime {
+): SelectedRuntime | null {
   const stepIndex = group.pending?.stepIndex ?? 0;
   const seq = (group.attempts.at(-1)?.seq ?? 0) + 1;
   return selectAttemptRuntime({
@@ -170,6 +173,7 @@ export function planDispatch(
 ): DispatchPlan {
   const start: DispatchPlan['start'] = [];
   const waits = new Map<string, GroupWait>();
+  const fail: DispatchPlan['fail'] = [];
   const repository = runningByRepository(states);
   const counters: Counters = {
     machine: [...repository.values()].reduce((sum, count) => sum + count, 0),
@@ -197,6 +201,10 @@ export function planDispatch(
     const slug = specialist?.slug;
     const selected =
       specialist && step ? plannedRuntime(state, group, specialist, step.id, holds) : undefined;
+    if (selected === null && specialist) {
+      fail.push({ state, group, reason: providerMissing(state, specialist) });
+      continue;
+    }
     const held = selected ? holdOf(holds, selected.runtime, selected.provider) : undefined;
     // A repair ignores the hold of a usage limit: an agent that hits it ends the repair.
     if (selected && held !== undefined && !isRepairGroup(group)) {
@@ -238,7 +246,16 @@ export function planDispatch(
     counters.machine += 1;
     bump(counters.repository, state.run.repository);
   }
-  return { start, waits };
+  return { start, waits, fail };
+}
+
+/** The reason a step fails when its chain has no enabled item of the provider of the run. */
+function providerMissing(state: RunState, specialist: Specialist): FailReason {
+  return {
+    kind: 'provider_missing',
+    provider: state.run.provider!,
+    chain: specialist.runtimeChain!,
+  };
 }
 
 /** The name of the provider a usage limit holds, when the configuration of the run knows it. */

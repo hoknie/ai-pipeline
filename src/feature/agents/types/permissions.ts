@@ -2,6 +2,7 @@ import type {
   ClaudeEditMode,
   ClaudeSettingsSource,
   Permissions,
+  Provider,
   ResolvedConfig,
   RuntimeChain,
   Specialist,
@@ -81,6 +82,7 @@ export function refreshPermissions(
 export interface SpecialistsRefresh extends RuntimeRefresh {
   specialists: Specialist[];
   chains?: RuntimeChain[];
+  providers: Provider[];
   claudeEditMode: ClaudeEditMode;
   claudeSettings: ClaudeSettingsSource;
 }
@@ -94,6 +96,11 @@ function copySpecialist(specialist: Specialist): Specialist {
   };
 }
 
+/** The provider registry of a configuration; nested access routes and models are copied too. */
+function copyProviders(providers: readonly Provider[]): Provider[] {
+  return structuredClone([...providers]);
+}
+
 /** Specialists of a configuration, for a retry with the current configuration. */
 export function specialistsOf(config: ResolvedConfig): SpecialistsRefresh {
   return {
@@ -102,6 +109,7 @@ export function specialistsOf(config: ResolvedConfig): SpecialistsRefresh {
       ...chain,
       runtimes: chain.runtimes.map((r) => ({ ...r })),
     })),
+    providers: copyProviders(config.providers),
     claudeEditMode: config.claude.editMode,
     claudeSettings: config.claude.settings,
     opencode: structuredClone(config.opencode),
@@ -188,6 +196,7 @@ export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsR
       runtimes: chain.runtimes.map((r) => ({ ...r })),
     }));
   }
+  config.providers = copyProviders(refresh.providers);
   return changes;
 }
 

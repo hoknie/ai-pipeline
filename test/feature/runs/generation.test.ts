@@ -112,3 +112,55 @@ describe('the generation of a conversation', () => {
     });
   });
 });
+
+const PROVIDERS = `swarm:
+  max: 5
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: opencode }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
+  chains:
+    pair:
+      name: Pair
+      mode: on_error
+      runtimes:
+        - { provider: anthropic, runtime: opencode, model: anthropic/sonnet }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+        - { provider: openai, runtime: opencode, model: openai/gpt-6.1-sol }
+  specialists:
+    coder: { name: Coder, runtime_chain: pair }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`;
+
+describe('a session never crosses a provider', () => {
+  it('keeps the session of a resume on the same provider', () => {
+    const state = run(1, { configText: PROVIDERS, provider: 'zai' });
+    step(state);
+    expect(runningAttempt(state)).toMatchObject({ runtime: 'opencode', provider: 'zai' });
+    finish(state, 'needs_human', { feedback: 'which?' });
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'this' }, 2500);
+    step(state);
+    expect(attempts(state)[1]).toMatchObject({
+      provider: 'zai',
+      resumeSession: 'session-1',
+    });
+  });
+
+  it('opens a new session when the step continues on another provider', () => {
+    const state = run(1, { configText: PROVIDERS, provider: 'zai' });
+    step(state);
+    finish(state, 'needs_human', { feedback: 'which?' });
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'this' }, 2500);
+    expect(group(state).pending?.resume).toBe(true);
+    state.run.provider = 'openai';
+    step(state);
+    expect(attempts(state)[1]).toMatchObject({
+      provider: 'openai',
+      resumeSession: null,
+      sessionId: null,
+    });
+  });
+});

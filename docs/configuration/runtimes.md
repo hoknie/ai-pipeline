@@ -26,7 +26,7 @@ runtimes:
 
 This section is set in the shared `settings.yaml` only. In a project `aip/settings.yaml` it is a validation error (`swarm.runtimes`).
 
-- **`enabled`** switches the runtime on or off. Every runtime is off until you switch it on: without the field, `aip` does not start it. A step of a specialist on a runtime that is off fails with `runtime disabled: <name>` (a chain with `on_error` moves on to its next item), the request for a run name is skipped and the list of its models stays empty.
+- **`enabled`** switches the runtime on or off. Every runtime is off until you switch it on: without the field, `aip` does not start it. A step of a specialist on a runtime that is off fails with `runtime disabled: <name>` (a chain with `on_error` moves on to its next enabled item; with a provider, of that provider), the request for a run name is skipped and the list of its models stays empty.
   - [Observers](../usage/runs.md#observers) do not repair such a failure and do not start a repair on a runtime that is off.
   - A non-empty `AIP_<NAME>_BIN` (`AIP_CLAUDE_BIN`, `AIP_OPENCODE_BIN`, `AIP_AGY_BIN`, `AIP_CODEX_BIN`, `AIP_KILO_BIN`, `AIP_CLINE_BIN`, `AIP_COPILOT_BIN`) in the daemon's environment switches the runtime on while `enabled` is not set. An explicit `enabled: false` wins over the variable.
   - Switch it in the panel (Settings → Runtimes → <runtime> → Enabled) or set `runtimes.<name>.enabled: true` in the shared `settings.yaml`. To go back to an older `aip`, remove `enabled` from the file first.
@@ -100,7 +100,7 @@ What may differ in a real CLI: for `codex`, `kilo` and `cline` the endpoint hand
 Try one on a throwaway profile and repository before you rely on it.
 
 Each keeps its conversation in a private folder of the group in the workspace (`logs/<run>/<group>/conversations/`), outside the worktree and apart from your own profile of the CLI.
-A resume after a human answer, a pause or a restart of the daemon continues the same conversation with the exact id the CLI reported; a retry starts an empty one, and a fall back to another runtime in a [chain](#runtime-chains) never carries the id or the folder over.
+A resume after a human answer, a pause or a restart of the daemon continues the same conversation with the exact id the CLI reported; a retry starts an empty one, and a switch to another item (a fall back in a [chain](#runtime-chains), a provider change) never carries the id or the folder over.
 The folder of a step is removed when the step ends with `done` or `rejected` (a step waiting for review keeps it) and with the merged group. Every attempt gets a new worker server and a new token, and the registration of the earlier one is replaced before the CLI starts.
 
 The endpoint is set in the environment of the CLI, in the shared `settings.yaml` (`runtimes.<name>.env`) or in the environment of the daemon. The panel shows the names of the variables, never their values.
@@ -203,12 +203,13 @@ runtimes:
 ```
 
 - **`mode`**:
-  - `on_error`: starts with the first enabled runtime and falls back to the next enabled runtime when an attempt hits limits or cannot start (`usage_limit`, `runtime_not_found`, `runtime_disabled`, `spawn`, `no_report`).
-  - `random`: picks a random enabled runtime from the pool for each step.
-  - `round_robin`: cycles through the enabled runtimes in order across steps.
-  - `by_provider`: a tier, see [Tiers](#tiers-by_provider).
+  - `on_error`: starts with the first enabled runtime and falls back to the next enabled runtime when an attempt hits limits or cannot start (`usage_limit`, `runtime_not_found`, `runtime_disabled`, `spawn`, `no_report`). With a chosen provider, both choices use only enabled items of that provider.
+  - `random`: picks a random enabled runtime from the pool for each step; with a chosen provider, from its items only.
+  - `round_robin`: cycles through the enabled runtimes in order across steps; with a chosen provider, through its items only.
+  - `by_provider`: a tier, see [Tiers](#tiers-by_provider); with a chosen provider, the tier uses its item.
 - **`runtimes`**: a non-empty list of items. Each item defines `runtime` (`claude`, `opencode`, `agy`, `codex`, `kilo`, `cline` or `copilot`), optional `model`, optional `enabled` (default `true`), optional `provider` (the slug of a [provider](providers.md); it must exist, a disabled one is allowed), and optional `variant` and `reasoning_effort` for OpenCode.
 - **`enabled`**: optional boolean (default `true`). When a chain or all its runtimes are disabled, specialists bound to it use `defaults.runtime` with no explicit model.
+- **Provider of the run**: a chosen provider keeps every mode above to enabled items of that provider. A chain without such an item fails the group with `provider_missing` before an attempt; the default item and other providers are not used. A missing, disabled or empty chain still gives `defaults.runtime`.
 
 A specialist binds to a chain via `runtime_chain: <slug>` in its definition (see [Specialists](specialists.md#fields)). The `runtime_chain` field cannot be used together with explicit `runtime`, `model`, `variant`, or `reasoning_effort`.
 
@@ -231,13 +232,15 @@ runtimes:
     model: openai/gpt-6.1-sol
 ```
 
-A specialist uses a tier through `runtime_chain: thinking`. Until a step asks for a provider, a tier takes the first available item in file order, and the next one after a failure: the `on_error` rule. `default` does not change that order. A session that continues stays on the item it started on.
+A specialist uses a tier through `runtime_chain: thinking`. Until a run chooses a provider, a tier takes the first available item in file order, and the next one after a failure: the `on_error` rule. `default` does not change that order.
+With a chosen provider, session continuation and a network retry keep the item of the earlier attempt only when it belongs to that provider; otherwise the step starts on the provider's item in a new session.
 
-A task can ask for a provider (`--provider zai`, see [Provider](../usage/queue.md#provider)). Its steps on a tier then use the item of that provider, or the `default` item (else the first enabled one) when the tier has none. The tier never switches to another provider for such a task, neither after a failure nor at a usage limit.
+A task can ask for a provider (`--provider zai`, see [Provider](../usage/queue.md#provider)). Its steps with a chain then use the enabled item of that provider in every chain mode.
+When the tier has no enabled item of the provider, the group fails with `provider_missing` before an attempt, and the `default` item or another provider is not used. The run never switches to another provider, neither after a failure nor at a usage limit.
 
 ### Usage limit and providers
 
-A [usage limit](../usage/queue.md#usage-limit) holds the provider of the attempt when its chain item has a `provider` (also in chains of other modes), and the runtime otherwise. A held provider does not stop other providers on the same runtime, while a limit of a runtime without a provider holds every item of that runtime.
+A [usage limit](../usage/queue.md#usage-limit) holds the provider of the attempt when its chain item has a `provider` (in chains of every mode), and the runtime otherwise. A held provider does not stop other providers on the same runtime, while a limit of a runtime without a provider holds every item of that runtime.
 
 The wait of a group and the stop of the queue then name the provider, for example `zai (Z.ai, opencode)`. Use one provider id for one account: two ids for the same account do not share a limit.
 

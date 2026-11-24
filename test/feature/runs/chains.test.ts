@@ -193,7 +193,7 @@ describe('selectAttemptRuntime', () => {
       stepIndex: 0,
       round: 1,
       resume: false,
-    });
+    })!;
     expect(first.runtime).toBe('claude');
     expect(first.chainIndex).toBe(0);
     attempts.push(makeAttempt(1, 'claude', 0));
@@ -207,7 +207,7 @@ describe('selectAttemptRuntime', () => {
       stepIndex: 1,
       round: 1,
       resume: false,
-    });
+    })!;
     expect(second.runtime).toBe('opencode');
     expect(second.model).toBe('openai/gpt-4o');
     expect(second.chainIndex).toBe(1);
@@ -222,7 +222,7 @@ describe('selectAttemptRuntime', () => {
       stepIndex: 2,
       round: 1,
       resume: false,
-    });
+    })!;
     expect(third.runtime).toBe('agy');
     expect(third.chainIndex).toBe(2);
     attempts.push(makeAttempt(3, 'agy', 2));
@@ -236,7 +236,7 @@ describe('selectAttemptRuntime', () => {
       stepIndex: 3,
       round: 1,
       resume: false,
-    });
+    })!;
     expect(fourth.runtime).toBe('claude');
     expect(fourth.chainIndex).toBe(0);
   });
@@ -469,7 +469,7 @@ describe('qualified model preservation across chain modes and attempt creation',
       round: 1,
       resume: false,
       seed: 0,
-    });
+    })!;
     expect(first.model).toBe('openai/gpt-custom');
     expect(first.chainIndex).toBe(0);
 
@@ -483,7 +483,7 @@ describe('qualified model preservation across chain modes and attempt creation',
       round: 1,
       resume: false,
       seed: 1,
-    });
+    })!;
     expect(second.model).toBe('other/gpt-custom');
     expect(second.chainIndex).toBe(1);
     expect(first.model).not.toBe(second.model);
@@ -551,7 +551,7 @@ describe('qualified model preservation across chain modes and attempt creation',
       stepIndex: 0,
       round: 1,
       resume: false,
-    });
+    })!;
     expect(selected.model).toBeNull();
     expect(selected.runtime).toBe('opencode');
     expect(selected.chainIndex).toBe(0);
@@ -637,7 +637,7 @@ describe('chains and failures of the network', () => {
       round: 2,
       resume: false,
       keepRuntime: true,
-    });
+    })!;
     expect(chosen.runtime).toBe(attempts[0]?.runtime);
   });
 });

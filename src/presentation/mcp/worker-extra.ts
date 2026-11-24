@@ -14,7 +14,7 @@ const providerField = z
   .nullable()
   .optional()
   .describe(
-    'Id of a provider of the tiers; omit for the default provider of the project; null for none: the task does not inherit the provider of this run',
+    'Id of a provider of the run; omit for the default provider of the project; null for none: the task does not inherit the provider of this run',
   );
 
 export function registerSplit(kit: WorkerKit): void {
@@ -147,7 +147,7 @@ const editFields = {
     .optional()
     .describe('worktree, commit or branch; null: follow delivery.mode'),
   variant: z.string().optional().describe('Id of a variant of the pipeline'),
-  provider: z.string().nullable().optional().describe('Id of a provider of the tiers; null: none'),
+  provider: z.string().nullable().optional().describe('Id of a provider of the run; null: none'),
   skip: z.array(z.string()).optional().describe('Ids of pipeline steps to skip; replaces the list'),
   after: z
     .array(z.string().min(1))

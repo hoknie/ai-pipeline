@@ -83,6 +83,8 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     lines.push(
       `  #${attempt.seq} ${attempt.stepName} r${attempt.round} · ${attempt.specialist} (${attempt.runtime}${attempt.model ? ` ${attempt.model}` : ''}) · ${statusBadge(attempt.status, style)}${attempt.verdict ? ` ${attempt.verdict}` : ''} · ${seconds(attempt.durationMs)} · ${formatUsage(attempt.usage, style)}`,
     );
+    // Historical mark: only attempts recorded before the run provider limited every chain mode
+    // have `requestedProvider`; the run never falls back to another provider's item now.
     if (attempt.requestedProvider !== undefined) {
       lines.push(
         style.muted(

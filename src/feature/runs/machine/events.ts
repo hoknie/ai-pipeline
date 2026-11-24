@@ -25,6 +25,8 @@ export type Effect =
   | { kind: 'merge'; run: string; group: string; updateOnConflict: boolean }
   /** The daemon runs the shell command of a pipeline action. */
   | { kind: 'run_action'; run: string; group: string; seq: number }
+  /** The step's chain has no enabled item of the provider of the run: the group fails. */
+  | { kind: 'provider_unavailable'; run: string; group: string; reason: FailReason }
   | DeliveryEffect;
 
 /** How a command action ended. */
@@ -96,6 +98,8 @@ export type Event =
       registryProject: RegistryProjectRef;
     }
   | { kind: 'timed_out'; group: string; seq: number }
+  /** The chain of the group has no enabled item of the provider of the run: the group fails. */
+  | { kind: 'provider_unavailable'; group: string; reason: FailReason }
   | { kind: 'action_finished'; group: string; seq: number; outcome: ActionOutcome }
   | { kind: 'message'; group: string; seq: number; text: string }
   /** `reason`: why an observer cancels; it is written to the cancelled groups. */

@@ -104,17 +104,18 @@ In the panel it is **More → Change variant…** of a run that is not finished;
 
 ```sh
 aip run provider <run-id> openai      # follow another provider
-aip run provider <run-id> --none      # no provider: the tiers take their items by their own rules
+aip run provider <run-id> --none      # no provider: the chains take their items by the rules of their modes
 ```
 
 In the panel it is **More → Change provider…** of a run that is not finished; the item appears when the project has [providers](../configuration/providers.md).
 
-- A running step on a tier whose item changes with the new provider is stopped without a commit and starts again on that item in a new session, keeping the remarks and the answer it had. The attempt shows `provider changed: zai → openai`. Its partial changes stay in the group worktree.
-- A step that does not use a tier, or whose item stays the same, keeps running. Actions, merges, delivery, the name generator and the observers are not touched.
+- A running step whose chain item changes with the new provider is stopped without a commit and starts again on that item in a new session, whatever the mode of the chain, keeping the remarks and the answer it had. The attempt shows `provider changed: zai → openai`. Its partial changes stay in the group worktree.
+- A step with an explicit runtime and model, or whose item stays the same, keeps running. Actions, merges, delivery, the name generator and the observers are not touched.
 - A group that waits (queued, for a limit or the network, paused, or with a question) takes the item of the new provider with its next attempt in a new session; its question and answer stay.
-- `--none` does not stop a running step. The next attempts choose the item by the rules of the tier, so a group that waits with a question may start a new session when that choice differs from the item of its last attempt.
-- The tiers come from the snapshot of the run. To take the tiers of the current configuration, retry with `aip group retry <run-id> <group> --refresh-config`.
-- The switch is refused for a finished run, an unknown or disabled provider, or a configuration that does not load. Choosing the current provider changes nothing.
+- Session continuation and a network retry keep the previous item only when it belongs to the chosen provider; otherwise the step starts on an item of the provider in a new session.
+- `--none` does not stop a running step. Following attempts choose the item by the rules of the chain mode, so a group that waits with a question may start a new session when that choice differs from the item of its last attempt.
+- The chains come from the snapshot of the run; a missing, disabled or empty chain still gives `defaults.runtime`. To take the chains of the current configuration, retry with `aip group retry <run-id> <group> --refresh-config`.
+- The switch is refused for a finished run, an unknown or disabled provider, a configuration that does not load, or a chain of a running or waiting step that has no enabled item of the new provider. Choosing the current provider changes nothing.
 - On a run that returned to the queue the same switch is `aip queue edit <item> --provider …`.
 
 ## Stopping a run

@@ -30,6 +30,11 @@ const CONFIG = `swarm:
         - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }
 `;
 
+const CONFIG_WITHOUT_OPENAI_ITEM = CONFIG.replace(
+  '        - { provider: openai, runtime: claude, model: haiku }\n',
+  '',
+);
+
 function models(h: Parameters<typeof calls>[0]): (string | undefined)[] {
   return calls(h).map((call) => call.args[call.args.indexOf('--model') + 1]);
 }
@@ -142,5 +147,33 @@ describe('switching the provider of a running run', () => {
     await expect(h.call('run_provider', { runId, provider: 'openai' })).rejects.toThrow(
       'is finished',
     );
+  });
+});
+
+describe('a run whose provider the chain lacks', () => {
+  it('fails the group before an attempt when the chain has no item of the provider', async () => {
+    const h = await start(CONFIG_WITHOUT_OPENAI_ITEM);
+    const runId = await runWith(h, 'openai');
+    const view = await h.waitFor(runId, (run) => run.groups[0]?.status === 'failed');
+    expect(view.groups[0]?.reason).toContain(
+      'no enabled item of provider `openai` in chain `coding`',
+    );
+    const group = await h.group(runId, 'g1');
+    expect(group.attempts).toHaveLength(0);
+    expect(group.reason).toContain('no enabled item of provider `openai` in chain `coding`');
+    expect(existsSync(join(h.fakeState, 'calls.jsonl')) ? calls(h) : []).toHaveLength(0);
+  });
+
+  it("refuses a switch to a provider with no item in the running step's chain", async () => {
+    const h = await start(CONFIG_WITHOUT_OPENAI_ITEM);
+    h.script({ code: [{ hang: true }] });
+    const runId = await runWith(h, 'zai');
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
+    await expect(h.call('run_provider', { runId, provider: 'openai' })).rejects.toThrow(
+      `cannot switch run ${runId} to provider \`openai\`: chain \`coding\` has no enabled item of provider \`openai\``,
+    );
+    const view = await h.status(runId);
+    expect(view.provider).toBe('zai');
+    expect(view.groups[0]?.status).toBe('running');
   });
 });

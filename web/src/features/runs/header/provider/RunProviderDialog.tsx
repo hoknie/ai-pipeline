@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '../../../../shared/ui/overlays/dialog.tsx';
 
-/** Picks another provider of the tiers for an unfinished run (or none) and asks the daemon to switch. */
+/** Picks another provider of the run for an unfinished run (or none) and asks the daemon to switch. */
 export function RunProviderDialog({
   run,
   api,

@@ -34,13 +34,13 @@ async function projectsOf(
   return Array.isArray(list) ? (list as RepositoryView[]) : [];
 }
 
-/** The provider of a task: every step on a tier runs on the model of that provider. */
+/** The provider of a task: every step with a chain takes its item from that provider. */
 const providerArgument = z
   .string()
   .nullable()
   .optional()
   .describe(
-    'Slug of a provider of the configuration (a `providers/<slug>.yaml` file): every step of the task on a tier runs on the model of that provider. Omit to take the default provider of the project (none when it has none); null means no provider. In an edit null clears it',
+    'Slug of a provider of the configuration (a `providers/<slug>.yaml` file): every step of the task with a chain takes its item from that provider, and a step whose chain has no item of it fails. Omit to take the default provider of the project (none when it has none); null means no provider. In an edit null clears it',
   );
 
 export function hostKit(options: HostOptions) {

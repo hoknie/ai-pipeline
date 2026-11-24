@@ -94,7 +94,7 @@ function VariantSelect({
   );
 }
 
-/** The provider of the tiers the task runs on: a choice among the providers of the registry. */
+/** The provider of the run the task follows: a choice among the providers of the registry. */
 function ProviderSelect({
   state,
   api,

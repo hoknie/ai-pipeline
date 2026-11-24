@@ -24,11 +24,17 @@ export interface AttemptView {
   model: string | null;
   /** Provider of the chain item the attempt ran on, when it has one. */
   provider?: string;
-  /** The provider of the run, when the tier of the step had no enabled item of it. */
+  /**
+   * The provider the run asked for, on attempts recorded before the run provider limited every
+   * chain mode; new attempts have no such field.
+   */
   requestedProvider?: string;
   /** The name of `provider` in the configuration of the run, when it has one. */
   providerName?: string;
-  /** The name of `requestedProvider` in the configuration of the run, when it has one. */
+  /**
+   * The name of `requestedProvider` in the configuration of the run, when it has one; like
+   * `requestedProvider`, only on attempts recorded before the change.
+   */
   requestedProviderName?: string;
   status: string;
   verdict: string | null;

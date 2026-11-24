@@ -36,7 +36,14 @@ import {
   retryGroup,
   startNextMerge,
 } from './run-control.ts';
-import { actionFinished, commitFailed, skipAhead, stepSkip, timedOut } from './steps.ts';
+import {
+  actionFinished,
+  commitFailed,
+  providerUnavailable,
+  skipAhead,
+  stepSkip,
+  timedOut,
+} from './steps.ts';
 import { setProvider } from './provider/index.ts';
 import { setVariant } from './variant/index.ts';
 
@@ -103,6 +110,7 @@ const HANDLERS: Handlers = {
   registry_project_resolved: (m, e) =>
     registryProjectResolved(m, e.group, e.seq, e.registryProject),
   timed_out: (m, e) => timedOut(m, e.group, e.seq),
+  provider_unavailable: (m, e) => providerUnavailable(m, e.group, e.reason),
   action_finished: (m, e) => actionFinished(m, e.group, e.seq, e.outcome),
   message: (m, e) => messageAttempt(m, e.group, e.seq, e.text),
   cancel: (m, e) => cancelGroups(m, e.group, e.reason),

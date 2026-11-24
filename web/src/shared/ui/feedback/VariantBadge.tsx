@@ -44,7 +44,7 @@ export function VariantBadge({
 }
 
 /**
- * The provider a run or a queue task follows in its tiers, next to the pipeline badge. Nothing
+ * The provider a run or a queue task follows in its chains, next to the pipeline badge. Nothing
  * when none is chosen. Not interactive.
  */
 export function ProviderBadge({

@@ -1,8 +1,4 @@
-import {
-  tierDefaultIndex,
-  type ReasoningEffort,
-  type RuntimeChain,
-} from '../../../swarm-config/types/index.ts';
+import type { ReasoningEffort, RuntimeChain } from '../../../swarm-config/types/index.ts';
 import type { Attempt } from '../attempt.ts';
 import type { AttemptRuntime } from '../constants.ts';
 
@@ -13,8 +9,6 @@ export interface SelectedRuntime {
   reasoningEffort?: ReasoningEffort;
   chainIndex?: number | null;
   provider?: string;
-  /** The provider of the run, when the tier had no enabled item of it and the default item was chosen. */
-  requestedProvider?: string;
 }
 
 type ChainEntry = { item: RuntimeChain['runtimes'][number]; index: number };
@@ -87,8 +81,15 @@ export function pickChainItem(
   const available = enabledItems.filter(free);
   const pool = available.length > 0 ? available : enabledItems;
   if (mode === 'round_robin') {
+    // The phase counts the attempts of the items that are candidates now, so a filtered pool keeps
+    // its own cycle.
+    const indices = new Set(pool.map((entry) => entry.index));
     const count = attempts.filter(
-      (a) => a.specialist === specialistSlug && a.chainIndex !== null && a.chainIndex !== undefined,
+      (a) =>
+        a.specialist === specialistSlug &&
+        a.chainIndex !== null &&
+        a.chainIndex !== undefined &&
+        indices.has(a.chainIndex),
     ).length;
     const choice = pool[count % pool.length]!;
     return formatSelected(choice);
@@ -96,23 +97,6 @@ export function pickChainItem(
   const pick = seed !== undefined ? Math.abs(seed) % pool.length : 0;
   const choice = pool[pick]!;
   return formatSelected(choice);
-}
-
-/**
- * The strict choice of a `by_provider` tier for a run with a provider: the enabled item of that
- * provider, else the default item of the tier, marked with the provider asked for. Holds and
- * failures do not move the choice to another provider.
- */
-export function pickProviderItem(
-  chain: Pick<RuntimeChain, 'runtimes'>,
-  enabledItems: ChainEntry[],
-  provider: string,
-): SelectedRuntime {
-  const own = enabledItems.find(({ item }) => item.provider === provider);
-  if (own) return formatSelected(own);
-  const index = tierDefaultIndex(chain);
-  const fallback = enabledItems.find((entry) => entry.index === index) ?? enabledItems[0]!;
-  return { ...formatSelected(fallback), requestedProvider: provider };
 }
 
 export function formatSelected(entry: ChainEntry): SelectedRuntime {
@@ -136,12 +120,11 @@ export function hasNextChainItem(
   provider: string | null = null,
 ): boolean {
   if (!chain || !chain.enabled || !failsOver(chain.mode)) return false;
-  // A run with a provider stays on it: the limit rules and the failure rules take over.
-  if (chain.mode === 'by_provider' && provider !== null) return false;
   const failedIndices = currentStepFailedIndices(attempts, stepIndex);
   return chain.runtimes.some(
     (item, index) =>
       item.enabled &&
+      (provider === null || item.provider === provider) &&
       !failedIndices.has(index) &&
       heldUntil(limitHolds, item.runtime, item.provider) === undefined,
   );
