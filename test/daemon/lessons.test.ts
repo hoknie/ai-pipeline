@@ -77,6 +77,24 @@ function seedLesson(h: Harness): string {
   return state.run.id;
 }
 
+/** A finished run whose coder had more distinct denials than the lessons block admits. */
+function seedManyLessons(h: Harness): string {
+  const state = seedRun(1, { id: 'seeded-many-lessons-run' });
+  state.run.repository = h.repo;
+  state.run.number = 8;
+  state.run.finishedAt = Date.now();
+  state.groups[0]!.attempts.push(
+    attempt({
+      denials: Array.from({ length: 14 }, (_, index) => ({
+        tool: `Tool${index}`,
+        command: null,
+      })),
+    }),
+  );
+  new RunRepository(h.running.application.database).saveRun(state);
+  return state.run.id;
+}
+
 describe('lessons of earlier runs', () => {
   it('summarises a finished run and gives its lessons to the next attempt as a skill', async () => {
     const h = await harness();
@@ -136,5 +154,23 @@ describe('lessons of earlier runs', () => {
     expect(
       String(reviewCall.args[reviewCall.args.indexOf('--append-system-prompt') + 1]),
     ).not.toContain('aip-lessons');
+  });
+
+  it('warns in the attempt log when the limit cut the lessons', async () => {
+    const h = await harness();
+    current = h;
+    seedManyLessons(h);
+
+    h.script({ code: [{ write: { 'feature.ts': 'export const feature = true;\n' } }] });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'add it' });
+    const final = await h.waitFor(created.runId, (view) => view.finished);
+    const group = final.groups[0]!;
+    const detail = await h.group(created.runId, group.slug);
+    const code = detail.attempts.find((one) => one.stepId === 'code')!;
+    const log = readFileSync(
+      join(h.repo, '.aip', 'logs', created.runId, group.slug, String(code.seq), 'output.log'),
+      'utf8',
+    );
+    expect(log).toContain('[aip] warning: lessons were cut by the limit: 2 of 14 lessons dropped');
   });
 });

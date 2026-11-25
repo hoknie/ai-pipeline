@@ -21,9 +21,17 @@ export function lessonsSkill(block: LessonBlock): string {
   return `${LESSONS_SKILL_HEADER}${block.text}\n`;
 }
 
+/** The warning that the lessons did not all fit the limit: it goes to the log of the attempt. */
+function droppedWarning(lessons: LessonBlock): string {
+  const total = lessons.lessons + lessons.dropped;
+  const noun = total === 1 ? 'lesson' : 'lessons';
+  return `lessons were cut by the limit: ${lessons.dropped} of ${total} ${noun} dropped`;
+}
+
 /**
  * Adds the lessons to what an attempt gets as skills. A runtime that does not load extra skills is
- * told so in its log; an attempt without lessons gets exactly what it got before.
+ * told so in its log, and so is an attempt whose lessons did not all fit the limit; an attempt
+ * without lessons gets exactly what it got before.
  */
 export function withLessons(
   attemptDirectory: string,
@@ -46,5 +54,9 @@ export function withLessons(
   const directory = join(root, '.claude', 'skills', LESSON_SKILL_NAME);
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, 'SKILL.md'), lessonsSkill(lessons), { mode: 0o600 });
-  return { directory: skills.directory ?? root, warnings: skills.warnings, lessons: true };
+  return {
+    directory: skills.directory ?? root,
+    warnings: lessons.dropped > 0 ? [...skills.warnings, droppedWarning(lessons)] : skills.warnings,
+    lessons: true,
+  };
 }

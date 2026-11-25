@@ -1,17 +1,22 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
+import { createClaudeRuntime } from '../../../src/feature/agents/clients/claude/index.ts';
 import type { Runtime } from '../../../src/feature/agents/types/index.ts';
+import { findSpecialist } from '../../../src/feature/swarm-config/types/index.ts';
+import { logSkillWarnings } from '../../../src/feature/runs/services/effects/skills/registry.ts';
 import { LESSON_SKILL_NAME, type LessonBlock } from '../../../src/feature/runs/types/index.ts';
 import {
   LESSONS_SKILL_HEADER,
   lessonsSkill,
   withLessons,
 } from '../../../src/feature/runs/services/effects/skills/lessons.ts';
+
+import { config } from './helpers.ts';
 
 const BLOCK: LessonBlock = {
   text: '# Lessons from earlier runs\n\n- A whole lesson with its evidence.',
@@ -68,6 +73,37 @@ describe('withLessons', () => {
     );
     expect(file).toContain(LESSON_SKILL_NAME);
     expect(file).toContain(BLOCK.text);
+  });
+
+  it('warns in the log of the attempt when the limit cut the lessons', () => {
+    const directory = attemptDirectory();
+    const cut: LessonBlock = { ...BLOCK, lessons: 10, dropped: 2 };
+    const skills = withLessons(directory, CLAUDE, cut, { directory: null, warnings: ['kept'] });
+    expect(skills.warnings).toEqual([
+      'kept',
+      'lessons were cut by the limit: 2 of 12 lessons dropped',
+    ]);
+
+    const log = join(directory, 'output.log');
+    writeFileSync(log, '');
+    logSkillWarnings(
+      log,
+      findSpecialist(config(), 'qa')!,
+      createClaudeRuntime('claude'),
+      '/worktree',
+      skills,
+    );
+    expect(readFileSync(log, 'utf8')).toContain(
+      '[aip] warning: lessons were cut by the limit: 2 of 12 lessons dropped',
+    );
+  });
+
+  it('says nothing about the limit when it cut nothing', () => {
+    const skills = withLessons(attemptDirectory(), CLAUDE, BLOCK, {
+      directory: null,
+      warnings: [],
+    });
+    expect(skills.warnings).toEqual([]);
   });
 
   it('keeps the folder of the registry skills and warns instead of writing for another runtime', () => {
