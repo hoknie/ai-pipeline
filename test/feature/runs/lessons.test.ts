@@ -340,7 +340,7 @@ describe('renderLessons', () => {
       id: `lesson-${index}`,
       kind: 'denial',
       text: `Lesson number ${index} is a whole sentence that stays whole.`,
-      evidence: { occurrences: 1, tasks: [index], seenAt: JAN_2 },
+      evidence: { occurrences: 1, attempts: 1, tasks: [index], seenAt: JAN_2 },
       priority: 100 - index,
     }));
 
@@ -360,7 +360,7 @@ describe('renderLessons', () => {
       id: 'one',
       kind: 'delivery',
       text: 'A lesson that is far too long for the limit.',
-      evidence: { occurrences: 1, tasks: [1], seenAt: JAN_2 },
+      evidence: { occurrences: 1, attempts: 1, tasks: [1], seenAt: JAN_2 },
       priority: 10,
     };
     expect(renderLessons([lesson], LESSON_HEADER.length)).toMatchObject({ text: '', dropped: 1 });

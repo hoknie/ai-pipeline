@@ -3,14 +3,20 @@ import {
   LESSONS_RUN_WINDOW,
   allGroups,
   collectSignal,
+  fitLessonFile,
   lessonsFromSignal,
   renderLessons,
+  selectLessons,
+  type ArchivedLesson,
+  type Lesson,
   type LessonBlock,
+  type LessonFile,
   type LessonSummary,
   type LessonSummarySpecialist,
-  type RenderedLessons,
   type RunState,
+  type SelectedLessons,
   type SpecialistSignal,
+  type SuppressedLesson,
 } from '../../types/index.ts';
 
 export interface LessonsDependencies {
@@ -46,16 +52,28 @@ export class RunLessons {
   /** The block an attempt of the specialist gets; null when there is nothing to teach it. */
   block(repository: string, specialist: string): LessonBlock | null {
     try {
-      const { rendered } = this.computed(repository, specialist);
-      if (rendered.lessons.length === 0) {
+      const now = this.dependencies.now();
+      const previous = this.dependencies.storage.read(repository, specialist, now);
+      const selection = selectLessons(
+        lessonsFromSignal(this.signalOf(repository, specialist)),
+        previous,
+        now,
+      );
+      if (
+        selection.lessons.length === 0 &&
+        selection.archived.length === 0 &&
+        selection.suppressed.length === 0
+      ) {
         this.dependencies.storage.remove(repository, specialist);
         return null;
       }
-      this.keep(repository, specialist, rendered.text);
+      const file = this.keep(repository, specialist, previous, selection, now);
+      if (file.lessons.length === 0) return null;
+      const rendered = renderLessons(file.lessons);
       return {
         text: rendered.text,
-        lessons: rendered.lessons.length,
-        dropped: rendered.dropped,
+        lessons: file.lessons.length,
+        dropped: selection.dropped + (selection.lessons.length - file.lessons.length),
       };
     } catch {
       // Lessons are an improvement to an attempt, never a reason for it not to start.
@@ -63,17 +81,37 @@ export class RunLessons {
     }
   }
 
-  /** Writes the file when the text changed, keeping the version and the date of the last change. */
-  private keep(repository: string, specialist: string, text: string): void {
-    const previous = this.dependencies.storage.read(repository, specialist);
-    if (previous?.text === text) return;
-    this.dependencies.storage.write({
+  /**
+   * Writes the file when the lessons or the archive changed, keeping the version and the date of
+   * the last change: the file is the artifact a person reads, not a log of every attempt. The file
+   * is fitted to its character limit first, so the block and the file always agree.
+   */
+  private keep(
+    repository: string,
+    specialist: string,
+    previous: LessonFile | null,
+    selection: SelectedLessons,
+    now: number,
+  ): LessonFile {
+    const draft: LessonFile = {
       repository,
       specialist,
+      version: previous?.version ?? 1,
+      generatedAt: previous?.generatedAt ?? now,
+      window: LESSONS_RUN_WINDOW,
+      lessons: selection.lessons,
+      archived: selection.archived,
+      suppressed: selection.suppressed,
+    };
+    const fitted = fitLessonFile(draft);
+    if (previous !== null && sameContent(previous, fitted)) return previous;
+    const next = fitLessonFile({
+      ...fitted,
       version: (previous?.version ?? 0) + 1,
-      generatedAt: this.dependencies.now(),
-      text,
+      generatedAt: now,
     });
+    this.dependencies.storage.write(next);
+    return next;
   }
 
   /**
@@ -103,14 +141,6 @@ export class RunLessons {
     } catch {
       return emptySummary(specialist);
     }
-  }
-
-  private computed(
-    repository: string,
-    specialist: string,
-  ): { signal: SpecialistSignal; rendered: RenderedLessons } {
-    const signal = this.signalOf(repository, specialist);
-    return { signal, rendered: renderLessons(lessonsFromSignal(signal)) };
   }
 
   /**
@@ -153,4 +183,26 @@ function specialistsOf(state: RunState): string[] {
     }
   }
   return found;
+}
+
+/** Whether a fresh read of the signal leaves the file exactly as it was. */
+function sameContent(previous: LessonFile, selection: LessonFile): boolean {
+  return (
+    previous.window === LESSONS_RUN_WINDOW &&
+    signature(previous.lessons, previous.archived, previous.suppressed) ===
+      signature(selection.lessons, selection.archived, selection.suppressed)
+  );
+}
+
+/** What the version and the date of a file stand for: the lessons and the archive, not the counts behind them. */
+function signature(
+  lessons: readonly Lesson[],
+  archived: readonly ArchivedLesson[],
+  suppressed: readonly SuppressedLesson[],
+): string {
+  return JSON.stringify([
+    lessons.map((lesson) => [lesson.id, lesson.text]),
+    archived.map((lesson) => [lesson.id, lesson.text, lesson.archivedAt]),
+    suppressed.map((lesson) => [lesson.id, lesson.text, lesson.suppressedAt]),
+  ]);
 }

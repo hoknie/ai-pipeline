@@ -49,7 +49,7 @@ For a live stream of changes, `aip events --json` prints a snapshot and then one
 
 ## Lessons from earlier runs
 
-Every attempt of a specialist gets the objective lessons of the last 50 finished runs of the repository: failed deliveries, changes outside the worktree, denied tool calls and rejected results. A lesson says how often it happened, on which tasks (`#7`, `#8`) and when it was last seen; a pattern never replaces a look at the current code.
+Every attempt of a specialist gets the objective lessons of the last 50 finished runs of the repository: failed deliveries, changes outside the worktree, denied tool calls and rejected results. A lesson says how many of how many attempts showed it (`4 of 12 attempts`), on which tasks (`#7`, `#8`) and when it was last seen; a pattern never replaces a look at the current code.
 
 ```sh
 aip run lessons <run-id>        # what the lessons of this run say, for every specialist
@@ -57,8 +57,11 @@ aip run lessons <run-id> --json
 ```
 
 - The lesson of a specialist is written under the state directory as `lessons/<repository-hash>/<specialist>.md` and reaches an attempt as the `aip-lessons` skill: the attempt gets the `Skill` tool and a line in its system prompt to read the skill before it starts, even when the specialist has no skills of its own. A runtime that does not load extra skills logs a warning instead.
+- The file is plain markdown with a front matter, so a person can open it and remove a rule: delete its `- [rule-id] …` line and the rule moves to `## Removed lessons` and stops reaching attempts. Delete its line from `## Removed lessons` (or the whole section) to let the rule come back.
 - The block is capped at 4000 characters and 12 lessons: the most frequent and severe come first, and a lesson that does not fit whole is dropped, never cut.
-- A specialist without lessons gets no skill and runs unchanged; a version and a date in the file change only when the text changes.
+- The file is capped at 12000 characters. A rule whose pattern is no longer seen in the window moves to the `## Archived lessons` section instead of being deleted: attempts do not get it, and it returns to the active list when the pattern comes back.
+- When the file would exceed its cap, the oldest archived rules leave first, then the least important active ones. What the file keeps and what the block offers always agree.
+- A specialist without lessons gets no skill and runs unchanged; the version and the date in the file change only when the lessons or the archive change.
 - The command answers for any run and reads the finished runs of the same repository.
 
 ## Answering a specialist

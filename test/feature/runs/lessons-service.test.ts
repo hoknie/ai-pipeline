@@ -1,11 +1,16 @@
-import { mkdtempSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Attempt, RunState } from '../../../src/feature/runs/types/index.ts';
-import { emptySignal } from '../../../src/feature/runs/types/index.ts';
+import {
+  LESSON_BLOCK_LIMIT,
+  LESSON_COUNT_LIMIT,
+  emptySignal,
+} from '../../../src/feature/runs/types/index.ts';
 import { LessonStorage, LessonsRepository } from '../../../src/feature/runs/repositories/index.ts';
 import { RunLessons } from '../../../src/feature/runs/services/lessons/index.ts';
 import { temporaryStorage, type Storage } from '../storage.ts';
@@ -65,6 +70,11 @@ function serviceOf(store: Storage, root: string, now: () => number): RunLessons 
 
 function tempRoot(): string {
   return mkdtempSync(join(tmpdir(), 'aip-lessons-'));
+}
+
+function filePath(root: string, repository: string, specialist: string): string {
+  const key = createHash('sha256').update(repository).digest('hex').slice(0, 16);
+  return join(root, key, `${specialist}.md`);
 }
 
 describe('RunLessons', () => {
@@ -192,7 +202,7 @@ describe('RunLessons', () => {
     expect(hydrated).toHaveBeenCalledTimes(2);
     expect(storage.read('/repo', 'coder')).not.toBeNull();
 
-    // The user merged it by hand: the lesson is withdrawn, and so is its file.
+    // The user merged it by hand: the lesson leaves the active list and moves to the archive.
     state.groups[0]!.delivery = {
       ...state.groups[0]!.delivery,
       state: 'applied',
@@ -204,7 +214,10 @@ describe('RunLessons', () => {
     store.runs.saveRun(state);
     expect(lessons.block('/repo', 'coder')).toBeNull();
     expect(hydrated).toHaveBeenCalledTimes(3);
-    expect(storage.read('/repo', 'coder')).toBeNull();
+    const withdrawn = storage.read('/repo', 'coder');
+    expect(withdrawn).not.toBeNull();
+    expect(withdrawn!.lessons).toEqual([]);
+    expect(withdrawn!.archived.map((lesson) => lesson.id)).toEqual(['delivery:apply_failed']);
     store.database.close();
   });
 
@@ -220,7 +233,10 @@ describe('RunLessons', () => {
     expect(firstBlock).not.toBeNull();
     const first = storage.read('/repo', 'coder');
     expect(first).toMatchObject({ version: 1, generatedAt: 1000 });
-    expect(first!.text).toBe(firstBlock!.text);
+    expect(first!.lessons).not.toHaveLength(0);
+    for (const lesson of first!.lessons) {
+      expect(firstBlock!.text).toContain(`- ${lesson.text}`);
+    }
 
     const again = serviceOf(store, root, () => 2000).block('/repo', 'coder');
     expect(again!.text).toBe(firstBlock!.text);
@@ -232,6 +248,117 @@ describe('RunLessons', () => {
     const changed = serviceOf(store, root, () => 3000).block('/repo', 'coder');
     expect(changed!.text).not.toBe(firstBlock!.text);
     expect(storage.read('/repo', 'coder')).toMatchObject({ version: 2, generatedAt: 3000 });
+    store.database.close();
+  });
+
+  it('keeps the active lessons within the limits in the same order on every run', () => {
+    const store = temporaryStorage();
+    const attempts = Array.from({ length: LESSON_COUNT_LIMIT + 8 }, (_, index) =>
+      attempt({
+        seq: index + 1,
+        denials: [{ tool: `Tool${String(index).padStart(2, '0')}`, command: null }],
+      }),
+    );
+    store.runs.saveRun(finishedRun('many', 7, attempts));
+
+    const firstRoot = tempRoot();
+    const first = serviceOf(store, firstRoot, () => 1000).block('/repo', 'coder');
+    expect(first).not.toBeNull();
+    const file = new LessonStorage(firstRoot).read('/repo', 'coder')!;
+    expect(file.lessons.length).toBe(LESSON_COUNT_LIMIT);
+    expect(first!.lessons).toBe(LESSON_COUNT_LIMIT);
+    expect(first!.text.length).toBeLessThanOrEqual(LESSON_BLOCK_LIMIT);
+
+    const secondRoot = tempRoot();
+    serviceOf(store, secondRoot, () => 2000).block('/repo', 'coder');
+    const second = new LessonStorage(secondRoot).read('/repo', 'coder')!;
+    expect(second.lessons.map((lesson) => lesson.id)).toEqual(
+      file.lessons.map((lesson) => lesson.id),
+    );
+    store.database.close();
+  });
+
+  it('says how many of how many attempts showed the pattern', () => {
+    const store = temporaryStorage();
+    store.runs.saveRun(
+      finishedRun('first', 7, [
+        attempt({ denials: [{ tool: 'Bash', command: null }] }),
+        attempt({ seq: 2 }),
+        attempt({ seq: 3 }),
+      ]),
+    );
+
+    const block = serviceOf(store, tempRoot(), () => 1000).block('/repo', 'coder');
+
+    expect(block!.text).toContain('1 of 3 attempts');
+    store.database.close();
+  });
+
+  it('keeps a rule a person deleted from the file out of later attempts', () => {
+    const store = temporaryStorage();
+    store.runs.saveRun(
+      finishedRun('first', 7, [attempt({ denials: [{ tool: 'Bash', command: null }] })]),
+    );
+    const root = tempRoot();
+    const path = filePath(root, '/repo', 'coder');
+
+    expect(serviceOf(store, root, () => 1000).block('/repo', 'coder')).not.toBeNull();
+    const edited = readFileSync(path, 'utf8')
+      .split('\n')
+      .filter((line) => !line.includes('[denial:Bash]'))
+      .join('\n');
+    writeFileSync(path, edited);
+
+    // The pattern is still in the window, but the rule must not come back.
+    expect(serviceOf(store, root, () => 2000).block('/repo', 'coder')).toBeNull();
+    const after = new LessonStorage(root).read('/repo', 'coder')!;
+    expect(after.lessons).toEqual([]);
+    expect(after.suppressed.map((lesson) => lesson.id)).toEqual(['denial:Bash']);
+    expect(serviceOf(store, root, () => 3000).block('/repo', 'coder')).toBeNull();
+    store.database.close();
+  });
+
+  it('moves a lesson whose pattern disappeared to the archive and brings it back', () => {
+    const store = temporaryStorage();
+    const state = finishedRun('first', 7, [
+      attempt({
+        denials: [{ tool: 'Bash', command: null }],
+        outsideChanges: ['/base/a.ts'],
+      }),
+    ]);
+    store.runs.saveRun(state);
+    const root = tempRoot();
+    const storage = new LessonStorage(root);
+
+    expect(serviceOf(store, root, () => 1000).block('/repo', 'coder')).not.toBeNull();
+    expect(storage.read('/repo', 'coder')!.lessons.map((lesson) => lesson.id)).toEqual([
+      'outside_changes',
+      'denial:Bash',
+    ]);
+
+    // The specialist no longer repeats either mistake: the rules leave the active list, not the file.
+    state.groups[0]!.attempts[0] = attempt({ finishedAt: 6000 });
+    store.runs.saveRun(state);
+    expect(serviceOf(store, root, () => 2000).block('/repo', 'coder')).toBeNull();
+    const archived = storage.read('/repo', 'coder')!;
+    expect(archived.lessons).toEqual([]);
+    expect(archived.archived.map((lesson) => lesson.id)).toEqual([
+      'outside_changes',
+      'denial:Bash',
+    ]);
+    expect(archived.archived.every((lesson) => lesson.archivedAt === 2000)).toBe(true);
+
+    // The same problem shows up again: the rule returns to the active list and leaves the archive.
+    state.groups[0]!.attempts[0] = attempt({
+      finishedAt: 7000,
+      denials: [{ tool: 'Bash', command: null }],
+    });
+    store.runs.saveRun(state);
+    const back = serviceOf(store, root, () => 3000).block('/repo', 'coder');
+    expect(back).not.toBeNull();
+    const restored = storage.read('/repo', 'coder')!;
+    expect(restored.lessons.map((lesson) => lesson.id)).toEqual(['denial:Bash']);
+    expect(restored.archived.map((lesson) => lesson.id)).toEqual(['outside_changes']);
     store.database.close();
   });
 });

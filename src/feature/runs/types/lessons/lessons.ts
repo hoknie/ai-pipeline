@@ -7,6 +7,18 @@ export const LESSON_BLOCK_LIMIT = 4000;
 /** The most lessons a prompt gets, by priority. */
 export const LESSON_COUNT_LIMIT = 12;
 
+/**
+ * The most characters of one lessons file, archive included. The archive is trimmed oldest first,
+ * so the file stays a readable artifact a person can open without a pager.
+ */
+export const LESSON_FILE_LIMIT = 12_000;
+
+/**
+ * The least evidence that makes a lesson: at least one observed outcome. A rule without an
+ * occurrence behind it would be a guess, and a guess is never a lesson.
+ */
+export const LESSON_MIN_OCCURRENCES = 1;
+
 /** How many finished runs of the repository the signal reads. */
 export const LESSONS_RUN_WINDOW = 50;
 
@@ -17,9 +29,12 @@ export const LESSON_KINDS = ['delivery', 'outside_changes', 'denial', 'rejected'
 
 export type LessonKind = (typeof LESSON_KINDS)[number];
 
-/** What backs a lesson: how often, on which tasks, and when last. */
+/** What backs a lesson: how often out of how many attempts, on which tasks, and when last. */
 export interface LessonEvidence {
+  /** How many times the pattern occurred in the window. */
   occurrences: number;
+  /** How many attempts of the specialist the window had: the denominator of `occurrences`. */
+  attempts: number;
   tasks: number[];
   seenAt: number;
 }
@@ -71,7 +86,7 @@ export interface RenderedLessons {
 
 export const LESSON_HEADER =
   '# Lessons from earlier runs\n\n' +
-  'Observed outcomes of earlier runs of this repository. Each lesson says how often it happened, on which tasks and when; check it against the current code before you rely on it.\n';
+  `Observed outcomes of the last ${LESSONS_RUN_WINDOW} finished runs of this repository. Each lesson says how often it happened, on which tasks and when; check it against the current code before you rely on it.\n`;
 
 const KIND_WEIGHT: Record<LessonKind, number> = {
   delivery: 4,
@@ -82,10 +97,11 @@ const KIND_WEIGHT: Record<LessonKind, number> = {
 
 /** Turns the objective signal of a specialist into lessons, most severe first. */
 export function lessonsFromSignal(signal: SpecialistSignal): Lesson[] {
-  const lessons: Lesson[] = signal.deliveries.map(deliveryLesson);
-  if (signal.outside !== null) lessons.push(outsideLesson(signal.outside));
-  lessons.push(...signal.denials.map(denialLesson));
-  if (signal.rejected.count > 0) lessons.push(rejectedLesson(signal));
+  const attempts = signal.attempts;
+  const lessons: Lesson[] = signal.deliveries.map((one) => deliveryLesson(one, attempts));
+  if (signal.outside !== null) lessons.push(outsideLesson(signal.outside, attempts));
+  lessons.push(...signal.denials.map((one) => denialLesson(one, attempts)));
+  if (signal.rejected.count > 0) lessons.push(rejectedLesson(signal, attempts));
   return lessons.sort(compareLessons);
 }
 
@@ -121,7 +137,7 @@ function compareLessons(left: Lesson, right: Lesson): number {
   return right.priority - left.priority || left.id.localeCompare(right.id);
 }
 
-function deliveryLesson(signal: DeliverySignal): Lesson {
+function deliveryLesson(signal: DeliverySignal, attempts: number): Lesson {
   const what =
     signal.state === 'apply_failed'
       ? 'Applying the result of the group failed'
@@ -140,13 +156,13 @@ function deliveryLesson(signal: DeliverySignal): Lesson {
   return {
     id: `delivery:${signal.state}`,
     kind: 'delivery',
-    text: `${what} ${evidence(signal)}.${reason}${conflicts} ${advice}`,
-    evidence: evidenceOf(signal),
+    text: `${what} ${evidence(signal, attempts)}.${reason}${conflicts} ${advice}`,
+    evidence: evidenceOf(signal, attempts),
     priority: signal.count * 10 + KIND_WEIGHT.delivery,
   };
 }
 
-function outsideLesson(signal: OutsideSignal): Lesson {
+function outsideLesson(signal: OutsideSignal, attempts: number): Lesson {
   const examples =
     signal.paths.length === 0
       ? ''
@@ -154,45 +170,59 @@ function outsideLesson(signal: OutsideSignal): Lesson {
   return {
     id: 'outside_changes',
     kind: 'outside_changes',
-    text: `Changes outside your worktree were detected ${evidence(signal)}.${examples} Every change outside the worktree is discarded.`,
-    evidence: evidenceOf(signal),
+    text: `Changes outside your worktree were detected ${evidence(signal, attempts)}.${examples} Every change outside the worktree is discarded.`,
+    evidence: evidenceOf(signal, attempts),
     priority: signal.count * 10 + KIND_WEIGHT.outside_changes,
   };
 }
 
-function denialLesson(signal: DenialSignal): Lesson {
+function denialLesson(signal: DenialSignal, attempts: number): Lesson {
   const tool = clip(signal.tool, 80);
   const example =
     signal.commands[0] === undefined ? '' : ` Example: \`${clip(signal.commands[0], 80)}\`.`;
   return {
     id: `denial:${tool}`,
     kind: 'denial',
-    text: `Tool calls of \`${tool}\` were denied ${evidence(signal)}.${example} Only the allowed tools and commands run.`,
-    evidence: evidenceOf(signal),
+    text: `Tool calls of \`${tool}\` were denied ${evidence(signal, attempts)}.${example} Only the allowed tools and commands run.`,
+    evidence: evidenceOf(signal, attempts),
     priority: signal.count * 10 + KIND_WEIGHT.denial,
   };
 }
 
-function rejectedLesson(signal: SpecialistSignal): Lesson {
+function rejectedLesson(signal: SpecialistSignal, attempts: number): Lesson {
   return {
     id: 'rejected',
     kind: 'rejected',
-    text: `A reviewer rejected the result ${evidence(signal.rejected)}. Address the feedback of the previous review before you report done.`,
-    evidence: evidenceOf(signal.rejected),
+    text: `A reviewer rejected the result ${evidence(signal.rejected, attempts)}. Address the feedback of the previous review before you report done.`,
+    evidence: evidenceOf(signal.rejected, attempts),
     priority: signal.rejected.count * 10 + KIND_WEIGHT.rejected,
   };
 }
 
-function evidenceOf(signal: { count: number; tasks: number[]; seenAt: number }): LessonEvidence {
-  return { occurrences: signal.count, tasks: [...signal.tasks], seenAt: signal.seenAt };
+function evidenceOf(
+  signal: { count: number; tasks: number[]; seenAt: number },
+  attempts: number,
+): LessonEvidence {
+  return {
+    occurrences: signal.count,
+    attempts: Math.max(attempts, signal.count),
+    tasks: [...signal.tasks],
+    seenAt: signal.seenAt,
+  };
 }
 
-function evidence(signal: { count: number; tasks: number[]; seenAt: number }): string {
-  return `${times(signal.count)} (${tasksText(signal.tasks)}; last seen ${date(signal.seenAt)})`;
+function evidence(
+  signal: { count: number; tasks: number[]; seenAt: number },
+  attempts: number,
+): string {
+  return `${times(signal.count, attempts)} (${tasksText(signal.tasks)}; last seen ${date(signal.seenAt)})`;
 }
 
-function times(count: number): string {
-  return count === 1 ? 'once' : `${count} times`;
+/** `4 of 12 attempts` when the denominator is known, a bare count when the signal has none. */
+function times(count: number, attempts: number): string {
+  if (attempts < count || attempts <= 0) return count === 1 ? 'once' : `${count} times`;
+  const window = attempts === 1 ? 'attempt' : 'attempts';
+  return `${count} of ${attempts} ${window}`;
 }
 
 function tasksText(tasks: number[]): string {
