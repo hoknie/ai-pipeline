@@ -25,10 +25,13 @@ import {
   FinishedRunRepository,
   LessonStorage,
   LessonsRepository,
+  ProbeFiles,
   RunRepository,
 } from '../repositories/index.ts';
 
 import { RunArchive } from './archive.ts';
+import { probeCheck } from './probes/check.ts';
+import { RunProbes } from './probes/service.ts';
 import type { EffectTimings } from './effects/context.ts';
 import { RunEffects } from './effects/effects.ts';
 import { RunCleanup } from './cleanup/index.ts';
@@ -75,6 +78,7 @@ export interface RunsServices {
   engine: RunEngine;
   effects: RunEffects;
   requests: RunRequests;
+  probes: RunProbes;
   reads: RunReads;
   cleanup: RunCleanup;
 }
@@ -117,13 +121,25 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
   const effects = new RunEffects({ ...dependencies, lessons, context: engine });
   engine.attach(effects);
   const { registry, config, agents } = dependencies;
+  const requests = new RunRequests({ states, engine, effects, registry, config, now });
+  const probes = new RunProbes({
+    states,
+    launcher: requests,
+    store: new ProbeFiles(join(dependencies.stateDirectory, 'probes')),
+    config,
+    check: probeCheck,
+    engine,
+    now,
+  });
+  engine.attachProbes(probes);
   return {
     attemptHistory: new RunAttemptHistoryService(new AttemptHistoryRepository(database)),
     lessons,
     states,
     engine,
     effects,
-    requests: new RunRequests({ states, engine, effects, registry, config, now }),
+    requests,
+    probes,
     reads: new RunReads({ states, effects, agents }),
     cleanup: new RunCleanup({ engine, diff: dependencies.diff }),
   };

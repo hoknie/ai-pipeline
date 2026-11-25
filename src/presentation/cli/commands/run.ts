@@ -28,6 +28,7 @@ import {
   type AuthorOptions,
 } from '../options.ts';
 import { watch } from '../watch.ts';
+import { addContrast, addContrastShow } from './probe/index.ts';
 import {
   addApply,
   addClean,
@@ -310,4 +311,6 @@ export function registerRun(program: Command, io: CliIo, style: Style): void {
   for (const add of [addPause, addApply, addMarkDelivered, addSkip, addVariant, addProbe, addClean])
     add(kit);
   addProvider(kit);
+  addContrast(kit);
+  addContrastShow(kit);
 }

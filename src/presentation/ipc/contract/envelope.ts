@@ -12,6 +12,7 @@ import { lessonsRequests } from './lessons/index.ts';
 import { notificationsRequests } from './notifications/notifications.ts';
 import { observersRequests } from './observers.ts';
 import { networkStatusSchema, panelRequests } from './panel.ts';
+import { probeRequests } from './probe/index.ts';
 import { processesRequests } from './processes.ts';
 import { queueRequests } from './queue.ts';
 import { repositoriesRequests } from './repositories.ts';
@@ -24,6 +25,7 @@ import { z } from 'zod';
 export const requestSchema = z.discriminatedUnion('method', [
   ...runsRequests,
   ...lessonsRequests,
+  ...probeRequests,
   ...groupsRequests,
   ...artifactsRequests,
   ...queueRequests,

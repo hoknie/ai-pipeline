@@ -9,6 +9,7 @@ export {
 } from './runner.ts';
 export * from './authorship.ts';
 export * from './changes.ts';
+export * from './check.ts';
 export * from './workspace.ts';
 export * from './delivery.ts';
 export * from './remote.ts';

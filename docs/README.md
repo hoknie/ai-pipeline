@@ -35,6 +35,7 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | Page | What it covers |
 |---|---|
 | [usage/runs.md](usage/runs.md) | starting, following, answering, retrying and cleaning up runs; run states; artifacts |
+| [usage/probes.md](usage/probes.md) | contrast probes: two variants of a pipeline on one task and base, the objective signals, the budget and the proposal |
 | [usage/queue.md](usage/queue.md) | the task queue: order, parallelism, autopilot, usage limits, dependencies, pausing and freezing |
 | [usage/tags.md](usage/tags.md) | tags of tasks and runs, linked tasks, the parent of a task |
 | [usage/notifications.md](usage/notifications.md) | notifications in Telegram and Slack: bot setup, subscriptions, answering from the chat, delivery journal |

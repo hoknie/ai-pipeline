@@ -5,6 +5,7 @@ export * from './groups.ts';
 export * from './lessons/index.ts';
 export * from './observers.ts';
 export * from './observer-history.ts';
+export * from './probe/index.ts';
 export * from './processes.ts';
 export * from './queue.ts';
 export * from './repositories.ts';

@@ -74,6 +74,14 @@ export function run(params: Params, context: IpcContext): Target {
   };
 }
 
+/** An experiment of a run: the resource of the run whose task it probes. */
+export function experiment(params: Params, context: IpcContext): Target {
+  const id = str(params.id);
+  const experiment = id === null ? null : context.services.runs.probes.find(id);
+  if (experiment === null) return { resources: [], hides: 'unknown probe experiment' };
+  return run({ runId: experiment.sourceRun }, context);
+}
+
 /** A queue item: the project of its queue, its author, pipeline and tags. */
 export function task(params: Params, context: IpcContext): Target {
   const id = str(params.item);

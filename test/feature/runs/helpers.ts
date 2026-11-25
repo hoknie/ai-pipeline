@@ -4,6 +4,7 @@ import {
   type Attempt,
   type Harness,
   type HumanQuestion,
+  type RunAttachment,
   type RunState,
   createRun,
   findGroup,
@@ -49,6 +50,7 @@ export function run(
     createdBySystem?: boolean;
     harness?: Harness;
     probeOf?: string | null;
+    attachments?: RunAttachment[];
   } = {},
 ): RunState {
   const resolved = config(options.configText);
@@ -76,6 +78,7 @@ export function run(
     createdBySystem: options.createdBySystem,
     harness: options.harness,
     probeOf: options.probeOf,
+    attachments: options.attachments,
   });
 }
 

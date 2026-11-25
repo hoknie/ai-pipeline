@@ -11,6 +11,7 @@ export * from './lessons/index.ts';
 export * from './notifications/notifications.ts';
 export * from './observers.ts';
 export * from './panel.ts';
+export * from './probe/index.ts';
 export * from './processes.ts';
 export * from './queue.ts';
 export * from './repositories.ts';

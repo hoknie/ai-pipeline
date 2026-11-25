@@ -29,6 +29,8 @@ const SAMPLES: Record<Method, unknown> = {
   attachment: { ...run, id: 'a1' },
   run_patch: run,
   run_lessons: run,
+  run_contrast: { ...run, candidates: ['default', 'strong'], repetitions: 3, maxRuns: 6 },
+  contrast_show: { id: 'pr1' },
   pipelines: repository,
   system_stages: repository,
   config: repository,
@@ -232,9 +234,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 156 methods, each in the request schema once', () => {
+  it('has 158 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(156);
+    expect(methods).toHaveLength(158);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -139,4 +139,22 @@ describe('guard', () => {
       expect(() => guard(apply, context(developer, mode))).not.toThrow();
     }
   });
+
+  it('guards a contrast probe as starting a run: a developer may probe, a viewer may not', () => {
+    const call = parse('run_contrast', {
+      runId: 'r1',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    expect(methodActions.run_contrast.action).toBe('run.start');
+    expect(() => guard(call, context(developer))).not.toThrow();
+    const viewer: Actor = { ...developer, attributes: { role: ['viewer'] } };
+    try {
+      guard(call, context(viewer));
+      expect.unreachable();
+    } catch (error) {
+      expect((error as Error).message).toContain('run.start');
+    }
+  });
 });

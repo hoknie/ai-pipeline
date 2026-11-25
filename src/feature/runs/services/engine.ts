@@ -27,6 +27,11 @@ import type { RunStates } from './states.ts';
 /** The longest delay `setTimeout` keeps. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
+/** The contrast probes: a change of a run is their chance to create the next repetition. */
+export interface ProbeProgress {
+  request(): void;
+}
+
 /** What carries out the effects the machine returns: the agents, git and the delivery. */
 export interface EffectRunner {
   perform(state: RunState, effects: Effect[]): Promise<void>;
@@ -60,6 +65,7 @@ export class RunEngine {
   private readonly dependencies: RunEngineDependencies;
   private queue: Promise<unknown> = Promise.resolve();
   private effects: EffectRunner | null = null;
+  private probes: ProbeProgress | null = null;
   private halted = false;
   /** Queued groups the scheduler holds back, by `waitKey`; recomputed after each `schedule()`. */
   private waits = new Map<string, GroupWait>();
@@ -75,6 +81,11 @@ export class RunEngine {
   attach(effects: EffectRunner): void {
     this.effects = effects;
   }
+
+  /** The probes; set once, right after both are built. */
+  readonly attachProbes = (probes: ProbeProgress): void => {
+    this.probes = probes;
+  };
 
   /** The daemon is stopping: nothing new starts. */
   get stopping(): boolean {
@@ -109,6 +120,8 @@ export class RunEngine {
     }
     // Any run, queued or not: an incident of a run started directly is noticed as well.
     observe.request();
+    // A finished probe lets the experiment spend the budget before the next repetition.
+    this.probes?.request();
   }
 
   async schedule(): Promise<void> {

@@ -7,6 +7,7 @@ export * from './launch/launch.ts';
 export * from './input.ts';
 export * from './chains/chain-select.ts';
 export * from './lessons/index.ts';
+export * from './probe/index.ts';
 export * from './limits.ts';
 export * from './probe/index.ts';
 export * from './pools/pools.ts';

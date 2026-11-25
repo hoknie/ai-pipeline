@@ -11,6 +11,8 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | `aip run show <run-id>` | The groups of one run and the `System:` line |
 | `aip run lessons <run-id> [--json]` | [Lessons](runs.md#lessons-from-earlier-runs) a run leaves to later attempts of its repository, for every specialist |
 | `aip run probe <run-id> [--harness <name>]` | [Starts a probe](runs.md#probes-of-another-harness) of the run on the same input in another harness; the probe is never delivered automatically |
+| `aip run contrast <run-id> --candidate <variant> --candidate <variant>` | [Contrast probes](probes.md): the task of a run on its base commit with several variants, compared by objective signals; `--repetitions`, `--max-runs`, `--max-tokens` set the budget |
+| `aip run contrast-show <probe-id> [--json]` | The signals, the comparison and the proposal of a [probe experiment](probes.md#reading-the-comparison) |
 | `aip run watch [run-id]` | Redraws the state of a run in place until it finishes |
 | `aip run cancel <run-id>` | Stops a whole run |
 | `aip run pause <run-id>` | [Pauses a run](queue.md#pausing-a-run) |

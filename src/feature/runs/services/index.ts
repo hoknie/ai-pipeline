@@ -23,5 +23,6 @@ export { RunStates, type FinishedPage } from './states.ts';
 export { RunReads, type GroupDetails, type WorkerRunRead } from './reads.ts';
 export { currentPermissions, currentSpecialists, providerEvent, variantConfig } from './refresh.ts';
 export { RunRequests } from './requests.ts';
+export { RunProbes, type RunProbesDependencies } from './probes/service.ts';
 export { RunCleanup, cleanPlanOf } from './cleanup/index.ts';
 export { RunLessons, type LessonsDependencies } from './lessons/index.ts';

@@ -26,6 +26,7 @@ import {
   sameProbeInput,
   type Harness,
   type NewGroup,
+  type ProbeRunRequest,
   type RunCreated,
   type RunRequest,
   type RunState,
@@ -200,6 +201,44 @@ export class RunRequests {
       commit: base.run.baseCommit,
     });
     await excludeWorkspace(repository, workspaceRoot(repository, base.run.config.workspaceDir));
+    return this.started(state, false, false);
+  }
+
+  /**
+   * Creates the run of a probe: one task from one base commit with one variant of the harness. The
+   * run is not a queue item, never delivers by itself and shares the task number of its source run.
+   */
+  async createProbe(request: ProbeRunRequest): Promise<RunCreated> {
+    const { registry, config: configs, now } = this.dependencies;
+    const repository = await registry.rootOf(request.repository);
+    const config = configs.load(repository);
+    const id = runId(now(), randomInt(36 ** 4));
+    const prepared = await prepareRunBranch(repository, `refs/aip/${id}/run`, {
+      workingTree: false,
+      include: [],
+      snapshotRef: `refs/aip/${id}/base`,
+      commit: request.baseCommit,
+    });
+    const state = createRun({
+      id,
+      repository,
+      pipeline: request.pipeline,
+      baseCommit: prepared.baseCommit,
+      config,
+      dirtyWarning: false,
+      groups: [{ title: request.groupTitle, task: request.task }],
+      split: request.split,
+      fromQueue: false,
+      queueItem: null,
+      number: request.number,
+      autoDeliver: false,
+      skip: request.skip,
+      variant: request.variant,
+      provider: request.provider,
+      attachments: request.attachments,
+      now: now(),
+      title: request.title,
+    });
     return this.started(state, false, false);
   }
 

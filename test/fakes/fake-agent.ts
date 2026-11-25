@@ -466,6 +466,8 @@ if (mode === 'agy')
   );
 const step = /Step: "([^"]+)"/.exec(worker.prompt)?.[1] ?? 'unknown';
 const group = /Group: "([^"]+)"/.exec(worker.prompt)?.[1] ?? 'unknown';
+// The executor of a variant may change the model: `step@group@model` scripts only that harness.
+const model = option('--model') ?? 'default';
 mkdirSync(state, { recursive: true });
 appendFileSync(
   join(state, 'calls.jsonl'),
@@ -473,6 +475,9 @@ appendFileSync(
     mode,
     step,
     group,
+    model,
+    prompt: worker.prompt,
+    message: worker.message,
     args,
     cwd: worker.cwd,
     ...(mode === 'opencode' ? { configPath: process.env.OPENCODE_CONFIG } : {}),
@@ -489,8 +494,9 @@ writeFileSync(counterPath, String(count + 1));
 const script = process.env.AIP_FAKE_SCRIPT
   ? JSON.parse(readFileSync(process.env.AIP_FAKE_SCRIPT, 'utf8'))
   : {};
-// `step@group` scripts one group of the step; `step` serves every group
-const actions: Action[] = script[`${step}@${group}`] ?? script[step] ?? [];
+// `step@group@model` scripts one harness, `step@group` one group of the step, `step` serves every group
+const actions: Action[] =
+  script[`${step}@${group}@${model}`] ?? script[`${step}@${group}`] ?? script[step] ?? [];
 const action: Action = actions[Math.min(count, actions.length - 1)] ?? {};
 
 if (action.read) {

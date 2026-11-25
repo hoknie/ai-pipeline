@@ -3,6 +3,7 @@ import type { MethodAccess } from './method-actions.ts';
 import {
   anywhere,
   editedTask,
+  experiment,
   launch,
   link,
   project,
@@ -27,6 +28,8 @@ export const runMethods = {
   finished_runs: onProject('project.read'),
   run_patch: onRun('run.read'),
   run_lessons: onRun('run.read'),
+  run_contrast: onRun('run.start'),
+  contrast_show: { action: 'run.read', target: experiment },
   cancel: onRun('run.cancel'),
   run_clean: onRun('run.cancel'),
   retry: onRun('run.retry'),

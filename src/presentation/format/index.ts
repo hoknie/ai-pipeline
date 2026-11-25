@@ -15,6 +15,7 @@ export { formatAccessActions, formatAccessCheck } from './access/index.ts';
 export { formatAudit } from './audit/index.ts';
 export { formatLinks } from './links.ts';
 export { formatLessons } from './lessons/index.ts';
+export { formatProbe } from './probe/index.ts';
 export { formatAddedToProjects, formatQueue, formatQueues, formatRepositories } from './queue.ts';
 export { formatRun, formatRunCreated, formatRunList, formatRunQueued, waitNote } from './runs.ts';
 export * from './style.ts';

@@ -59,6 +59,8 @@ export function createLifecycle(
         await observers.observe(true);
         runs.engine.armWake();
       });
+      // Probes the last daemon left unfinished continue from their stored plan.
+      runs.probes.request();
       // Questions that waited while the daemon was off are sent; the bots start listening.
       await notifications.dispatcher.start();
       await notifications.channels.start();

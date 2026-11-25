@@ -15,7 +15,6 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
   retry: { action: 'run.retry', info: runWith('group', 'refreshConfig') },
   run_skip: { action: 'run.skip', info: runWith('step') },
   run_variant: { action: 'run.variant', info: runWith('variant') },
-  run_provider: { action: 'run.provider', info: runWith('provider') },
   run_probe: {
     action: 'run.probe',
     info: (params, result) => ({
@@ -23,6 +22,11 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
       details: pick(params, 'harness'),
     }),
   },
+  run_contrast: {
+    action: 'run.contrast',
+    info: runWith('group', 'candidates', 'repetitions', 'maxRuns', 'maxTokens'),
+  },
+  run_provider: { action: 'run.provider', info: runWith('provider') },
   apply: { action: 'run.apply', info: runWith('groups', 'mode', 'force') },
   run_mark_delivered: {
     // `aip run apply` on the machine of a developer reports the delivery with its mode
