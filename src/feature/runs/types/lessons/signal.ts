@@ -1,8 +1,8 @@
 import { stepSpecialist } from '../../../swarm-config/types/index.ts';
-import type { Denial, Verdict } from '../../../agents/types/index.ts';
+import { addUsage, type Denial, type Usage, type Verdict } from '../../../agents/types/index.ts';
 import type { Attempt } from '../attempt.ts';
 import { stepsOf, type Group } from '../group.ts';
-import { allGroups, type RunState } from '../run.ts';
+import type { RunState } from '../run.ts';
 
 /** How often a pattern was seen, on which tasks, and when it was seen last. */
 export interface TaskCount {
@@ -12,6 +12,22 @@ export interface TaskCount {
   tasks: number[];
   /** The latest moment the pattern was seen (ms); 0 when unknown. */
   seenAt: number;
+}
+
+/** A path and how many times it was seen. */
+export interface FileCount {
+  path: string;
+  count: number;
+}
+
+/** The results of the specialist a review rejected, and how long the review loop lasted. */
+export interface RejectedSignal extends TaskCount {
+  /**
+   * The review rounds that ended with a rejection, counted once per task: two steps rejected in the
+   * same round of one task are one round. A rejection starts the next round, so this is how many
+   * rounds the work was redone in.
+   */
+  rounds: number;
 }
 
 /** Tool calls the agent CLI refused, grouped by the tool. */
@@ -32,17 +48,24 @@ export interface DeliverySignal extends TaskCount {
   state: 'apply_failed' | 'push_failed';
   /** The reasons of the deliveries, without repeats; at most three. */
   reasons: string[];
-  /** Conflicting files, without repeats; at most five. */
-  conflicts: string[];
+  /** Conflicting files with how often they conflicted, the most frequent first; at most five. */
+  conflicts: FileCount[];
+  /** Files committed with uncommitted edits of the user, the most frequent first; at most five. */
+  userEdits: FileCount[];
 }
 
 /** What the finished runs of a repository say about one specialist. */
 export interface SpecialistSignal {
   specialist: string;
   attempts: number;
+  /**
+   * Tokens the attempts of the specialist spent; null when none recorded usage. The attempt keeps
+   * them itself, and the usage journal copies the same numbers, so the signal needs no stats table.
+   */
+  usage: Usage | null;
   verdicts: { done: number; rejected: number; needs_human: number; failed: number };
   /** The tasks a review rejected and sent back to this specialist, with the moment of the last one. */
-  rejected: TaskCount;
+  rejected: RejectedSignal;
   denials: DenialSignal[];
   outside: OutsideSignal | null;
   deliveries: DeliverySignal[];
@@ -53,23 +76,35 @@ export function emptySignal(specialist: string): SpecialistSignal {
   return {
     specialist,
     attempts: 0,
+    usage: null,
     verdicts: { done: 0, rejected: 0, needs_human: 0, failed: 0 },
-    rejected: { count: 0, tasks: [], seenAt: 0 },
+    rejected: { count: 0, tasks: [], seenAt: 0, rounds: 0 },
     denials: [],
     outside: null,
     deliveries: [],
   };
 }
 
+/** One failed-delivery state while the runs are read: its counts and the files it touched. */
+interface DeliveryAggregate {
+  signal: DeliverySignal;
+  conflicts: Map<string, number>;
+  userEdits: Map<string, number>;
+}
+
 interface Collector {
   denials: Map<string, DenialSignal>;
-  deliveries: Map<string, DeliverySignal>;
+  deliveries: Map<string, DeliveryAggregate>;
   outside: OutsideSignal;
+  /** `<task>/<round>` of every rejection: the rounds the review loop lasted, once per task. */
+  rejectedRounds: Set<string>;
 }
 
 /**
- * Aggregates the objective outcome of finished runs for one specialist: verdicts, refused tool
- * calls, changes outside the worktree and failed deliveries. Only finished runs count.
+ * Aggregates the objective outcome of finished runs for one specialist: verdicts, tokens, refused
+ * tool calls, changes outside the worktree, failed deliveries and the files they touched. Only
+ * finished runs count, and only their work groups: probes and service groups (split, message,
+ * resolve, repair) and actions say nothing about the quality of the specialist's own work.
  */
 export function collectSignal(runs: readonly RunState[], specialist: string): SpecialistSignal {
   const signal = emptySignal(specialist);
@@ -77,15 +112,17 @@ export function collectSignal(runs: readonly RunState[], specialist: string): Sp
     denials: new Map(),
     deliveries: new Map(),
     outside: { count: 0, tasks: [], seenAt: 0, paths: [] },
+    rejectedRounds: new Set(),
   };
   for (const state of runs) {
     if (state.run.finishedAt === null) continue;
-    for (const group of allGroups(state)) {
+    for (const group of state.groups) {
       collectGroup(signal, collector, state, group, specialist);
     }
   }
+  signal.rejected.rounds = collector.rejectedRounds.size;
   signal.denials = [...collector.denials.values()].sort(byCount);
-  signal.deliveries = [...collector.deliveries.values()].sort(byCount);
+  signal.deliveries = [...collector.deliveries.values()].map(finishDelivery).sort(byCount);
   signal.outside = collector.outside.count === 0 ? null : collector.outside;
   return signal;
 }
@@ -103,7 +140,7 @@ function collectGroup(
 ): void {
   const task = state.run.number;
   // A review rejects the work; the lesson belongs to the specialist the review sends it back to.
-  collectRejected(signal, state, group, specialist);
+  collectRejected(signal, collector, state, group, specialist);
   const own = group.attempts.filter(
     (attempt) => attempt.specialist === specialist && attempt.runtime !== 'command',
   );
@@ -120,11 +157,11 @@ function collectGroup(
  */
 function collectRejected(
   signal: SpecialistSignal,
+  collector: Collector,
   state: RunState,
   group: Group,
   specialist: string,
 ): void {
-  if (!state.groups.includes(group)) return;
   let steps: ReturnType<typeof stepsOf>;
   try {
     steps = stepsOf(state.run, group);
@@ -137,6 +174,7 @@ function collectRejected(
     const goto = steps.find((step) => step.id === steps[attempt.stepIndex]?.onReject?.goto);
     if (!goto || stepSpecialist(state.run.config, goto)?.slug !== specialist) continue;
     addCount(signal.rejected, state.run.number, attempt.finishedAt ?? state.run.finishedAt ?? 0);
+    collector.rejectedRounds.add(`${state.run.number}/${attempt.round}`);
   }
 }
 
@@ -148,6 +186,7 @@ function collectAttempt(
   finishedAt: number,
 ): void {
   signal.attempts += 1;
+  signal.usage = addUsage(signal.usage, attempt.usage);
   const at = attempt.finishedAt ?? finishedAt;
   if (attempt.status === 'finished' && attempt.report !== null) {
     countVerdict(signal, attempt.report.verdict);
@@ -206,23 +245,41 @@ function collectDelivery(
 ): void {
   const { delivery } = group;
   if (delivery.state !== 'apply_failed' && delivery.state !== 'push_failed') return;
-  const found = collector.deliveries.get(delivery.state) ?? {
-    state: delivery.state,
-    count: 0,
-    tasks: [],
-    seenAt: 0,
-    reasons: [],
-    conflicts: [],
-  };
-  addCount(found, task, delivery.finishedAt ?? finishedAt);
+  const found = collector.deliveries.get(delivery.state) ?? newDelivery(delivery.state);
+  addCount(found.signal, task, delivery.finishedAt ?? finishedAt);
   const reason = delivery.reason?.trim() ?? '';
-  if (reason !== '' && !found.reasons.includes(reason) && found.reasons.length < 3) {
-    found.reasons.push(reason);
+  if (reason !== '' && !found.signal.reasons.includes(reason) && found.signal.reasons.length < 3) {
+    found.signal.reasons.push(reason);
   }
-  for (const conflict of delivery.conflicts) {
-    if (!found.conflicts.includes(conflict) && found.conflicts.length < 5) {
-      found.conflicts.push(conflict);
-    }
-  }
+  countFiles(found.conflicts, delivery.conflicts);
+  countFiles(found.userEdits, delivery.userEdits);
   collector.deliveries.set(delivery.state, found);
+}
+
+function newDelivery(state: DeliverySignal['state']): DeliveryAggregate {
+  return {
+    signal: { state, count: 0, tasks: [], seenAt: 0, reasons: [], conflicts: [], userEdits: [] },
+    conflicts: new Map(),
+    userEdits: new Map(),
+  };
+}
+
+function countFiles(target: Map<string, number>, paths: readonly string[]): void {
+  for (const path of paths) target.set(path, (target.get(path) ?? 0) + 1);
+}
+
+function finishDelivery(aggregate: DeliveryAggregate): DeliverySignal {
+  return {
+    ...aggregate.signal,
+    conflicts: topFiles(aggregate.conflicts),
+    userEdits: topFiles(aggregate.userEdits),
+  };
+}
+
+/** The most frequent paths first, at most five: a long delivery must not flood the signal. */
+function topFiles(counts: Map<string, number>): FileCount[] {
+  return [...counts.entries()]
+    .map(([path, count]) => ({ path, count }))
+    .sort((left, right) => right.count - left.count || left.path.localeCompare(right.path))
+    .slice(0, 5);
 }

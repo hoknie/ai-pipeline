@@ -1,4 +1,4 @@
-import type { DeliverySignal, DenialSignal, OutsideSignal } from './signal.ts';
+import type { DeliverySignal, DenialSignal, FileCount, OutsideSignal } from './signal.ts';
 import type { SpecialistSignal } from './signal.ts';
 
 /** The most characters of lessons a prompt gets; longer lists are dropped by priority, never cut. */
@@ -130,7 +130,7 @@ function deliveryLesson(signal: DeliverySignal): Lesson {
   const conflicts =
     signal.conflicts.length === 0
       ? ''
-      : ` Conflicts: ${signal.conflicts.map((conflict) => clip(conflict, 120)).join(', ')}.`;
+      : ` Conflicts: ${signal.conflicts.map(conflictText).join(', ')}.`;
   const advice =
     signal.state === 'apply_failed'
       ? conflicts === ''
@@ -213,4 +213,10 @@ function date(seenAt: number): string {
 function clip(text: string, limit = 200): string {
   const flat = text.replace(/`/g, "'").replace(/\s+/g, ' ').trim();
   return flat.length > limit ? `${flat.slice(0, limit - 1)}…` : flat;
+}
+
+/** A conflicting file with how often it conflicted when that is more than once. */
+function conflictText(conflict: FileCount): string {
+  const path = clip(conflict.path, 120);
+  return conflict.count > 1 ? `${path} (${conflict.count})` : path;
 }

@@ -5,15 +5,31 @@ import type { Attempt, RunState } from '../../../src/feature/runs/types/index.ts
 import {
   LESSON_COUNT_LIMIT,
   LESSON_HEADER,
+  RESOLVE_GROUP,
   collectSignal,
   emptySignal,
   lessonsFromSignal,
+  newGroup,
   renderLessons,
   type Lesson,
 } from '../../../src/feature/runs/types/index.ts';
 import { run } from './helpers.ts';
 
 const JAN_2 = Date.UTC(2026, 0, 2);
+
+/** Two steps that reject the work and send it back to the coder in the same round. */
+const TWO_REVIEW_CONFIG = `swarm:
+  max: 5
+  specialists:
+    coder: { name: Coder }
+    reviewer: { name: Reviewer, permissions: read }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+        - { id: review_a, specialist: reviewer, on_reject: { goto: code, max_rounds: 3 } }
+        - { id: review_b, specialist: reviewer, on_reject: { goto: code, max_rounds: 3 } }
+`;
 
 function attempt(overrides: Partial<Attempt> = {}): Attempt {
   return {
@@ -75,6 +91,15 @@ function denial(tool: string, command: string | null = null): Denial {
   return { tool, command };
 }
 
+/** A review of the named step that rejects the work and sends it back to the coder. */
+function rejectedStep(overrides: Partial<Attempt>): Attempt {
+  return attempt({
+    specialist: 'reviewer',
+    report: { verdict: 'rejected', summary: 'no', feedback: 'fix it' },
+    ...overrides,
+  });
+}
+
 describe('collectSignal', () => {
   it('ignores runs that are not finished and attempts of commands', () => {
     const unfinished = finishedRun('open', 1, [attempt()], 5000);
@@ -123,9 +148,101 @@ describe('collectSignal', () => {
         tasks: [7],
         seenAt: 4000,
         reasons: ['conflict in lib.ts'],
-        conflicts: ['lib.ts'],
+        conflicts: [{ path: 'lib.ts', count: 1 }],
+        userEdits: [],
       },
     ]);
+  });
+
+  it('sums the tokens, counts conflicting files and user edits, and the rounds of rejections', () => {
+    const first = finishedRun('first', 7, [
+      attempt({ usage: { inputTokens: 10, outputTokens: 4 } }),
+      rejectedReview({ round: 1 }),
+      rejectedReview({ seq: 3, round: 2 }),
+    ]);
+    first.groups[0]!.delivery = {
+      ...first.groups[0]!.delivery,
+      state: 'apply_failed',
+      reason: 'conflict in a.ts',
+      conflicts: ['a.ts', 'b.ts'],
+      userEdits: ['c.ts'],
+      finishedAt: 4000,
+    };
+    const second = finishedRun('second', 8, [
+      attempt({ seq: 4, usage: { inputTokens: 5, outputTokens: 1 } }),
+    ]);
+    second.groups[0]!.delivery = {
+      ...second.groups[0]!.delivery,
+      state: 'apply_failed',
+      reason: 'conflict in a.ts',
+      conflicts: ['a.ts'],
+      userEdits: ['c.ts', 'd.ts'],
+      finishedAt: 4500,
+    };
+
+    const signal = collectSignal([first, second], 'coder');
+
+    expect(signal.usage).toEqual({ inputTokens: 15, outputTokens: 5 });
+    expect(signal.rejected).toMatchObject({ count: 2, tasks: [7], rounds: 2 });
+    const [delivery] = signal.deliveries;
+    expect(delivery).toMatchObject({
+      state: 'apply_failed',
+      count: 2,
+      tasks: [7, 8],
+      reasons: ['conflict in a.ts'],
+    });
+    expect(delivery!.conflicts).toEqual([
+      { path: 'a.ts', count: 2 },
+      { path: 'b.ts', count: 1 },
+    ]);
+    expect(delivery!.userEdits).toEqual([
+      { path: 'c.ts', count: 2 },
+      { path: 'd.ts', count: 1 },
+    ]);
+  });
+
+  it('counts two rejections of one round of a task as one round', () => {
+    const state = run(1, { id: 'two-reviews', configText: TWO_REVIEW_CONFIG });
+    state.run.number = 12;
+    state.run.finishedAt = 5000;
+    state.groups[0]!.attempts.push(
+      attempt(),
+      rejectedStep({ seq: 2, stepId: 'review_a', stepIndex: 1, round: 1 }),
+      rejectedStep({ seq: 3, stepId: 'review_b', stepIndex: 2, round: 1 }),
+    );
+
+    const signal = collectSignal([state], 'coder');
+
+    expect(signal.rejected).toMatchObject({ count: 2, tasks: [12], rounds: 1 });
+  });
+
+  it('leaves out service groups and actions: they say nothing about the specialist', () => {
+    const state = finishedRun('done', 4, [attempt({ usage: { inputTokens: 1, outputTokens: 1 } })]);
+    const resolve = newGroup(RESOLVE_GROUP, 'Resolve', 'resolve', 0);
+    resolve.attempts.push(attempt({ seq: 9 }));
+    resolve.delivery = {
+      ...resolve.delivery,
+      state: 'apply_failed',
+      reason: 'conflict',
+      conflicts: ['hidden.ts'],
+      finishedAt: 100,
+    };
+    state.resolve = resolve;
+
+    const signal = collectSignal([state], 'coder');
+
+    expect(signal.attempts).toBe(1);
+    expect(signal.usage).toEqual({ inputTokens: 1, outputTokens: 1 });
+    expect(signal.deliveries).toEqual([]);
+  });
+
+  it('reports an empty signal for a repository without finished runs', () => {
+    expect(collectSignal([], 'coder')).toEqual(emptySignal('coder'));
+    expect(emptySignal('coder')).toMatchObject({
+      usage: null,
+      deliveries: [],
+      rejected: { count: 0, rounds: 0 },
+    });
   });
 
   it('gives a rejected result to the author the review sends it back to, not to the reviewer', () => {

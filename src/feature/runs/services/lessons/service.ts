@@ -76,9 +76,17 @@ export class RunLessons {
     });
   }
 
+  /**
+   * The typed signal of one specialist of a repository: the objective outcome of its earlier
+   * finished attempts. The lessons and the block an attempt gets are built from it.
+   */
+  signalOf(repository: string, specialist: string): SpecialistSignal {
+    return collectSignal(this.finishedRuns(repository), specialist);
+  }
+
   private summaryOf(repository: string, specialist: string): LessonSummarySpecialist {
     try {
-      const signal = this.signal(repository, specialist);
+      const signal = this.signalOf(repository, specialist);
       const lessons = lessonsFromSignal(signal);
       const rendered = renderLessons(lessons);
       return {
@@ -101,12 +109,8 @@ export class RunLessons {
     repository: string,
     specialist: string,
   ): { signal: SpecialistSignal; rendered: RenderedLessons } {
-    const signal = this.signal(repository, specialist);
+    const signal = this.signalOf(repository, specialist);
     return { signal, rendered: renderLessons(lessonsFromSignal(signal)) };
-  }
-
-  private signal(repository: string, specialist: string): SpecialistSignal {
-    return collectSignal(this.finishedRuns(repository), specialist);
   }
 
   /**

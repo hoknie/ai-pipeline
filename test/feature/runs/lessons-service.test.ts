@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Attempt, RunState } from '../../../src/feature/runs/types/index.ts';
+import { emptySignal } from '../../../src/feature/runs/types/index.ts';
 import { LessonStorage, LessonsRepository } from '../../../src/feature/runs/repositories/index.ts';
 import { RunLessons } from '../../../src/feature/runs/services/lessons/index.ts';
 import { temporaryStorage, type Storage } from '../storage.ts';
@@ -67,6 +68,22 @@ function tempRoot(): string {
 }
 
 describe('RunLessons', () => {
+  it('returns the typed signal of a specialist by repository, empty without finished runs', () => {
+    const store = temporaryStorage();
+    const lessons = serviceOf(store, tempRoot(), () => 9000);
+
+    expect(lessons.signalOf('/repo', 'coder')).toEqual(emptySignal('coder'));
+
+    store.runs.saveRun(
+      finishedRun('first', 7, [attempt({ usage: { inputTokens: 3, outputTokens: 2 } })]),
+    );
+    const signal = lessons.signalOf('/repo', 'coder');
+    expect(signal.attempts).toBe(1);
+    expect(signal.verdicts.done).toBe(1);
+    expect(signal.usage).toEqual({ inputTokens: 3, outputTokens: 2 });
+    store.database.close();
+  });
+
   it('summarises the objective signal of every specialist of a run', () => {
     const store = temporaryStorage();
     const first = finishedRun('first', 7, [
