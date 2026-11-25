@@ -33,6 +33,7 @@ export const runMethods = {
   run_skip: onRun('run.skip'),
   run_variant: onRun('run.configure'),
   run_provider: onRun('run.configure'),
+  run_probe: onRun('run.start'),
   run_title: onRun('run.configure'),
   run_auto_deliver_cancel: onRun('run.configure'),
   run_tags: {

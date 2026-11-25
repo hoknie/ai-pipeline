@@ -1,6 +1,7 @@
 import { isAbsolute } from 'node:path';
 
 import { RUN_TITLE_LIMIT } from '../../../feature/agents/types/index.ts';
+import { HARNESSES } from '../../../feature/runs/types/index.ts';
 import { DELIVERY_MODES } from '../../../feature/swarm-config/types/index.ts';
 import { TAG_NAME_LIMIT } from '../../../feature/tags/types/index.ts';
 import { z } from 'zod';
@@ -140,6 +141,10 @@ export const runsRequests = [
   z.object({
     method: z.literal('run_provider'),
     params: z.object({ runId: z.string().min(1), provider: providerId.nullable() }),
+  }),
+  z.object({
+    method: z.literal('run_probe'),
+    params: z.object({ runId: z.string().min(1), harness: z.enum(HARNESSES).optional() }),
   }),
   z.object({
     method: z.literal('apply'),

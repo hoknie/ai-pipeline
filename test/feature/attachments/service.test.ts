@@ -176,6 +176,19 @@ describe('detach, removeOwner and bindToRun', () => {
     await expect(service.content('r1', ref!.id)).rejects.toThrow('is not available');
   });
 
+  it('gives a probe the content of an attachment it lists among the refs of its base run', async () => {
+    const [ref] = await service.ingest({
+      repository: '/repo',
+      itemId: 'q1',
+      sources: [{ path: source('a.txt', 'shared') }],
+    });
+    service.bindToRun('q1', 'r1');
+    await expect(service.content('probe1', ref!.id)).rejects.toThrow('unknown attachment');
+    const content = await service.content('probe1', ref!.id, [ref!]);
+    expect(content.bytes.toString()).toBe('shared');
+    await expect(service.content('probe1', 'other', [ref!])).rejects.toThrow('unknown attachment');
+  });
+
   it('reports a link of an unknown scheme as not available but keeps it listed', async () => {
     repository.add([
       {

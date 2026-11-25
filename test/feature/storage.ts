@@ -81,9 +81,12 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
   }
 }
 
-/** Takes away the columns of the newest migrations (the tag inheritance and the cleanup time), when they are there. */
+/** Takes away the columns of the newest migrations (the harness of a run, the tag inheritance and the cleanup time), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
-  // The newest migration adds the tag inheritance of a queue item.
+  // The newest migration adds the harness of a run and the run it probes.
+  dropColumn(database, 'runs', 'harness');
+  dropColumn(database, 'runs', 'probe_of');
+  // The one before adds the tag inheritance of a queue item.
   dropColumn(database, 'queue_items', 'inherit_tags');
   // The one before adds the cleanup time of a run.
   dropColumn(database, 'runs', 'cleaned_at');

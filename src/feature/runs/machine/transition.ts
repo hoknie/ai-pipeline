@@ -166,6 +166,8 @@ function movePipeline(m: Ctx, wasDone: boolean): void {
 }
 
 function autoDeliver(m: Ctx): void {
+  // A probe is delivered only by an explicit request: the tree of the user belongs to the main run.
+  if (m.state.run.probeOf !== null) return;
   // A check that failed or was cancelled stops the pipeline: only an explicit request starts it again.
   if (m.checksCancelled || pointStalled(m.state, 'before_delivery')) return;
   if (

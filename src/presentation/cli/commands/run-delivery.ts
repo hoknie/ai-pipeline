@@ -1,6 +1,7 @@
-import { formatApply, formatRun } from '../../format/index.ts';
+import { HARNESSES, isHarness } from '../../../feature/runs/types/index.ts';
+import { formatApply, formatRun, formatRunCreated } from '../../format/index.ts';
 import { repositoryArgument } from '../../ipc/client/index.ts';
-import type { ApplyResult, QueueView, RunView } from '../../ipc/contract/index.ts';
+import type { ApplyResult, QueueView, RunCreated, RunView } from '../../ipc/contract/index.ts';
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
 import { printQueue } from '../queue-print.ts';
@@ -194,6 +195,35 @@ export function addProvider(kit: RunKit): void {
         output(options.json, formatRun(view, Date.now(), activeStyle), view);
       },
     );
+}
+
+export function addProbe(kit: RunKit): void {
+  const { output, examples, context, activeStyle, run } = kit;
+  run
+    .command('probe')
+    .description(
+      'Run the same task of a run on its base commit in another harness: an isolated run that is delivered only when you apply it',
+    )
+    .argument('<run-id>', 'run id to probe')
+    .option(
+      '--harness <harness>',
+      `harness of the probe: ${HARNESSES.join(', ')}; default: the other one`,
+    )
+    .option('--json', 'print JSON')
+    .addHelpText(
+      'after',
+      examples(['aip run probe 0mh3k2ab1x9z', 'aip run probe 0mh3k2ab1x9z --harness full']),
+    )
+    .action(async (runId: string, options: { harness?: string; json?: boolean }) => {
+      if (options.harness !== undefined && !isHarness(options.harness)) {
+        throw usage(`--harness must be ${HARNESSES.join(' or ')}, not \`${options.harness}\``);
+      }
+      const created = (await call(context(), 'run_probe', {
+        runId,
+        ...(options.harness !== undefined ? { harness: options.harness } : {}),
+      })) as RunCreated;
+      output(options.json, formatRunCreated(created, activeStyle), created);
+    });
 }
 
 export function addClean(kit: RunKit): void {

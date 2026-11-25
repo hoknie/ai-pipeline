@@ -2,6 +2,7 @@ import { parseConfig } from '../../../src/feature/swarm-config/services/index.ts
 import { type ResolvedConfig } from '../../../src/feature/swarm-config/types/index.ts';
 import {
   type Attempt,
+  type Harness,
   type HumanQuestion,
   type RunState,
   createRun,
@@ -46,6 +47,8 @@ export function run(
     provider?: string;
     author?: string | null;
     createdBySystem?: boolean;
+    harness?: Harness;
+    probeOf?: string | null;
   } = {},
 ): RunState {
   const resolved = config(options.configText);
@@ -71,6 +74,8 @@ export function run(
     provider: options.provider,
     author: options.author,
     createdBySystem: options.createdBySystem,
+    harness: options.harness,
+    probeOf: options.probeOf,
   });
 }
 

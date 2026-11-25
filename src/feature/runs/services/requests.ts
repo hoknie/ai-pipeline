@@ -19,8 +19,13 @@ import {
   checkSkip,
   createRun,
   groupsFromTask,
+  oppositeHarness,
+  probeInputOf,
   runCreated,
   runId,
+  sameProbeInput,
+  type Harness,
+  type NewGroup,
   type RunCreated,
   type RunRequest,
   type RunState,
@@ -146,6 +151,58 @@ export class RunRequests {
     return this.started(state, config.naming.enabled, prepared.dirty);
   }
 
+  /**
+   * `run_probe`: the same task, base commit and configuration as the run it probes, in another
+   * harness. Its own id gives it its own refs and worktrees; an explicit `apply` is its only way
+   * into the working tree.
+   */
+  async probe(baseId: string, harness?: Harness): Promise<RunCreated> {
+    const { registry, now } = this.dependencies;
+    const base = this.dependencies.states.get(baseId);
+    if (base.run.cleanedAt !== null) {
+      throw rejected(`run ${baseId} is cleaned up; there is no tree to probe`);
+    }
+    const chosen = harness ?? oppositeHarness(base.run.harness);
+    if (chosen === base.run.harness) {
+      throw rejected(`run ${baseId} already runs the ${chosen} harness`);
+    }
+    const repository = await registry.rootOf(base.run.repository);
+    const state = createRun({
+      id: runId(now(), randomInt(36 ** 4)),
+      repository,
+      pipeline: base.run.pipeline,
+      baseCommit: base.run.baseCommit,
+      config: base.run.config,
+      configIsResolved: true,
+      dirtyWarning: false,
+      groups: probeGroups(base),
+      split: base.split !== null,
+      fromQueue: false,
+      number: base.run.number,
+      variant: base.run.variant,
+      provider: base.run.provider,
+      author: base.run.author,
+      createdBySystem: base.run.createdBySystem,
+      attachments: base.run.attachments,
+      tags: base.run.tags,
+      harness: chosen,
+      probeOf: base.run.id,
+      now: now(),
+      ...(base.run.title ? { title: base.run.title } : {}),
+    });
+    if (!sameProbeInput(probeInputOf(base), probeInputOf(state))) {
+      throw rejected(`a probe of run ${baseId} must repeat its input`);
+    }
+    await prepareRunBranch(repository, state.run.branch, {
+      workingTree: false,
+      include: [],
+      snapshotRef: null,
+      commit: base.run.baseCommit,
+    });
+    await excludeWorkspace(repository, workspaceRoot(repository, base.run.config.workspaceDir));
+    return this.started(state, false, false);
+  }
+
   private async started(state: RunState, naming: boolean, dirty: boolean): Promise<RunCreated> {
     const { states, engine, effects } = this.dependencies;
     states.add(state);
@@ -157,4 +214,10 @@ export class RunRequests {
       dirty ? ['the repository has uncommitted changes; they are not part of this run'] : [],
     );
   }
+}
+
+/** The groups of a probe: the split task again, or the groups of the run as they were given. */
+function probeGroups(base: RunState): NewGroup[] {
+  if (base.split !== null) return groupsFromTask(base.split.task, base.run.title ?? undefined);
+  return base.groups.map(({ title, task }) => ({ title, task }));
 }

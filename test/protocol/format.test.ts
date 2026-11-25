@@ -592,6 +592,8 @@ describe('formatRunQueued', () => {
     groups: [{ slug: 'a', title: 'A' }],
     split: false,
     warnings: [],
+    harness: 'full' as const,
+    probeOf: null,
   };
 
   function queueWith(taken: number, parallel: number) {

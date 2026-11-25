@@ -33,6 +33,7 @@ import {
   addClean,
   addMarkDelivered,
   addPause,
+  addProbe,
   addProvider,
   addSkip,
   addVariant,
@@ -306,6 +307,7 @@ export function registerRun(program: Command, io: CliIo, style: Style): void {
   const kit = runKit(program, io, style);
   for (const add of [addStart, addList, addTag, addUntag, addShow, addWatch, addCancel, addLessons])
     add(kit);
-  for (const add of [addPause, addApply, addMarkDelivered, addSkip, addVariant, addClean]) add(kit);
+  for (const add of [addPause, addApply, addMarkDelivered, addSkip, addVariant, addProbe, addClean])
+    add(kit);
   addProvider(kit);
 }

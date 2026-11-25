@@ -13,6 +13,7 @@ import {
 } from '../../swarm-config/types/index.ts';
 import { SPLIT_GROUP } from './constants.ts';
 import { newGroup } from './group.ts';
+import { type Harness, probeFields } from './probe/index.ts';
 import { type RunAttachment, type RunState, emptyRepair } from './run.ts';
 import { applySkip } from './skip.ts';
 import { enterPoint } from './stage-status.ts';
@@ -53,6 +54,10 @@ export interface RunCreated {
   groups: { slug: string; title: string }[];
   split: boolean;
   warnings: string[];
+  /** Harness of the run; `full` for a run that is not a probe. */
+  harness: Harness;
+  /** Id of the main run this run probes; `null` for a main run. */
+  probeOf: string | null;
 }
 
 /** What a run says about itself right after it was created or taken from the queue again. */
@@ -64,6 +69,8 @@ export function runCreated(state: RunState, warnings: string[] = []): RunCreated
     groups: state.groups.map((group) => ({ slug: group.slug, title: group.title })),
     split: state.split !== null,
     warnings,
+    harness: state.run.harness,
+    probeOf: state.run.probeOf,
   };
 }
 
@@ -83,8 +90,18 @@ export interface NewRun {
   fromQueue?: boolean;
   /** Id of the queue item the run starts from. */
   queueItem?: string | null;
+  /**
+   * `config` is the configuration of an existing run, already resolved: the variant and the skips
+   * were applied when that run started. A probe takes its own copy of it instead of resolving
+   * again, so a later variant switch of one run leaves the other as it is.
+   */
+  configIsResolved?: boolean | undefined;
   /** Number of the task the run is created for. */
   number: number;
+  /** Harness of the run; absent: the full one. */
+  harness?: Harness | undefined;
+  /** Id of the main run this run probes; absent or `null`: a main run. */
+  probeOf?: string | null | undefined;
   /** Overrides `delivery.auto` of the configuration for this run only. */
   autoDeliver?: boolean | undefined;
   /** Overrides `delivery.mode` of the configuration for this run only. */
@@ -116,6 +133,32 @@ function checkedProvider(
   return provider;
 }
 
+/** The configuration a new run starts with: its variant, then the skips of the variant and the task. */
+function resolveConfig(input: NewRun, variant: string): ResolvedConfig {
+  const variantError = checkVariant(input.config, input.pipeline, variant);
+  if (variantError !== null) throw rejected(variantError);
+  return applySkip(applyVariant(input.config, input.pipeline, variant), input.pipeline, [
+    ...variantSkip(input.config, input.pipeline, variant),
+    ...(input.skip ?? []),
+  ]);
+}
+
+/** The configuration with the delivery overrides of the request for this run only. */
+function withDelivery(
+  config: ResolvedConfig,
+  input: Pick<NewRun, 'autoDeliver' | 'deliveryMode'>,
+): ResolvedConfig {
+  if (input.autoDeliver === undefined && input.deliveryMode === undefined) return config;
+  return {
+    ...config,
+    delivery: {
+      ...config.delivery,
+      ...(input.autoDeliver !== undefined ? { auto: input.autoDeliver } : {}),
+      ...(input.deliveryMode !== undefined ? { mode: input.deliveryMode } : {}),
+    },
+  };
+}
+
 export function createRun(input: NewRun): RunState {
   const pipeline = findPipeline(input.config, input.pipeline);
   if (!pipeline) {
@@ -132,27 +175,20 @@ export function createRun(input: NewRun): RunState {
       throw invalid('core.invalid_run', `group \`${group.title}\` has an empty task`);
   }
   const variant = input.variant ?? DEFAULT_VARIANT;
-  const variantError = checkVariant(input.config, input.pipeline, variant);
-  if (variantError !== null) throw rejected(variantError);
-  const provider = checkedProvider(input.config, input.provider);
-  const skipped = applySkip(applyVariant(input.config, input.pipeline, variant), input.pipeline, [
-    ...variantSkip(input.config, input.pipeline, variant),
-    ...(input.skip ?? []),
-  ]);
-  const config =
-    input.autoDeliver === undefined && input.deliveryMode === undefined
-      ? skipped
-      : {
-          ...skipped,
-          delivery: {
-            ...skipped.delivery,
-            ...(input.autoDeliver !== undefined ? { auto: input.autoDeliver } : {}),
-            ...(input.deliveryMode !== undefined ? { mode: input.deliveryMode } : {}),
-          },
-        };
+  // A probe repeats the configuration of its run, skips included: resolving it again would apply
+  // the skip of the variant twice, or add one the run never had after a variant switch. The
+  // snapshot of the run is authoritative, so its variant and provider are not checked again.
+  // It is cloned: a run switches its variant by changing its configuration in place, and a probe
+  // must not change the steps of the run it copies (or the other way around).
+  const resolved = input.configIsResolved
+    ? structuredClone(input.config)
+    : resolveConfig(input, variant);
+  const provider = input.configIsResolved
+    ? (input.provider ?? null)
+    : checkedProvider(input.config, input.provider);
+  const config = withDelivery(resolved, input);
   const splitting = input.split && pipeline.split !== null && input.groups.length === 1;
   const slugs = groupSlugs(input.groups.map((group) => group.title));
-  const task = input.groups[0]?.task ?? '';
   const state: RunState = {
     run: {
       id: input.id,
@@ -176,13 +212,14 @@ export function createRun(input: NewRun): RunState {
       fromQueue: input.fromQueue ?? false,
       queueItem: input.queueItem ?? null,
       number: input.number,
+      ...probeFields(input),
       tags: [...(input.tags ?? [])],
       skippedSteps: [],
       hold: null,
       repair: emptyRepair(),
       attachments: (input.attachments ?? []).map((attachment) => ({ ...attachment })),
     },
-    split: splitting ? newGroup(SPLIT_GROUP, 'split', task, -1) : null,
+    split: splitting ? newGroup(SPLIT_GROUP, 'split', input.groups[0]?.task ?? '', -1) : null,
     groups: splitting
       ? []
       : input.groups.map((group, index) =>

@@ -21,7 +21,9 @@ import {
   RESOLVE_GROUP,
   emptyRepair,
   SPLIT_GROUP,
+  DEFAULT_HARNESS,
   isActionGroup,
+  isHarness,
   pendingDelivery,
 } from '../types/index.ts';
 
@@ -61,6 +63,8 @@ export function hydrateRun(database: Database, row: Row): RunState {
       fromQueue: Number(row.from_queue ?? 0) === 1,
       queueItem: text(row.queue_item ?? null),
       number: Number(row.number ?? 0),
+      harness: isHarness(row.harness) ? row.harness : DEFAULT_HARNESS,
+      probeOf: text(row.probe_of ?? null),
       hold: RUN_HOLDS.find((hold) => hold === row.hold) ?? null,
       tags: row.tags_json ? parse(row.tags_json) : [],
       skippedSteps: row.skipped_steps_json ? parse(row.skipped_steps_json) : [],

@@ -4,6 +4,7 @@ import type {
   GroupDelivery,
   GroupStatus,
   GroupWait,
+  Harness,
   HumanOnly,
   HumanQuestion,
   Incident,
@@ -160,6 +161,10 @@ export interface RunView {
   title: string;
   /** English kebab-case name; null until the run is named. */
   name: string | null;
+  /** What the attempts learn from the history of the repository. */
+  harness: Harness;
+  /** Id of the main run this one probes; `null` for a main run. */
+  probeOf: string | null;
   repository: string;
   pipeline: string;
   /** Display name of the pipeline in the configuration of the run. */

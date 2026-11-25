@@ -64,6 +64,22 @@ aip run lessons <run-id> --json
 - A specialist without lessons gets no skill and runs unchanged; the version and the date in the file change only when the lessons or the archive change.
 - The command answers for any run and reads the finished runs of the same repository.
 
+## Probes of another harness
+
+A probe repeats the task of a run on the same base commit and with the same configuration, but with another harness: `none` gets no [lessons](#lessons-from-earlier-runs), `full` gets them as every ordinary run does.
+It is a new run with its own id, so its commits live in its own `refs/aip/<run>/…` and its groups work in their own worktrees: nothing of a probe reaches your working tree until you ask.
+
+```sh
+aip run probe <run-id>                 # the other harness of the run, then the task runs again
+aip run probe <run-id> --harness full  # a named harness; a probe of a probe can come back to full
+```
+
+- The same input is what a run was launched with: the task or the prepared groups, the base commit and the launch configuration — the pipeline, the configuration snapshot the run follows now (its variant and the skips it started with included), the provider, the attachments and the number of the task.
+- The probe takes its own copy of exactly that, without resolving the configuration again; a later `aip run variant` of either run changes only that run. The harness is the only difference; `aip run probe` refuses the harness the run already has.
+- Runtime state is not input and is not repeated: steps skipped later with `aip run skip`, skill versions pinned by earlier attempts, passed steps and delivery stay in the run the probe copies. Both runs start the same task from the same commit; what they do with it is what you compare.
+- A probe is never delivered automatically, whatever `delivery.auto` says: its merged groups stay `pending` until [`aip run apply`](../configuration/delivery.md) names them. Comparing the results and choosing the better one is a separate step.
+- Probes are not part of the lessons: only main runs teach later attempts. The probe itself gives its attempts no lessons when its harness is `none`.
+
 ## Answering a specialist
 
 A group in `needs_human` waits for you. Its question is in `aip run list` and `aip group show`.

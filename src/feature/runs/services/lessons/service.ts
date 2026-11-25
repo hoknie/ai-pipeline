@@ -13,6 +13,7 @@ import {
   type LessonFile,
   type LessonSummary,
   type LessonSummarySpecialist,
+  type Run,
   type RunState,
   type SelectedLessons,
   type SpecialistSignal,
@@ -47,6 +48,14 @@ export class RunLessons {
         this.summaryOf(state.run.repository, specialist),
       ),
     };
+  }
+
+  /**
+   * The lessons an attempt of the run gets: a run of the `none` harness teaches nothing, so a probe
+   * compares the task without them. The file stays as earlier runs left it.
+   */
+  blockFor(run: Run, specialist: string): LessonBlock | null {
+    return run.harness === 'none' ? null : this.block(run.repository, specialist);
   }
 
   /** The block an attempt of the specialist gets; null when there is nothing to teach it. */

@@ -22,8 +22,8 @@ describe('migration that adds the tag inheritance of a queue item', () => {
   it('reads an item of an older database as inheriting and keeps a written refusal', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'aip-inherit-')), 'aip.db');
     const old = new DatabaseSync(path);
-    MIGRATIONS.slice(0, -1).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    MIGRATIONS.slice(0, -2).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     expect(columns(old)).not.toContain('inherit_tags');
     old
       .prepare(

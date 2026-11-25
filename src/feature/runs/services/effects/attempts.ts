@@ -74,7 +74,7 @@ export class AttemptStarter {
     const { key, specialist, runtime } = prepared;
     const directory = attemptDirectory(workspaceOf(state), state.run.id, slug, seq);
     mkdirSync(directory, { recursive: true });
-    const lessons = this.dependencies.lessons.block(state.run.repository, specialist.slug);
+    const lessons = this.dependencies.lessons.blockFor(state.run, specialist.slug);
     // the network of the registry runs outside the serial queue, inside `startWithSkills`
     await startWithSkills(
       this.dependencies,

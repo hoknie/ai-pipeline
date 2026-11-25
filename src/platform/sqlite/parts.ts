@@ -76,4 +76,6 @@ export const LATER_MIGRATIONS: string[] = [
   `ALTER TABLE runs ADD COLUMN cleaned_at INTEGER`,
   // whether a queue item takes the tags of its predecessors in `after`; old rows inherit them
   `ALTER TABLE queue_items ADD COLUMN inherit_tags INTEGER NOT NULL DEFAULT 1`,
+  // the harness of a run and the main run it probes; old rows are main runs of the full harness
+  `ALTER TABLE runs ADD COLUMN harness TEXT NOT NULL DEFAULT 'full'; ALTER TABLE runs ADD COLUMN probe_of TEXT`,
 ];

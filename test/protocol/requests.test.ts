@@ -61,6 +61,7 @@ const SAMPLES: Record<Method, unknown> = {
   run_skip: { ...run, step: 'review', skip: true },
   run_variant: { ...run, variant: 'strong' },
   run_provider: { ...run, provider: 'openai' },
+  run_probe: run,
   apply: run,
   run_mark_delivered: run,
   run_clean: { ...run, all: true },
@@ -231,9 +232,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 155 methods, each in the request schema once', () => {
+  it('has 156 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(155);
+    expect(methods).toHaveLength(156);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

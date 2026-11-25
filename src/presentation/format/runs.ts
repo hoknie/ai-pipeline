@@ -20,6 +20,11 @@ export function formatRunCreated(created: RunCreated, style: Style = plainStyle)
     lines.push(
       `Groups: ${created.groups.map((group) => `${group.slug} (${group.title})`).join(', ')}`,
     );
+  if (created.probeOf !== null) {
+    lines.push(
+      `Probe of run ${created.probeOf} with the ${created.harness} harness: it is delivered only when you apply it.`,
+    );
+  }
   for (const warning of created.warnings) lines.push(style.warning(`Warning: ${warning}`));
   return lines.join('\n');
 }
@@ -99,6 +104,9 @@ export function formatRun(
     `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${runPipelineLabel(run)} · ${statusBadge(run.state, style)} · ${run.branch}`,
     ...(run.title
       ? [`${style.muted('Title:')} ${run.title}${run.name ? ` (${run.name})` : ''}`]
+      : []),
+    ...(run.probeOf !== null
+      ? [`${style.muted('Probe of:')} ${run.probeOf} (${run.harness} harness)`]
       : []),
     `${style.muted('Repository:')} ${run.repository}`,
     ...(run.author ? [`${style.muted('Author:')} ${run.author.email}`] : []),

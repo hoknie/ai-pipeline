@@ -74,10 +74,16 @@ export class RunRepository {
     return Number(row.max);
   }
 
-  /** The id of the run of the repository with this task number; null when there is none. */
+  /**
+   * The id of the main run of the repository with this task number; null when there is none. A
+   * probe copies the number of its base, and `#N` names the run the task was started as.
+   */
   runIdByNumber(repository: string, number: number): string | null {
     const row = this.database
-      .prepare('SELECT id FROM runs WHERE repository = ? AND number = ?')
+      .prepare(
+        `SELECT id FROM runs WHERE repository = ? AND number = ?
+         ORDER BY (probe_of IS NULL) DESC, created_at, id LIMIT 1`,
+      )
       .get(repository, number) as { id: string } | undefined;
     return row?.id ?? null;
   }

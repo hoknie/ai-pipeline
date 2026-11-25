@@ -210,6 +210,8 @@ function runHead(state: RunState, observers: RepairPolicy) {
     number: state.run.number,
     title: runTitle(state),
     name: state.run.name ?? null,
+    harness: state.run.harness,
+    probeOf: state.run.probeOf,
     repository: state.run.repository,
     pipeline: state.run.pipeline,
     pipelineName: pipelineNameOf(state.run.config, state.run.pipeline),

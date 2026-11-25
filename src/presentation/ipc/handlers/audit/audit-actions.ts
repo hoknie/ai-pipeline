@@ -16,6 +16,13 @@ export const runActions: Partial<Record<Method, AuditRow>> = {
   run_skip: { action: 'run.skip', info: runWith('step') },
   run_variant: { action: 'run.variant', info: runWith('variant') },
   run_provider: { action: 'run.provider', info: runWith('provider') },
+  run_probe: {
+    action: 'run.probe',
+    info: (params, result) => ({
+      resource: resource('run', (result as { runId?: string } | null)?.runId ?? params.runId),
+      details: pick(params, 'harness'),
+    }),
+  },
   apply: { action: 'run.apply', info: runWith('groups', 'mode', 'force') },
   run_mark_delivered: {
     // `aip run apply` on the machine of a developer reports the delivery with its mode

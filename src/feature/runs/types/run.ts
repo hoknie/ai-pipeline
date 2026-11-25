@@ -21,6 +21,7 @@ import {
   isTerminal,
 } from './constants.ts';
 import { type Group, actionOf, actionPointOf, isRepairGroup } from './group.ts';
+import type { Harness } from './probe/harness.ts';
 
 /** The branch of a delivery sent to a remote repository. */
 export interface RemoteBranch {
@@ -84,6 +85,10 @@ export interface Run {
   queueItem: string | null;
   /** Number of the task the run was created for. */
   number: number;
+  /** What the attempts learn from the history of the repository; a probe changes only this. */
+  harness: Harness;
+  /** Id of the main run this run probes on the same input; `null` for a main run. */
+  probeOf: string | null;
   /** Ids of catalog tags. */
   tags: string[];
   /** Steps skipped after the start; the step list of the snapshot is unchanged. */

@@ -20,7 +20,8 @@ export const groupHandlers = {
   artifact: (params, { services }) => services.artifacts.content(params),
   artifact_publish: (params, { services }) => services.artifacts.publish(params),
   attachment: async (params, { services }) => {
-    const file = await services.attachments.content(params.runId, params.id);
+    const run = services.runs.states.get(params.runId).run;
+    const file = await services.attachments.content(params.runId, params.id, run.attachments);
     return {
       fileName: file.fileName,
       mediaType: file.mediaType,

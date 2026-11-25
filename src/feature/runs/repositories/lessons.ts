@@ -29,7 +29,7 @@ export class LessonsRepository {
     const rows = this.database
       .prepare(
         `SELECT * FROM runs
-         WHERE repository = ? AND finished_at IS NOT NULL
+         WHERE repository = ? AND finished_at IS NOT NULL AND probe_of IS NULL
          ORDER BY finished_at DESC, id
          LIMIT ?`,
       )
@@ -47,7 +47,7 @@ export class LessonsRepository {
     const row = this.database
       .prepare(
         `SELECT COUNT(*) AS count, MAX(finished_at) AS last FROM runs
-         WHERE repository = ? AND finished_at IS NOT NULL`,
+         WHERE repository = ? AND finished_at IS NOT NULL AND probe_of IS NULL`,
       )
       .get(repository) as { count: number; last: number | null };
     return {
@@ -63,7 +63,7 @@ export class LessonsRepository {
       .prepare(
         `SELECT g.run_id AS run, g.slug AS slug, g.delivery_json AS delivery FROM groups g
          JOIN (SELECT id FROM runs
-               WHERE repository = ? AND finished_at IS NOT NULL
+               WHERE repository = ? AND finished_at IS NOT NULL AND probe_of IS NULL
                ORDER BY finished_at DESC, id
                LIMIT ?) AS recent ON recent.id = g.run_id
          ORDER BY g.run_id, g.slug`,

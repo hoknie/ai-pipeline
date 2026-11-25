@@ -143,9 +143,17 @@ export class AttachmentService {
     await this.removeBytes(this.dependencies.attachments.removeOfItem(itemId));
   }
 
-  /** The file and its bytes; rejected when the run has no such attachment or the bytes are gone. */
-  async content(runId: string, id: string): Promise<AttachmentContent> {
-    const record = this.dependencies.attachments.inRun(runId, id);
+  /**
+   * The file and its bytes; rejected when the run has no such attachment or the bytes are gone.
+   * `refs` lists the attachments the run points at: a probe copies the refs of its base and the
+   * rows stay with the base, so the refs are what makes the shared bytes readable for the probe.
+   */
+  async content(
+    runId: string,
+    id: string,
+    refs: readonly AttachmentRef[] = [],
+  ): Promise<AttachmentContent> {
+    const record = this.dependencies.attachments.inRun(runId, id) ?? this.sharedRef(refs, id);
     if (!record) throw rejected(`unknown attachment \`${id}\``);
     const bytes = await this.bytesOf(record);
     if (bytes === null) throw rejected(`attachment \`${record.fileName}\` is not available`);
@@ -213,6 +221,12 @@ export class AttachmentService {
     const storage = this.dependencies.storages[0];
     if (!storage) throw new Error('no attachment storage');
     return storage;
+  }
+
+  /** The attachment of another run that this one lists among its refs; null when it does not. */
+  private sharedRef(refs: readonly AttachmentRef[], id: string): AttachmentRecord | null {
+    if (!refs.some((ref) => ref.id === id)) return null;
+    return this.dependencies.attachments.byId(id);
   }
 
   private async bytesOf(record: AttachmentRecord): Promise<Buffer | null> {

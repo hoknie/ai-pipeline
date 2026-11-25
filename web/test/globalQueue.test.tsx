@@ -506,6 +506,8 @@ describe('controls of the global queue', () => {
       groups: [],
       split: true,
       warnings: [],
+      harness: 'full' as const,
+      probeOf: null,
     }));
     const api = mount(globalOf(), { queueRemove: remove, queueRunNow: runNow });
     const lib = await row('ql');

@@ -48,6 +48,8 @@ export const runHandlers = {
     })),
   run_provider: async (params, { services, snapshots }) =>
     snapshots.run(await services.runs.requests.setProvider(params.runId, params.provider)),
+  run_probe: (params, { services }) =>
+    services.runs.engine.serial(() => services.runs.requests.probe(params.runId, params.harness)),
   run_observer: (params, context) =>
     event(context, params.runId, { kind: 'repair_allowed', allowed: params.enabled }),
   answer: (params, context) =>
