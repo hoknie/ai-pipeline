@@ -29,19 +29,42 @@ import type { EffectDependencies } from './context.ts';
 import type { OutsideChanges } from './outside.ts';
 import { ensureGroupWorktree, resolveWorktree, worktreePath } from './worktrees.ts';
 
-function groupChanges(state: RunState, slugs: string[]): GroupChange[] {
-  return state.groups
-    .filter((group) => slugs.includes(group.slug) && group.mergeCommit !== null)
-    .sort((left, right) => (left.mergeSeq ?? 0) - (right.mergeSeq ?? 0))
-    .map((group) => ({
-      group: group.slug,
-      from: `${group.mergeCommit}^1`,
-      to: group.mergeCommit as string,
-    }));
+/** The changes a delivery carries: the split result first, then the merged groups in merge order. */
+export function groupChanges(state: RunState, slugs: string[]): GroupChange[] {
+  const split = state.split;
+  const changes: GroupChange[] = [];
+  if (split?.mergeCommit != null && split.delivery.state !== 'applied') {
+    changes.push({
+      group: SPLIT_GROUP,
+      from: `${split.mergeCommit}^1`,
+      to: split.mergeCommit,
+    });
+  }
+  changes.push(
+    ...state.groups
+      .filter((group) => slugs.includes(group.slug) && group.mergeCommit !== null)
+      .sort((left, right) => (left.mergeSeq ?? 0) - (right.mergeSeq ?? 0))
+      .map((group) => ({
+        group: group.slug,
+        from: `${group.mergeCommit}^1`,
+        to: group.mergeCommit as string,
+      })),
+  );
+  return changes;
 }
 
 function resolveBaseRef(state: RunState): string {
   return `refs/aip/${state.run.id}/resolve-base`;
+}
+
+/**
+ * An attempt that failed to move the ref of the run leaves its commit in `HEAD` while the ref stays
+ * behind. Rewinding keeps the parent of the new commit at the ref, so a retry does not drop what the
+ * previous attempt committed (the groups and the delivery diff from the ref).
+ */
+async function rewindToRef(tree: string, ref: string): Promise<void> {
+  const ahead = Number(await git(tree, 'rev-list', '--count', `${ref}..HEAD`));
+  if (ahead > 0) await git(tree, 'reset', '--soft', ref);
 }
 
 /** The effects of a run on git: commits of steps, merges of groups, delivery and cleanup. */
@@ -73,6 +96,36 @@ export class GitEffects {
       await this.dependencies.context.apply(state, {
         kind: 'commit_failed',
         group: slug,
+        message: (error as Error).message,
+      });
+    }
+  }
+
+  /**
+   * Commits what the split step left in the worktree of the run into the ref of the run: the groups
+   * start from it. No changes mean no commit and no event.
+   */
+  async commitSplit(state: RunState, stepId: string, summary: string): Promise<void> {
+    const split = findGroup(state, SPLIT_GROUP);
+    if (!split) return;
+    try {
+      const tree = await ensureGroupWorktree(state, split);
+      const ref = runRef(state.run);
+      // A retry after a failed `update-ref` would find everything committed and make no new commit.
+      await rewindToRef(tree, ref);
+      const commit = await commitAll(
+        tree,
+        commitMessage(SPLIT_GROUP, stepId, summary),
+        ref,
+        state.run.config.workspace.include,
+      );
+      if (commit !== null) {
+        await this.dependencies.context.apply(state, { kind: 'split_committed', commit });
+      }
+    } catch (error) {
+      await this.dependencies.context.apply(state, {
+        kind: 'commit_failed',
+        group: SPLIT_GROUP,
         message: (error as Error).message,
       });
     }

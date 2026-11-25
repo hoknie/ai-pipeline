@@ -1,7 +1,9 @@
 import { rejected } from '../../../platform/errors/index.ts';
 import {
+  type Group,
   type GroupDelivery,
   type PendingDelivery,
+  type Report,
   type RunState,
   MESSAGE_GROUP,
   RESOLVE_GROUP,
@@ -16,7 +18,13 @@ import {
   pointStalled,
 } from '../types/index.ts';
 import { cleanupIfDelivered, selectGroups } from './delivery-checks.ts';
-import type { AttemptExit, DeliveryEffect, DeliveryRequest, DeliveryResult } from './events.ts';
+import type {
+  AttemptExit,
+  Ctx,
+  DeliveryEffect,
+  DeliveryRequest,
+  DeliveryResult,
+} from './events.ts';
 import { pushDue, pushEffect } from './push/index.ts';
 import { closeRepair, deliveryKeys, openRepairGroup, repairTask } from './repair.ts';
 import { messageTask, renderCommitMessage, resolveTask } from './texts.ts';
@@ -111,6 +119,15 @@ export function finishMessage(state: RunState, summary: string | null): Delivery
   return [deliverEffect(state, message)];
 }
 
+/** The message author reported: a summary closes its group, then the delivery is asked for. */
+export function finishMessageGroup(m: Ctx, group: Group, summary: string | null): void {
+  if (summary !== null) {
+    group.status = 'merged';
+    group.pending = null;
+  }
+  m.effects.push(...finishMessage(m.state, summary));
+}
+
 /**
  * The commit message author answered with text but sent no report: the text is the message. Only
  * a clean exit counts; a stop, a timeout, a limit or a network error keeps the attempt failed.
@@ -179,6 +196,29 @@ export function resolverDone(state: RunState): DeliveryEffect[] {
   return pending ? [finishResolveEffect(state, pending)] : [];
 }
 
+/** The resolver reported: done delivers its result, any other verdict fails the delivery. */
+export function finishResolve(m: Ctx, group: Group, report: Report): void {
+  group.pending = null;
+  if (report.verdict === 'done') {
+    group.status = 'merged';
+    m.effects.push(...resolverDone(m.state));
+    return;
+  }
+  const detail = (report.feedback ?? report.summary).trim();
+  group.status = 'failed';
+  group.reason = `resolver reported ${report.verdict}`;
+  m.effects.push(
+    ...finishDelivery(
+      m.state,
+      {
+        kind: 'failed',
+        message: `the resolver reported ${report.verdict}${detail ? `: ${detail}` : ''}`,
+      },
+      m.now,
+    ),
+  );
+}
+
 export function finishDelivery(
   state: RunState,
   result: DeliveryResult,
@@ -203,6 +243,14 @@ export function finishDelivery(
     group.delivery = {
       ...deliveryOf(outcome, now),
       ...(outcome.kind === 'applied' ? { message: pending.message ?? null } : {}),
+    };
+  }
+  // The split result travels with the first delivery and is not applied again: a later delivery
+  // leaves it out. Its counters stay out of `deliveryCounts` and `allDelivered`.
+  if (outcome.kind === 'applied' && state.split) {
+    state.split.delivery = {
+      ...deliveryOf(outcome, now),
+      message: pending.message ?? null,
     };
   }
   if (pending.repair) {

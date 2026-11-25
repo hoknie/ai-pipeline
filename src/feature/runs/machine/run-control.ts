@@ -10,6 +10,7 @@ import {
   type RunHold,
   REPAIR_GROUP,
   REPAIR_RETRY_MS,
+  SPLIT_GROUP,
   actionGroupsOf,
   allGroups,
   attemptVerdict,
@@ -36,6 +37,7 @@ import {
   failGroup,
   groupOf,
   restorePending,
+  runningAttempt,
 } from './steps.ts';
 
 /** Stops the running agents of the groups before delivery; their steps go on after the pause. */
@@ -241,20 +243,27 @@ export function mergeFinished(m: Ctx, slug: string, outcome: MergeOutcome): void
   }
 }
 
-export function startNextMerge(m: Ctx): void {
-  if (m.state.groups.some((group) => group.mergeInFlight)) return;
-  if (deliveryCheckActive(m.state)) return;
-  const next = m.state.groups
-    .filter((group) => group.status === 'merging')
-    .sort((left, right) => (left.mergeSeq ?? 0) - (right.mergeSeq ?? 0))[0];
-  if (!next) return;
-  next.mergeInFlight = true;
-  m.effects.push({
-    kind: 'merge',
-    run: m.state.run.id,
-    group: next.slug,
-    updateOnConflict: next.updateOnConflict,
-  });
+/** The actions after the split have nothing to work on when its commit failed: they never start. */
+export function cancelAfterSplit(m: Ctx): void {
+  for (const action of actionGroupsOf(m.state, 'after_split')) {
+    if (action.status !== 'queued') continue;
+    action.status = 'cancelled';
+    action.reason = 'the split commit failed';
+  }
+}
+
+/** The attempt of a group ran out of time: the step fails, or waits, as the limits say. */
+export function timedOut(m: Ctx, slug: string, seq: number): void {
+  const group = groupOf(m, slug);
+  const attempt = runningAttempt(group, seq);
+  if (!attempt || attempt.reason?.kind === 'message' || attempt.reason?.kind === 'paused') {
+    return;
+  }
+  attempt.status = 'failed';
+  attempt.reason = { kind: 'timeout' };
+  attempt.finishedAt = m.now;
+  m.effects.push({ kind: 'stop_attempt', run: m.state.run.id, group: slug, seq });
+  failGroup(m, group, { kind: 'timeout' });
 }
 
 function rejectDeliveryRetry(group: Group): void {
@@ -316,4 +325,11 @@ export function retryGroup(
   } else {
     refreshPermissionsOf(m, group, permissions);
   }
+}
+
+/** The result of the split is in the ref of the run: its commit describes the change of the group. */
+export function splitCommitted(m: Ctx, commit: string): void {
+  const split = m.state.split;
+  if (!split || split.slug !== SPLIT_GROUP) return;
+  split.mergeCommit = commit;
 }

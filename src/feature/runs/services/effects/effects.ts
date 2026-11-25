@@ -93,6 +93,8 @@ export class RunEffects implements EffectRunner {
         });
       case 'commit':
         return this.git.commit(state, effect.group, effect.stepId, effect.summary);
+      case 'commit_split':
+        return this.git.commitSplit(state, effect.stepId, effect.summary);
       case 'merge':
         return this.git.merge(state, effect.group, effect.updateOnConflict);
       case 'deliver':

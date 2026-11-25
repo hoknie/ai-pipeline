@@ -95,6 +95,7 @@ Answer with [`aip group answer`](../usage/runs.md#answering-a-specialist), in th
 - If the groups are passed as a list (`--groups`), the split is skipped.
 - In commands the split step is the `_split` group.
 - After the split each group starts at the first step of its own pipeline, or, with `split.pipeline`, at the first step of the named pipeline.
+- The files the split step creates or changes, ignored paths of `workspace.include` included, are committed to the ref of the run. The groups start from them, and `aip apply` delivers them together with the groups.
 
 ### Groups that follow another pipeline's steps
 

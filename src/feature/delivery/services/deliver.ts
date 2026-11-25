@@ -14,12 +14,18 @@ async function mergedFiles(state: RunState, slugs: string[] | null): Promise<str
         ? group.delivery.state !== 'applied'
         : slugs.includes(group.slug)),
   );
+  const split = state.split;
+  // The split result travels with every delivery until it is applied, as in `groupChanges`.
+  const splitFiles =
+    split !== null && split.mergeCommit !== null && split.delivery.state !== 'applied'
+      ? await changedFiles(state.run.repository, `${split.mergeCommit}^1`, split.mergeCommit)
+      : [];
   const files = await Promise.all(
     groups.map((group) =>
       changedFiles(state.run.repository, `${group.mergeCommit}^1`, group.mergeCommit as string),
     ),
   );
-  return [...new Set(files.flat())].sort();
+  return [...new Set([...splitFiles, ...files.flat().sort()])];
 }
 
 /** The delivery of a group without the commit message, which only the actions after delivery need. */

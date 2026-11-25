@@ -22,6 +22,8 @@ export type Effect =
   | { kind: 'start_attempt'; run: string; group: string; seq: number }
   | { kind: 'stop_attempt'; run: string; group: string; seq: number }
   | { kind: 'commit'; run: string; group: string; stepId: string; summary: string }
+  /** Commits the result of the split step into the ref of the run, before the groups start. */
+  | { kind: 'commit_split'; run: string; stepId: string; summary: string }
   | { kind: 'merge'; run: string; group: string; updateOnConflict: boolean }
   /** The daemon runs the shell command of a pipeline action. */
   | { kind: 'run_action'; run: string; group: string; seq: number }
@@ -122,6 +124,8 @@ export type Event =
     }
   | { kind: 'merge_finished'; group: string; outcome: MergeOutcome }
   | { kind: 'commit_failed'; group: string; message: string }
+  /** The result of the split step is committed; `commit` is the commit in the ref of the run. */
+  | { kind: 'split_committed'; commit: string }
   | { kind: 'deliver_requested'; groups: string[] | null; force: boolean; files: string[] }
   | { kind: 'delivered_marked'; groups: string[] | null }
   | { kind: 'delivery_finished'; result: DeliveryResult }

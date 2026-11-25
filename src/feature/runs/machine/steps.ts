@@ -16,13 +16,14 @@ import {
   isMessageGroup,
   isRepairGroup,
   isResolveGroup,
+  isSplitGroup,
   isTerminal,
   nextUnskipped,
   runPipeline,
   stepStates,
   stepsOf,
 } from '../types/index.ts';
-import { finishDelivery, finishMessage } from './delivery-flow.ts';
+import { finishDelivery, finishMessageGroup } from './delivery-flow.ts';
 import type { ActionOutcome, Ctx, Effect } from './events.ts';
 import { failRepair } from './repair.ts';
 
@@ -126,14 +127,6 @@ export function rejectedStep(m: Ctx, group: Group, attempt: Attempt, feedback: s
     humanAnswer: null,
     resume: false,
   };
-}
-
-export function finishMessageGroup(m: Ctx, group: Group, summary: string | null): void {
-  if (summary !== null) {
-    group.status = 'merged';
-    group.pending = null;
-  }
-  m.effects.push(...finishMessage(m.state, summary));
 }
 
 export function failGroup(m: Ctx, group: Group, reason: FailReason): void {
@@ -307,6 +300,16 @@ export function actionFinished(m: Ctx, slug: string, seq: number, outcome: Actio
 /** The commit of a step failed. The group of an action is merged by then: it fails, and the pipeline waits. */
 export function commitFailed(m: Ctx, slug: string, message: string): void {
   const group = groupOf(m, slug);
+  if (isSplitGroup(group)) {
+    // The groups were created by the split and wait for its commit: without it they have nothing
+    // to start from. `merged` is terminal, so the split fails here instead of through `failGroup`;
+    // the pending step is restored here for the retry the same way.
+    m.state.groups = [];
+    restorePending(group);
+    group.status = 'failed';
+    group.reason = describeFailReason({ kind: 'git', message });
+    return;
+  }
   if (!isActionGroup(group)) {
     failGroup(m, group, { kind: 'git', message });
     return;
@@ -314,17 +317,4 @@ export function commitFailed(m: Ctx, slug: string, message: string): void {
   group.status = 'failed';
   group.reason = describeFailReason({ kind: 'git', message });
   group.pending = freshPending(0);
-}
-
-export function timedOut(m: Ctx, slug: string, seq: number): void {
-  const group = groupOf(m, slug);
-  const attempt = runningAttempt(group, seq);
-  if (!attempt || attempt.reason?.kind === 'message' || attempt.reason?.kind === 'paused') {
-    return;
-  }
-  attempt.status = 'failed';
-  attempt.reason = { kind: 'timeout' };
-  attempt.finishedAt = m.now;
-  m.effects.push({ kind: 'stop_attempt', run: m.state.run.id, group: slug, seq });
-  failGroup(m, group, { kind: 'timeout' });
 }

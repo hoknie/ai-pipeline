@@ -3,6 +3,7 @@ import { addUsage } from '../../agents/types/index.ts';
 import {
   type PinnedSkill,
   type RunState,
+  SPLIT_GROUP,
   isRunFinished,
   pointStalled,
   retryableGroups,
@@ -29,21 +30,17 @@ import type { Ctx, Effect, Event } from './events.ts';
 import { attemptExited } from './exits.ts';
 import { repairAllowed, repairStart } from './repair.ts';
 import {
+  cancelAfterSplit,
   cancelGroups,
   holdRun,
   interrupted,
   mergeFinished,
   retryGroup,
-  startNextMerge,
-} from './run-control.ts';
-import {
-  actionFinished,
-  commitFailed,
-  providerUnavailable,
-  skipAhead,
-  stepSkip,
+  splitCommitted,
   timedOut,
-} from './steps.ts';
+} from './run-control.ts';
+import { startNextMerge } from './scheduler.ts';
+import { actionFinished, commitFailed, providerUnavailable, skipAhead, stepSkip } from './steps.ts';
 import { setProvider } from './provider/index.ts';
 import { setVariant } from './variant/index.ts';
 
@@ -98,6 +95,15 @@ function autoDeliveryCancelled(m: Ctx): void {
   run.config.delivery.auto = false;
 }
 
+/**
+ * The commit of a step failed. The commit of the split takes its groups and the actions after them
+ * away: nothing may start from a tree without the result of the split.
+ */
+function commitFailedEvent(m: Ctx, event: Extract<Event, { kind: 'commit_failed' }>): void {
+  commitFailed(m, event.group, event.message);
+  if (event.group === SPLIT_GROUP) cancelAfterSplit(m);
+}
+
 /** The table of the events: one handler for each kind. */
 const HANDLERS: Handlers = {
   report: (m, e) => reportAttempt(m, e.group, e.seq, e.report),
@@ -121,7 +127,8 @@ const HANDLERS: Handlers = {
   },
   answer: (m, e) => answerQuestion(m, e.group, e.answer, e.by ?? 'human', e.permissions),
   merge_finished: (m, e) => mergeFinished(m, e.group, e.outcome),
-  commit_failed: (m, e) => commitFailed(m, e.group, e.message),
+  commit_failed: commitFailedEvent,
+  split_committed: (m, e) => splitCommitted(m, e.commit),
   deliver_requested: deliveryRequested,
   delivered_marked: (m, e) => void m.effects.push(...markDelivered(m.state, e.groups, m.now)),
   delivery_finished: (m, e) => void m.effects.push(...finishDelivery(m.state, e.result, m.now)),

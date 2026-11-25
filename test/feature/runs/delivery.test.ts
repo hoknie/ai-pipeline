@@ -4,9 +4,11 @@ import {
   type FailReason,
   type RunState,
   MESSAGE_GROUP,
-  createRun,
   RESOLVE_GROUP,
+  SPLIT_GROUP,
+  createRun,
   deliveryCounts,
+  newGroup,
 } from '../../../src/feature/runs/types/index.ts';
 import {
   type Effect,
@@ -14,6 +16,7 @@ import {
   renderCommitMessage,
   transition,
 } from '../../../src/feature/runs/machine/index.ts';
+import { groupChanges } from '../../../src/feature/runs/services/effects/git.ts';
 
 import { CONFIG_TEXT, finish, group, run, runningAttempt, step } from './helpers.ts';
 
@@ -162,6 +165,66 @@ describe('delivery requests', () => {
     const state = mergedRun(2, { leaveLast: true });
     request(state);
     expect(transition(state, { kind: 'delivery_finished', result: applied }, 7000)).toEqual([]);
+  });
+});
+
+describe('split result in delivery', () => {
+  function withSplit(state: RunState, commit: string | null): RunState {
+    state.split = newGroup(SPLIT_GROUP, 'split', 'split the task', 0);
+    state.split.mergeCommit = commit;
+    return state;
+  }
+
+  it('puts the change of the split before the changes of the groups, whatever the groups are', () => {
+    const state = withSplit(mergedRun(2), 's1');
+    expect(groupChanges(state, ['group-2'])).toEqual([
+      { group: SPLIT_GROUP, from: 's1^1', to: 's1' },
+      { group: 'group-2', from: 'c-group-2^1', to: 'c-group-2' },
+    ]);
+  });
+
+  it('leaves the split out when it has no commit or its result is delivered', () => {
+    const noCommit = withSplit(mergedRun(1), null);
+    expect(groupChanges(noCommit, ['group-1'])).toEqual([
+      { group: 'group-1', from: 'c-group-1^1', to: 'c-group-1' },
+    ]);
+    const delivered = withSplit(mergedRun(1), 's1');
+    delivered.split!.delivery.state = 'applied';
+    expect(groupChanges(delivered, ['group-1'])).toEqual([
+      { group: 'group-1', from: 'c-group-1^1', to: 'c-group-1' },
+    ]);
+  });
+
+  it('marks the split delivered with the delivery and keeps it out of the counters', () => {
+    const state = withSplit(mergedRun(1), 's1');
+    request(state);
+    transition(state, { kind: 'delivery_finished', result: applied }, 7000);
+    expect(state.split?.delivery.state).toBe('applied');
+    expect(state.split?.delivery.finishedAt).toBe(7000);
+    expect(deliveryCounts(state)).toEqual({ applied: 1, merged: 1, failed: 0 });
+    expect(groupChanges(state, ['group-1']).map((change) => change.group)).toEqual(['group-1']);
+  });
+
+  it('keeps the split pending after a refused delivery so the next one carries it', () => {
+    const state = withSplit(mergedRun(1), 's1');
+    request(state);
+    transition(
+      state,
+      { kind: 'delivery_finished', result: { kind: 'refused', reason: 'conflict', files: ['a'] } },
+      7000,
+    );
+    expect(state.split?.delivery.state).toBe('pending');
+    expect(groupChanges(state, ['group-1']).map((change) => change.group)).toEqual([
+      SPLIT_GROUP,
+      'group-1',
+    ]);
+  });
+
+  it('does not mark the split when the user marks the groups delivered by hand', () => {
+    const state = withSplit(mergedRun(1), 's1');
+    transition(state, { kind: 'delivered_marked', groups: null }, 8000);
+    expect(state.groups[0]?.delivery).toMatchObject({ state: 'applied', manual: true });
+    expect(state.split?.delivery.state).toBe('pending');
   });
 });
 

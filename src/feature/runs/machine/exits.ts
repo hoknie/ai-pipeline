@@ -22,7 +22,12 @@ import {
   stepsOf,
 } from '../types/index.ts';
 import { NETWORK_FAILURE_LIMIT } from '../../network/types/index.ts';
-import { finishDelivery, resolverDone } from './delivery-flow.ts';
+import {
+  finishDelivery,
+  finishMessageGroup,
+  finishResolve,
+  resolverDone,
+} from './delivery-flow.ts';
 import type { AttemptExit, Ctx } from './events.ts';
 import { closeRepair } from './repair.ts';
 import {
@@ -32,7 +37,6 @@ import {
   continueAfterMessage,
   continueAfterPause,
   failGroup,
-  finishMessageGroup,
   groupOf,
   rejectedStep,
   restorePending,
@@ -209,7 +213,8 @@ function verdictOf(m: Ctx, group: Group, attempt: Attempt, report: Report): void
   else if (isActionGroup(group)) finishAction(group, attempt, report);
   else if (report.verdict === 'done' && isMessageGroup(group)) {
     finishMessageGroup(m, group, report.summary);
-  } else if (report.verdict === 'done' && isSplitGroup(group)) finishSplit(m, group, attempt);
+  } else if (report.verdict === 'done' && isSplitGroup(group))
+    finishSplit(m, group, attempt, report);
   else if (report.verdict === 'done') finishStep(m, group, attempt, report);
   else if (report.verdict === 'rejected') rejectedStep(m, group, attempt, report.feedback ?? '');
   else askFromReport(group, attempt, report);
@@ -231,7 +236,7 @@ function finishStep(m: Ctx, group: Group, attempt: Attempt, report: Report): voi
   advanceStep(m, group, attempt.stepIndex);
 }
 
-function finishSplit(m: Ctx, split: Group, attempt: Attempt): void {
+function finishSplit(m: Ctx, split: Group, attempt: Attempt, report: Report): void {
   const proposal = attempt.proposal;
   if (!proposal || proposal.length === 0) {
     attempt.status = 'failed';
@@ -247,6 +252,13 @@ function finishSplit(m: Ctx, split: Group, attempt: Attempt): void {
   split.pending = null;
   // The groups wait in `queued` for the actions after the split.
   enterPoint(m.state, 'after_split');
+  // The commit comes before the groups start: their worktrees are created from the ref of the run.
+  m.effects.push({
+    kind: 'commit_split',
+    run: m.state.run.id,
+    stepId: attempt.stepId,
+    summary: report.summary,
+  });
 }
 
 /** A specialist reported on its pipeline action. */
@@ -265,28 +277,6 @@ function finishAction(group: Group, attempt: Attempt, report: Report): void {
     return;
   }
   askFromReport(group, attempt, report);
-}
-
-function finishResolve(m: Ctx, group: Group, report: Report): void {
-  group.pending = null;
-  if (report.verdict === 'done') {
-    group.status = 'merged';
-    m.effects.push(...resolverDone(m.state));
-    return;
-  }
-  const detail = (report.feedback ?? report.summary).trim();
-  group.status = 'failed';
-  group.reason = `resolver reported ${report.verdict}`;
-  m.effects.push(
-    ...finishDelivery(
-      m.state,
-      {
-        kind: 'failed',
-        message: `the resolver reported ${report.verdict}${detail ? `: ${detail}` : ''}`,
-      },
-      m.now,
-    ),
-  );
 }
 
 /** The observer reported. A delivery repair is closed by the delivery that follows `done`. */

@@ -8,12 +8,13 @@ import {
   buildInput,
   REPOSITORY_LIMIT,
   type SelectedRuntime,
+  deliveryCheckActive,
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
 import { keepsConversation } from '../../swarm-config/types/index.ts';
 import { OFF_NETWORK, type NetworkSnapshot } from '../../network/types/index.ts';
-import type { Effect } from './events.ts';
+import type { Ctx, Effect } from './events.ts';
 import { isCommandAction, planDispatch } from './plan.ts';
 
 export function dispatch(
@@ -148,6 +149,23 @@ function startAttempt(
   group.status = 'running';
   group.pending = null;
   return attempt;
+}
+
+/** Starts the merge of the oldest merged-ready group unless one is in flight or a check is active. */
+export function startNextMerge(m: Ctx): void {
+  if (m.state.groups.some((group) => group.mergeInFlight)) return;
+  if (deliveryCheckActive(m.state)) return;
+  const next = m.state.groups
+    .filter((group) => group.status === 'merging')
+    .sort((left, right) => (left.mergeSeq ?? 0) - (right.mergeSeq ?? 0))[0];
+  if (!next) return;
+  next.mergeInFlight = true;
+  m.effects.push({
+    kind: 'merge',
+    run: m.state.run.id,
+    group: next.slug,
+    updateOnConflict: next.updateOnConflict,
+  });
 }
 
 /**

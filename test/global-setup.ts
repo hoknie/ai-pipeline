@@ -119,5 +119,7 @@ export default function setup(project: TestProject): () => void {
     'compileCache',
     process.env.NODE_COMPILE_CACHE ?? join(directory, 'node-compile-cache'),
   );
-  return () => rmSync(directory, { recursive: true, force: true });
+  // A stopping worker or agent may still write to the shared compile cache while the directory is
+  // removed: the ENOTEMPTY retries of `rm` let such writes finish instead of failing the run.
+  return () => rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

@@ -31,6 +31,7 @@ const golden = [
   'test/daemon/config.test.ts',
   'test/daemon/queue.test.ts',
   'test/daemon/patches-flow.test.ts',
+  'test/daemon/split-commit.test.ts',
   'test/daemon/serial.test.ts',
   'test/daemon/lock.test.ts',
   'test/git/delivery.test.ts',

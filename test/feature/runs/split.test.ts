@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { type RunState, SPLIT_GROUP, stepsOf } from '../../../src/feature/runs/types/index.ts';
+import {
+  type RunState,
+  SPLIT_GROUP,
+  retryableGroups,
+  stepsOf,
+} from '../../../src/feature/runs/types/index.ts';
 import { dispatch, transition } from '../../../src/feature/runs/machine/index.ts';
 
 import { CONFIG_TEXT, config, finish, run, runningAttempt } from './helpers.ts';
@@ -8,6 +13,11 @@ import { CONFIG_TEXT, config, finish, run, runningAttempt } from './helpers.ts';
 const SPLIT_CONFIG = CONFIG_TEXT.replace(
   '    feature:\n      steps:',
   '    feature:\n      split: { specialist: plan, max_groups: 3 }\n      steps:',
+);
+
+const SPLIT_ACTION_CONFIG = SPLIT_CONFIG.replace(
+  '  pipelines:',
+  '  actions:\n    notes: { run: "echo notes" }\n  stages:\n    after_split: [notes]\n  pipelines:',
 );
 
 function splitting(): RunState {
@@ -33,7 +43,9 @@ describe('split step', () => {
       { title: 'Registration', task: 'build the registration' },
     ]);
     const effects = finish(state, 'done', { slug: SPLIT_GROUP });
-    expect(effects).toEqual([]);
+    expect(effects).toEqual([
+      { kind: 'commit_split', run: state.run.id, stepId: 'split', summary: 'split done' },
+    ]);
     expect(state.split?.status).toBe('merged');
     expect(state.groups.map((group) => [group.slug, group.status])).toEqual([
       ['login', 'queued'],
@@ -65,7 +77,8 @@ describe('split step', () => {
 
   it('fails with no groups when the specialist reports done without a proposal', () => {
     const state = splitting();
-    finish(state, 'done', { slug: SPLIT_GROUP });
+    const effects = finish(state, 'done', { slug: SPLIT_GROUP });
+    expect(effects.some((effect) => effect.kind === 'commit_split')).toBe(false);
     expect(state.split).toMatchObject({ status: 'failed', reason: 'no groups' });
     expect(state.run.finishedAt).not.toBeNull();
     transition(state, { kind: 'retry', group: SPLIT_GROUP }, 1500);
@@ -103,6 +116,104 @@ describe('split step', () => {
     expect(() =>
       transition(state, { kind: 'split_proposed', seq: 1, groups: [{ title: 'a', task: 'b' }] }, 2),
     ).toThrow('not a running split step');
+  });
+});
+
+describe('split result in the run ref', () => {
+  function proposed(): RunState {
+    const state = splitting();
+    propose(state, [
+      { title: 'Login', task: 'build the login' },
+      { title: 'Registration', task: 'build the registration' },
+    ]);
+    finish(state, 'done', { slug: SPLIT_GROUP });
+    return state;
+  }
+
+  it('records the commit of the split in its group', () => {
+    const state = proposed();
+    expect(state.split?.mergeCommit).toBeNull();
+    transition(state, { kind: 'split_committed', commit: 'c-split' }, 1300);
+    expect(state.split?.mergeCommit).toBe('c-split');
+    expect(state.split?.delivery.state).toBe('pending');
+  });
+
+  it('does nothing without a split group', () => {
+    const state = run(1);
+    expect(() =>
+      transition(state, { kind: 'split_committed', commit: 'c-split' }, 1300),
+    ).not.toThrow();
+    expect(state.split).toBeNull();
+  });
+
+  it('fails the split and drops its groups when the commit fails', () => {
+    const state = proposed();
+    expect(state.groups).toHaveLength(2);
+    const effects = transition(
+      state,
+      { kind: 'commit_failed', group: SPLIT_GROUP, message: 'disk full' },
+      1300,
+    );
+    expect(state.groups).toEqual([]);
+    expect(state.split).toMatchObject({ status: 'failed', reason: 'git: disk full' });
+    expect(state.run.finishedAt).toBe(1300);
+    expect(effects.filter((effect) => effect.kind === 'start_attempt')).toEqual([]);
+    expect(dispatch([state], 1400).filter((effect) => effect.kind === 'start_attempt')).toEqual([]);
+  });
+
+  it('cancels the actions after the split when the commit fails', () => {
+    const state = run(1, { split: true, configText: SPLIT_ACTION_CONFIG });
+    dispatch([state], 1100);
+    propose(state, [{ title: 'Login', task: 'build the login' }]);
+    finish(state, 'done', { slug: SPLIT_GROUP });
+    expect(state.actions.map((action) => [action.slug, action.status])).toEqual([
+      ['_action-after-split-notes', 'queued'],
+    ]);
+    transition(state, { kind: 'commit_failed', group: SPLIT_GROUP, message: 'disk full' }, 1300);
+    expect(state.groups).toEqual([]);
+    expect(state.split).toMatchObject({ status: 'failed', reason: 'git: disk full' });
+    expect(state.actions[0]).toMatchObject({
+      status: 'cancelled',
+      reason: 'the split commit failed',
+    });
+    expect(state.run.finishedAt).toBe(1300);
+    expect(dispatch([state], 1400)).toEqual([]);
+  });
+
+  it('starts a new split attempt after a retry of the failed commit', () => {
+    const state = proposed();
+    transition(state, { kind: 'commit_failed', group: SPLIT_GROUP, message: 'disk full' }, 1300);
+    expect(state.split?.pending).not.toBeNull();
+    transition(state, { kind: 'retry', group: SPLIT_GROUP }, 1400);
+    expect(state.run.finishedAt).toBeNull();
+    dispatch([state], 1500);
+    expect(runningAttempt(state, SPLIT_GROUP)).toMatchObject({ seq: 2, stepId: 'split' });
+  });
+
+  it('does not retry the actions after the split until it commits again', () => {
+    const state = run(1, { split: true, configText: SPLIT_ACTION_CONFIG });
+    dispatch([state], 1100);
+    propose(state, [{ title: 'Login', task: 'build the login' }]);
+    finish(state, 'done', { slug: SPLIT_GROUP });
+    const action = state.actions[0]!;
+    transition(state, { kind: 'commit_failed', group: SPLIT_GROUP, message: 'disk full' }, 1300);
+    // A returned run continues the split first: its actions are not retried from a tree without it.
+    expect(retryableGroups(state)).toEqual([SPLIT_GROUP]);
+    transition(state, { kind: 'retry', group: SPLIT_GROUP }, 1400);
+    transition(state, { kind: 'retry', group: action.slug }, 1450);
+    expect(action.status).toBe('queued');
+    const first = dispatch([state], 1500);
+    expect(runningAttempt(state, SPLIT_GROUP).seq).toBe(2);
+    expect(first.filter((effect) => effect.kind === 'run_action')).toEqual([]);
+    // The new result of the split queues its actions again.
+    propose(state, [{ title: 'Login', task: 'build the login' }]);
+    finish(state, 'done', { slug: SPLIT_GROUP });
+    expect(action.status).toBe('queued');
+    transition(state, { kind: 'split_committed', commit: 'c-split' }, 1700);
+    const second = dispatch([state], 1800);
+    expect(second.filter((effect) => effect.kind === 'run_action')).toEqual([
+      { kind: 'run_action', run: state.run.id, group: action.slug, seq: 1 },
+    ]);
   });
 });
 

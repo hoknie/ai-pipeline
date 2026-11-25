@@ -64,6 +64,9 @@ function gated(state: RunState, group: Group): boolean {
   const point = actionPointOf(group);
   // A check shares the tree of the run with the merges: it starts on a tree no merge is changing.
   if (point === 'before_delivery' && state.groups.some((other) => other.mergeInFlight)) return true;
+  // The actions after the split work on its result: without a completed split they have no tree.
+  if (point === 'after_split' && state.split !== null && state.split.status !== 'merged')
+    return true;
   if (point !== undefined) return openAction(state, point) !== group;
   if (group === state.split) return !pointClosed(state, 'before_split');
   if (state.groups.includes(group)) return !pointClosed(state, 'after_split');

@@ -313,9 +313,19 @@ export function specialistOfStep(
 /** Work groups and the split step of a run that a retry can continue. */
 export function retryableGroups(state: RunState): string[] {
   const work = [...(state.split ? [state.split, ...state.groups] : state.groups), ...state.actions];
-  return work
-    .filter((group) => group.status === 'failed' || group.status === 'cancelled')
-    .map((group) => group.slug);
+  return (
+    work
+      .filter((group) => group.status === 'failed' || group.status === 'cancelled')
+      // The actions after the split wait for its result: a retry of the run continues the split first,
+      // and the split queues them again once it produces a new result.
+      .filter(
+        (group) =>
+          actionPointOf(group) !== 'after_split' ||
+          state.split === null ||
+          state.split.status === 'merged',
+      )
+      .map((group) => group.slug)
+  );
 }
 
 export function deliveryCounts(state: RunState): {
