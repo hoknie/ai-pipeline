@@ -34,6 +34,7 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
     },
   });
   ports.notify.set(services.notifications.dispatcher);
+  ports.stats.set(services.stats.ledger);
   ports.notifications.set(publications.notifications);
   ports.processes.set(publications.processes);
   // Every saved run reaches the clients first, then the usage journal.

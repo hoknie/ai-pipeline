@@ -1,4 +1,5 @@
 import type { RunCreated } from '../create.ts';
+import type { ProbeSummary } from './harness-comparison.ts';
 import { runId } from '../create.ts';
 import type { RunAttachment, RunState } from '../run.ts';
 
@@ -144,7 +145,7 @@ export interface ProbeObservation {
   groups: number;
   merged: number;
   /** Files of the merged result that conflict on the base; 0 when it applies cleanly. */
-  conflicts: number;
+  conflicts: number | null;
   /** Every group merged and the result applies cleanly on the base: the only full success. */
   clean: boolean;
   denials: number;
@@ -153,6 +154,8 @@ export interface ProbeObservation {
   tokens: number;
   /** Why the isolated check of the result could not run; null when it did. */
   error: string | null;
+  /** Detailed per-run evidence, when the comparison is built by the probe service. */
+  summary?: ProbeSummary;
 }
 
 /** The signal of one candidate over its runs. */
@@ -165,7 +168,8 @@ export interface ProbeScore {
   clean: number;
   groups: number;
   merged: number;
-  conflicts: number;
+  /** Total conflicts, unknown when any observation lacks a check result. */
+  conflicts: number | null;
   denials: number;
   outsideChanges: number;
   verdicts: { done: number; rejected: number; needs_human: number };

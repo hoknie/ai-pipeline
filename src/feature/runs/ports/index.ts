@@ -9,6 +9,7 @@ export type { RemoteMcpPort, RemoteMcpRefusal, RemoteMcpResolution } from './rem
 export type { RegistryProjectAnswer, RegistryProjectPort } from './registry-project.ts';
 export type { QueueAdvancePort } from './queue-advance.ts';
 export type { RunNotifyPort } from './notify.ts';
+export type { RunStatsPort } from './stats/index.ts';
 export type {
   RegistrySkillPin,
   RegistrySkillsPinned,

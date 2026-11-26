@@ -1,6 +1,11 @@
 import type { Database } from '../../../platform/sqlite/index.ts';
 import { type AttemptRecord, type TaskRecord } from '../types/index.ts';
 
+type ProbeRecord = Pick<
+  AttemptRecord,
+  'runId' | 'group' | 'seq' | 'durationMs' | 'inputTokens' | 'outputTokens'
+>;
+
 /** Writes of the journal: the rows of `stats_attempts` and `stats_runs`. */
 export class StatsRecordRepository {
   private readonly database: Database;
@@ -12,6 +17,21 @@ export class StatsRecordRepository {
   /** Runs `work` in one transaction; `work` calls no method that opens its own. */
   transaction<T>(work: () => T): T {
     return this.database.transaction(work);
+  }
+
+  /** Reads the recorded attempts and task wall time without estimating missing data. */
+  read(runId: string): { attempts: ProbeRecord[]; wallMs: number | null } {
+    const attempts = this.database
+      .prepare(
+        `SELECT run_id AS runId, group_slug AS "group", seq, duration_ms AS durationMs,
+                input_tokens AS inputTokens, output_tokens AS outputTokens
+         FROM stats_attempts WHERE run_id = ? ORDER BY group_slug, seq`,
+      )
+      .all(runId) as ProbeRecord[];
+    const task = this.database
+      .prepare('SELECT wall_ms AS wallMs FROM stats_runs WHERE run_id = ?')
+      .get(runId) as { wallMs: number } | undefined;
+    return { attempts, wallMs: task?.wallMs ?? null };
   }
 
   /** Adds the attempts that are not there yet; returns how many rows are new. */

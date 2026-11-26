@@ -72,6 +72,7 @@ describe('RunAttemptHistoryService', () => {
       registryProject: {} as never,
       commits: {} as never,
       push: {} as never,
+      stats: {} as never,
     });
     expect(services.attemptHistory).toBeInstanceOf(RunAttemptHistoryService);
     expect(typeof services.attemptHistory.page).toBe('function');

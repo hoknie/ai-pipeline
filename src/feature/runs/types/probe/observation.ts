@@ -47,7 +47,7 @@ export function observeRun(
     finished: false,
     groups: 0,
     merged: 0,
-    conflicts: 0,
+    conflicts: null,
     clean: false,
     denials: 0,
     outsideChanges: 0,
@@ -58,7 +58,7 @@ export function observeRun(
   if (state === null || !isRunFinished(state)) return empty;
   const groups = state.groups.length;
   const merged = state.groups.filter((group) => group.status === 'merged').length;
-  const conflicts = check?.conflicts.length ?? 0;
+  const conflicts = error === null ? (check?.conflicts.length ?? null) : null;
   const clean = groups > 0 && merged === groups && check?.applied === true && conflicts === 0;
   return {
     ...empty,

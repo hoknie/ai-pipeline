@@ -18,6 +18,31 @@ function repositories() {
 }
 
 describe('statistics repositories', () => {
+  it('reads only the recorded usage of one run, including attempts without a task', () => {
+    const { records } = repositories();
+    expect(records.read('a')).toEqual({ attempts: [], wallMs: null });
+    records.insertAttempts([
+      attemptRecord({
+        runId: 'a',
+        group: 'main',
+        seq: 1,
+        durationMs: 12,
+        inputTokens: 3,
+        outputTokens: 4,
+      }),
+      attemptRecord({ runId: 'b', seq: 1 }),
+    ]);
+    expect(records.read('a')).toEqual({
+      attempts: [
+        { runId: 'a', group: 'main', seq: 1, durationMs: 12, inputTokens: 3, outputTokens: 4 },
+      ],
+      wallMs: null,
+    });
+    records.upsertTask(taskRecord({ runId: 'a', wallMs: 0 }));
+    expect(records.read('a').wallMs).toBe(0);
+    expect(records.read('b').wallMs).toBeNull();
+  });
+
   it('does not duplicate an attempt inserted twice', () => {
     const { records, reads } = repositories();
     const record = attemptRecord();

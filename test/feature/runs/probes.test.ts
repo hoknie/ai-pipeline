@@ -299,7 +299,7 @@ describe('the observation of one probe run', () => {
     expect(errored).toMatchObject({
       finished: true,
       clean: false,
-      conflicts: 0,
+      conflicts: null,
       error: 'bad object name',
     });
   });
@@ -314,6 +314,47 @@ describe('the observation of one probe run', () => {
 });
 
 describe('the comparison of the probes', () => {
+  it('separates a significant winner from pair safety and does not change the sign test', () => {
+    const observations = [...cleanPair('default', 6, false), ...cleanPair('strong', 6, true)].map(
+      (entry) => ({
+        ...entry,
+        summary: {
+          runId: entry.runId,
+          task: 'same',
+          baseCommit: 'abc',
+          actualDelivery: 'not_attempted' as const,
+          allGroupsMerged: true,
+          check: { applied: entry.clean, conflicts: entry.clean ? 0 : 1, error: null },
+          outsideChanges: 0,
+          denials: 0,
+          reviewerAttempts: [],
+          cost: null,
+          wallMs: null,
+          attemptDurationMs: null,
+          inputTokens: null,
+          outputTokens: null,
+        },
+      }),
+    );
+    const agreed = compareExperiment(experiment(), observations);
+    expect(agreed.winner).toBe('strong');
+    expect(agreed.proposal?.what).toContain('use variant `strong`');
+    expect(agreed.proposal?.markdown).toContain('actualDelivery: not_attempted');
+    for (const entry of observations.slice(0, 6)) {
+      entry.summary.allGroupsMerged = false;
+      entry.summary.check = { applied: true, conflicts: 0, error: null };
+    }
+    const equalChecks = compareExperiment(experiment(), observations);
+    expect(equalChecks.winner).toBe('strong');
+    expect(equalChecks.versus).toEqual(agreed.versus);
+    expect(equalChecks.proposal?.what).toContain('no change');
+    observations[6]!.summary.outsideChanges = 1;
+    const unsafe = compareExperiment(experiment(), observations);
+    expect(unsafe.winner).toBe('strong');
+    expect(unsafe.versus).toEqual(agreed.versus);
+    expect(unsafe.proposal?.what).toContain('no change');
+  });
+
   it('adds the signal of each candidate over its runs', () => {
     const score = scoreOf('default', [
       observation('default', 1, true, { tokens: 5 }),
@@ -365,11 +406,15 @@ describe('the comparison of the probes', () => {
     expect(comparison.status).toBe('ready');
     expect(comparison.winner).toBe('strong');
     expect(comparison.versus).toMatchObject([{ wins: 6, losses: 0, significant: true }]);
-    expect(comparison.proposal?.markdown).toContain('use variant `strong`');
+    expect(comparison.proposal?.markdown).toContain('no change: pair evidence is insufficient');
     expect(comparison.proposal?.markdown).toContain('probes never apply anything');
     expect(comparison.proposal?.markdown).not.toMatch(/apply --|aip apply/);
-    expect(comparison.proposal?.markdown).toContain('baseline `default`: clean 0/6 (0%)');
-    expect(comparison.proposal?.markdown).toContain('`strong`: clean 6/6 (100%)');
+    expect(comparison.proposal?.markdown).toContain(
+      'baseline `default`: clean 0/6 (0%; checked probes only)',
+    );
+    expect(comparison.proposal?.markdown).toContain(
+      '`strong`: clean 6/6 (100%; checked probes only)',
+    );
   });
 
   it('keeps the baseline when every candidate is significantly worse', () => {
@@ -417,7 +462,9 @@ describe('the comparison of the probes', () => {
     });
     expect(comparison.scores[1]).toMatchObject({ finished: 6, errors: 6, cleanRate: 0 });
     // The clean rate of a probe whose check failed divides by the probes it could check, not by all.
-    expect(comparison.proposal?.markdown).toContain('`strong`: clean 0/0 (0%)');
+    expect(comparison.proposal?.markdown).toContain(
+      '`strong`: clean 0/0 (unknown; checked probes only), conflicts unknown',
+    );
     expect(comparison.winner).toBeNull();
     expect(comparison.reason).toContain('could not be checked');
   });

@@ -18,6 +18,7 @@ import type {
   RunNotifyPort,
   RunCommitsPort,
   RunPushPort,
+  RunStatsPort,
   RunsPublishPort,
 } from '../ports/index.ts';
 import {
@@ -69,6 +70,7 @@ export interface RunsDependencies {
   registryProject: RegistryProjectPort;
   commits: RunCommitsPort;
   push: RunPushPort;
+  stats: RunStatsPort;
 }
 
 export interface RunsServices {
@@ -130,6 +132,7 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
     check: probeCheck,
     engine,
     now,
+    stats: dependencies.stats,
   });
   engine.attachProbes(probes);
   return {

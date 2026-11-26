@@ -53,8 +53,10 @@ The output lists, for every candidate:
 | `tokens` | Tokens every attempt of the probes used |
 | verdicts | `done`, `rejected` and `needs_human` reports, counted but not judged |
 
-The check runs in a temporary git index, so it never touches the worktree. A git failure is a check
-error, not a conflict: the probe says nothing about the harness and is left out of the pairs.
+The check runs in a temporary git index, so it never touches the worktree. It shows whether the
+result **would** apply to the base, not an actual delivery; probes do not attempt delivery. A git
+failure is a check error, not a conflict: the probe says nothing about the harness and is left out
+of the pairs.
 
 Candidates are compared repetition by repetition with the baseline, one bit per pair: a clean probe
 against an unclean one is a win or a loss, two equal outcomes are a tie. The exact two-sided sign
@@ -79,11 +81,19 @@ reports `budget_exhausted` and names no winner.
 
 ## The proposal
 
-Only a significant winner gets a Markdown proposal: `contrast-show` writes it near the daemon state,
-under `probes/`, and prints its path. An inconclusive experiment writes no file and prints
-`no winner`. The proposal names the variant to use, the objective signal behind the choice and the
-budget the experiment spent. Probes never change the configuration: a person applies the variant to
-`aip/pipelines/<pipeline>.yaml` by hand.
+For a completed pair, `contrast-show` writes a Markdown proposal near the daemon state under
+`probes/` and prints its path, including when the result is inconclusive. It distinguishes the
+pair's observed check from the sign test across repetitions. The proposal suggests a change only
+when the sign test has a significant winner and the pair's check supports it without an outside
+change. A tie or insufficient signal keeps the baseline. Check and conflicts take priority over
+safety, reviewer outcomes, measured cost, time and tokens; cost takes priority over tokens. A cost
+that was not measured is unknown, not zero. Probes never change the configuration: a person decides
+whether to apply a proposal to `aip/pipelines/<pipeline>.yaml` by hand.
+
+Review outcomes and rounds are shown per work group, using each group's own attempt sequence and
+rounds. The overall outcome is `done` only when every group finishes review with `done`; a missing or
+running review is unknown. The overall rounds to done are the maximum of the groups' local round
+counts when all groups are done, and unknown otherwise. Review remains a secondary signal.
 
 `run_contrast` also accepts fewer than 6 repetitions; the answer then carries a warning, because a
 difference of fewer decided pairs cannot be significant. The CLI refuses such a request instead.

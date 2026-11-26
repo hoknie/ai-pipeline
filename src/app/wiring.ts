@@ -20,6 +20,7 @@ import type {
   RunAttachmentsPort,
   RunCommitsPort,
   RunPushPort,
+  RunStatsPort,
   RunNotifyPort,
   RunsPublishPort,
 } from '../feature/runs/ports/index.ts';
@@ -88,6 +89,7 @@ export function declarePorts() {
     authors: wiring.port<DeliveryAuthorsPort>('delivery.authors'),
     commits: wiring.port<RunCommitsPort>('runs.commits'),
     push: wiring.port<RunPushPort>('runs.push'),
+    stats: wiring.port<RunStatsPort>('runs.stats'),
     artifacts: wiring.port<ArtifactsPublishPort>('artifacts.publish'),
     queuePublish: wiring.port<QueuePublishPort>('queue.publish'),
     repair: wiring.port<RepairPolicyPort>('queue.repair'),

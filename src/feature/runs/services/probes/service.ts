@@ -2,6 +2,10 @@ import { randomInt } from 'node:crypto';
 
 import { rejected } from '../../../../platform/errors/index.ts';
 import type { ConfigService } from '../../../swarm-config/services/index.ts';
+import type { RunStatsPort } from '../../ports/stats/index.ts';
+import { harnessProbe } from './harness-probe.ts';
+import { keepProposal } from './keep-proposal.ts';
+import { probeStats } from './probe-stats.ts';
 import {
   type ResolvedConfig,
   checkVariant,
@@ -19,7 +23,6 @@ import {
   sourceSkip,
   type Group,
   type ProbeCheck,
-  type ProbeComparison,
   type ProbeExperiment,
   type ProbeLauncher,
   type ProbeObservation,
@@ -40,6 +43,7 @@ export interface RunProbesDependencies {
   check: ProbeCheck;
   engine: ProbeQueue;
   now: () => number;
+  stats: RunStatsPort;
 }
 
 function groupOf(state: RunState, slug: string | null): Group {
@@ -307,32 +311,27 @@ export class RunProbes {
           error = reasonOf(cause);
         }
       }
-      observations.push(observeRun(run, state, check, error));
+      const observation = observeRun(run, state, check, error);
+      observations.push(
+        state === null
+          ? observation
+          : {
+              ...observation,
+              summary: harnessProbe(
+                state,
+                check,
+                error,
+                await probeStats(this.dependencies.stats, state),
+              ),
+            },
+      );
     }
     return observations;
   }
 
-  /** A significant winner is proposed once; an inconclusive experiment writes nothing. */
-  private keepProposal(experiment: ProbeExperiment, comparison: ProbeComparison): ProbeExperiment {
-    if (
-      comparison.winner === null ||
-      comparison.proposal === null ||
-      experiment.proposalPath !== null
-    ) {
-      return experiment;
-    }
-    const proposalPath = this.dependencies.store.writeProposal(
-      experiment.id,
-      comparison.proposal.markdown,
-    );
-    const saved = { ...experiment, proposalPath };
-    this.dependencies.store.save(saved);
-    return saved;
-  }
-
   private async viewOf(experiment: ProbeExperiment): Promise<ProbeView> {
     const comparison = compareExperiment(experiment, await this.observe(experiment));
-    const current = this.keepProposal(experiment, comparison);
+    const current = keepProposal(this.dependencies.store, experiment, comparison);
     return {
       experiment: current,
       status: comparison.status,

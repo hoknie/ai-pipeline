@@ -36,7 +36,10 @@ export function scoreOf(candidate: string, observations: ProbeObservation[]): Pr
     if (observation.clean) total.clean += 1;
     total.groups += observation.groups;
     total.merged += observation.merged;
-    total.conflicts += observation.conflicts;
+    total.conflicts =
+      total.conflicts === null || observation.conflicts === null || observation.error !== null
+        ? null
+        : total.conflicts + observation.conflicts;
     total.denials += observation.denials;
     total.outsideChanges += observation.outsideChanges;
     total.verdicts.done += observation.verdicts.done;
@@ -45,6 +48,7 @@ export function scoreOf(candidate: string, observations: ProbeObservation[]): Pr
     total.tokens += observation.tokens;
     return total;
   }, emptyScore(candidate));
+  if (own.length === 0) score.conflicts = null;
   const comparable = score.finished - score.errors;
   score.cleanRate = comparable === 0 ? 0 : score.clean / comparable;
   return score;
@@ -133,7 +137,7 @@ function decide(
     );
     return {
       winner,
-      reason: `variant \`${winner}\` delivered cleanly more often than \`${baseline}\`${unchecked}`,
+      reason: `variant \`${winner}\` would apply cleanly more often than \`${baseline}\`${unchecked}`,
     };
   }
   const worse = versus.filter((entry) => entry.significant && entry.losses > entry.wins);
@@ -155,7 +159,7 @@ function decide(
 }
 
 /**
- * Compares the probes by the objective signal only: a clean delivery on the same base weighs more
+ * Compares the probes by the objective signal only: a clean check on the same base weighs more
  * than any verdict, and a difference counts only when the exact sign test trusts it. A probe whose
  * check failed decides no pair; a budget that ran out makes the experiment inconclusive instead of
  * quietly widening it.
@@ -228,6 +232,7 @@ export function compareExperiment(
     versus,
     winner,
     overBudget: status === 'budget_exhausted',
+    observations,
   });
   return { status, observations, scores, versus, winner, reason, spent, proposal };
 }

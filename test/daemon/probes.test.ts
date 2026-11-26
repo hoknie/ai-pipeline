@@ -170,6 +170,10 @@ describe('contrast probes of a run', () => {
     expect(shown.comparison.scores.map((score) => score.clean)).toEqual([1, 1]);
     expect(shown.comparison.versus[0]).toMatchObject({ pairs: 1, ties: 1, significant: false });
     expect(shown.comparison.winner).toBeNull();
+    expect(shown.proposalPath).not.toBeNull();
+    const proposal = readFileSync(shown.proposalPath!, 'utf8');
+    expect(proposal).toContain('no change');
+    for (const run of started.experiment.runs) expect(proposal).toContain(run.runId);
     // The proposal of a finished experiment is only text: nothing is applied or delivered.
     await h.call('contrast_show', { id: started.experiment.id });
     expect(git(h.repo, 'status', '--porcelain')).toBe('');

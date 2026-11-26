@@ -193,6 +193,7 @@ function createRuns(context: Context, lower: Lower) {
     registryProject: ports.registryProject.port,
     commits: ports.commits.port,
     push: ports.push.port,
+    stats: ports.stats.port,
     agentExit: processes,
   });
   return { runs, processes };

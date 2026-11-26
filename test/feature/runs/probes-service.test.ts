@@ -14,6 +14,8 @@ import {
   type RunState,
 } from '../../../src/feature/runs/types/index.ts';
 import type { ConfigService } from '../../../src/feature/swarm-config/services/index.ts';
+import type { RunStatsPort } from '../../../src/feature/runs/ports/stats/index.ts';
+import { formatProbe } from '../../../src/presentation/format/probe/probe.ts';
 
 import { CONFIG_TEXT, config as parse, group, run } from './helpers.ts';
 
@@ -27,13 +29,15 @@ const ATTACHMENT = { id: 'a1', fileName: 'task.md', size: 4, mediaType: 'text/ma
 class MemoryStore implements ProbeStore {
   readonly experiments = new Map<string, ProbeExperiment>();
   readonly proposals = new Map<string, string>();
+  proposalWrites = 0;
 
   save(experiment: ProbeExperiment): void {
     this.experiments.set(experiment.id, experiment);
   }
 
   load(id: string): ProbeExperiment | null {
-    return this.experiments.get(id) ?? null;
+    const experiment = this.experiments.get(id);
+    return experiment ? structuredClone(experiment) : null;
   }
 
   list(): ProbeExperiment[] {
@@ -41,6 +45,7 @@ class MemoryStore implements ProbeStore {
   }
 
   writeProposal(id: string, markdown: string): string {
+    this.proposalWrites += 1;
     this.proposals.set(id, markdown);
     return `/state/probes/${id}.md`;
   }
@@ -121,7 +126,7 @@ class FakeLauncher implements ProbeLauncher {
   }
 }
 
-function setup(launcherOptions: LauncherOptions = {}, check?: ProbeCheck) {
+function setup(launcherOptions: LauncherOptions = {}, check?: ProbeCheck, stats?: RunStatsPort) {
   const store = new MemoryStore();
   const states = new FakeStates();
   const launcher = new FakeLauncher(states, launcherOptions);
@@ -151,6 +156,7 @@ function setup(launcherOptions: LauncherOptions = {}, check?: ProbeCheck) {
     check: probeCheck,
     engine,
     now: () => 1000,
+    stats: stats ?? { capture: async () => {}, read: () => ({ attempts: [], wallMs: null }) },
   });
   return { store, states, launcher, probes, engine };
 }
@@ -329,6 +335,308 @@ describe('the probes of a run', () => {
     const again = await probes.show(started.experiment.id);
     expect(again.proposalPath).toBe(view.proposalPath);
     expect(store.proposals.size).toBe(1);
+    expect(store.proposalWrites).toBe(1);
+  });
+
+  it('publishes only once when two views check the same experiment concurrently', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let entered = 0;
+    let bothEntered!: () => void;
+    const both = new Promise<void>((resolve) => {
+      bothEntered = resolve;
+    });
+    const check: ProbeCheck = async () => {
+      entered += 1;
+      if (entered === 2) bothEntered();
+      await gate;
+      return { applied: true, conflicts: [] };
+    };
+    const { probes, launcher, store, states } = setup({}, check);
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    const first = probes.show(started.experiment.id);
+    const second = probes.show(started.experiment.id);
+    await both;
+    release();
+    const views = await Promise.all([first, second]);
+    expect(views[0]!.proposalPath).not.toBeNull();
+    expect(views[1]!.proposalPath).toBe(views[0]!.proposalPath);
+    expect(store.proposalWrites).toBe(1);
+  });
+
+  it('waits for delayed statistics capture before writing the final proposal', async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let ready = false;
+    const stats: RunStatsPort = {
+      capture: async () => {
+        entered();
+        await gate;
+        ready = true;
+      },
+      read: (runId) => ({
+        attempts: ready
+          ? [
+              {
+                runId,
+                group: 'group-1',
+                seq: 1,
+                durationMs: 1234,
+                inputTokens: 456,
+                outputTokens: 78,
+              },
+            ]
+          : [],
+        wallMs: ready ? 2345 : null,
+      }),
+    };
+    const { probes, launcher, store, states } = setup({}, undefined, stats);
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    for (const id of launcher.created) {
+      const work = group(states.lookup(id)!);
+      work.attempts.push({
+        seq: 1,
+        status: 'done',
+        stepId: 'code',
+        round: 1,
+        usage: { inputTokens: 456, outputTokens: 78 },
+      } as never);
+    }
+    const pending = probes.show(started.experiment.id);
+    await waiting;
+    expect(store.proposalWrites).toBe(0);
+    expect(store.load(started.experiment.id)?.proposalPath).toBeNull();
+    release();
+    const first = await pending;
+    const again = await probes.show(started.experiment.id);
+    expect(first.proposalPath).not.toBeNull();
+    expect(again.proposalPath).toBe(first.proposalPath);
+    expect(store.proposalWrites).toBe(1);
+    expect(store.proposals.get(started.experiment.id)).toContain('1,234');
+    expect(store.proposals.get(started.experiment.id)).toContain('456');
+    expect(store.proposals.get(started.experiment.id)).toContain('78');
+  });
+
+  it('does not mistake journal placeholder zeros for candidate token savings', async () => {
+    const stats: RunStatsPort = {
+      capture: async () => {},
+      read: (runId) => ({
+        attempts: [
+          {
+            runId,
+            group: 'group-1',
+            seq: 1,
+            durationMs: 100,
+            inputTokens: runId.includes('strong') ? 0 : 10,
+            outputTokens: 0,
+          },
+        ],
+        wallMs: 100,
+      }),
+    };
+    const { probes, launcher, store, states } = setup(
+      {},
+      async () => ({ applied: true, conflicts: [] }),
+      stats,
+    );
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    for (const id of launcher.created) {
+      group(states.lookup(id)!).attempts.push({
+        seq: 1,
+        status: 'finished',
+        stepId: 'code',
+        round: 1,
+        ...(id.includes('strong') ? {} : { usage: { inputTokens: 10, outputTokens: 0 } }),
+      } as never);
+    }
+    const view = await probes.show(started.experiment.id);
+    const markdown = store.proposals.get(started.experiment.id)!;
+    expect(view.proposalPath).not.toBeNull();
+    expect(markdown).toContain('| Input tokens | 10 | unknown |');
+    expect(markdown).toContain('| Output tokens | 0 | unknown |');
+    expect(markdown).toMatch(/`strong`:.*tokens unknown/);
+    expect(markdown).toContain('measured tokens unknown');
+    expect(markdown).not.toMatch(/`strong`:.*tokens 0(?:\D|$)/);
+    expect(markdown).not.toMatch(/budget:.*\b\d+ tokens/);
+    expect(markdown).not.toContain('## use variant');
+    expect(markdown).not.toContain('tokens favors candidate');
+    expect(markdown).toContain('Pair signal: **baseline**');
+    expect(view.comparison.winner).toBeNull();
+    const cli = formatProbe(view);
+    expect(cli).toMatch(/`strong`:.*tokens unknown/);
+    expect(cli).toContain('spent unknown token(s)');
+    expect(cli).not.toMatch(/`strong`:.*tokens 0(?:\D|$)|spent 0 token\(s\)/);
+  });
+
+  it('reports measured zero in candidate and budget summaries', async () => {
+    const stats: RunStatsPort = {
+      capture: async () => {},
+      read: (runId) => ({
+        attempts: [
+          { runId, group: 'group-1', seq: 1, durationMs: 100, inputTokens: 0, outputTokens: 0 },
+        ],
+        wallMs: 100,
+      }),
+    };
+    const { probes, launcher, store, states } = setup({}, undefined, stats);
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    for (const id of launcher.created) {
+      group(states.lookup(id)!).attempts.push({
+        seq: 1,
+        status: 'finished',
+        stepId: 'code',
+        round: 1,
+        usage: { inputTokens: 0, outputTokens: 0 },
+      } as never);
+    }
+    const view = await probes.show(started.experiment.id);
+    const markdown = store.proposals.get(started.experiment.id)!;
+    expect(markdown).toMatch(/`strong`:.*tokens 0/);
+    expect(markdown).toMatch(/budget:.* 0 tokens/);
+    expect(markdown).not.toContain('measured tokens unknown');
+    expect(formatProbe(view)).toMatch(/`strong`:.*tokens 0/);
+    expect(formatProbe(view)).toContain('spent 0 token(s)');
+  });
+
+  it('formats missing and mixed attempt usage as unknown, not the accounted minimum', async () => {
+    const stats: RunStatsPort = {
+      capture: async () => {},
+      read: (runId) => ({
+        attempts: [1, 2].map((seq) => ({
+          runId,
+          group: 'group-1',
+          seq,
+          durationMs: 100,
+          inputTokens: seq === 1 ? 7 : 0,
+          outputTokens: 0,
+        })),
+        wallMs: 200,
+      }),
+    };
+    const { probes, launcher, store, states } = setup({}, undefined, stats);
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    for (const id of launcher.created) {
+      const attempts = group(states.lookup(id)!).attempts;
+      attempts.push({
+        seq: 1,
+        status: 'finished',
+        stepId: 'code',
+        round: 1,
+        ...(id.includes('strong') ? {} : { usage: { inputTokens: 7, outputTokens: 0 } }),
+      } as never);
+      attempts.push({ seq: 2, status: 'finished', stepId: 'code', round: 1 } as never);
+    }
+    const view = await probes.show(started.experiment.id);
+    const cli = formatProbe(view);
+    expect(view.comparison.spent.tokens).toBe(7);
+    expect(cli).toMatch(/`default` \(baseline\):.*tokens unknown/);
+    expect(cli).toMatch(/`strong`:.*tokens unknown/);
+    expect(cli).toContain('spent unknown token(s)');
+    expect(cli).not.toMatch(/tokens (?:0|7)(?:\D|$)|spent (?:0|7) token\(s\)/);
+    const markdown = store.proposals.get(started.experiment.id)!;
+    expect(markdown).toMatch(/`default`:.*tokens unknown/);
+    expect(markdown).toMatch(/`strong`:.*tokens unknown/);
+    expect(markdown).toContain('measured tokens unknown');
+  });
+
+  it('publishes unknown measurements if statistics capture fails', async () => {
+    const stats: RunStatsPort = {
+      capture: async () => {
+        throw new Error('journal unavailable');
+      },
+      read: () => {
+        throw new Error('unexpected read');
+      },
+    };
+    const { probes, launcher, store, states } = setup({}, undefined, stats);
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    const view = await probes.show(started.experiment.id);
+    expect(view.proposalPath).not.toBeNull();
+    expect(store.proposals.get(started.experiment.id)).toContain('unknown');
+    expect(store.proposalWrites).toBe(1);
+  });
+
+  it('does not publish or overwrite newly created runs from a stale view', async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const check: ProbeCheck = async () => {
+      entered();
+      await gate;
+      return { applied: true, conflicts: [] };
+    };
+    const { probes, launcher, store, states, engine } = setup({}, check);
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 2,
+      maxRuns: 4,
+    });
+    finishProbes(states, launcher);
+    engine.stopping = true;
+    const stale = probes.show(started.experiment.id);
+    await waiting;
+    engine.stopping = false;
+    await probes.advance();
+    expect(store.load(started.experiment.id)?.runs).toHaveLength(4);
+    release();
+    const view = await stale;
+    expect(view.experiment.runs).toHaveLength(4);
+    expect(store.load(started.experiment.id)?.runs).toHaveLength(4);
+    expect(store.proposalWrites).toBe(0);
+    finishProbes(states, launcher);
+    const complete = await probes.show(started.experiment.id);
+    expect(complete.proposalPath).not.toBeNull();
+    expect(store.proposalWrites).toBe(1);
   });
 
   it('keeps an experiment without a winner when its tokens ran over the budget', async () => {
@@ -354,6 +662,32 @@ describe('the probes of a run', () => {
     expect(view.comparison.proposal?.what).toBe(
       'no change: the experiment ran over its token budget',
     );
+  });
+
+  it('waits for every created probe before saving a budget-exhausted proposal', async () => {
+    const { probes, launcher, states, store } = setup();
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 2,
+      maxRuns: 4,
+      maxTokens: 10,
+    });
+    await settle(probes, states, launcher);
+    expect(launcher.created).toHaveLength(4);
+    const completed = run(1, { id: launcher.created[2] });
+    group(completed).status = 'merged';
+    group(completed).attempts.push({ usage: { inputTokens: 11, outputTokens: 0 } } as never);
+    states.states.set(launcher.created[2]!, completed);
+    const unfinished = await probes.show(started.experiment.id);
+    expect(unfinished.status).toBe('budget_exhausted');
+    expect(unfinished.proposalPath).toBeNull();
+    expect(store.proposalWrites).toBe(0);
+    finishProbes(states, launcher);
+    const finished = await probes.show(started.experiment.id);
+    expect(finished.proposalPath).not.toBeNull();
+    expect(store.proposalWrites).toBe(1);
+    expect(store.proposals.get(started.experiment.id)).not.toContain('Insufficient pair data');
   });
 
   it('stops creating probes before the next repetition when the tokens reached the limit', async () => {
@@ -406,7 +740,7 @@ describe('the probes of a run', () => {
       if (state.run.id.includes('strong')) throw new Error('the base commit is gone');
       return { applied: true, conflicts: [] };
     };
-    const { probes, launcher, states } = setup({}, failing);
+    const { probes, launcher, states, store } = setup({}, failing);
     const started = await probes.start({
       runId: 'source',
       candidates: ['default', 'strong'],
@@ -419,5 +753,56 @@ describe('the probes of a run', () => {
     expect(view.comparison.winner).toBeNull();
     expect(view.comparison.scores[1]).toMatchObject({ errors: 6 });
     expect(view.comparison.reason).toContain('could not be checked');
+    const markdown = store.proposals.get(started.experiment.id)!;
+    expect(markdown).toContain(
+      '`strong`: clean 0/0 (unknown; checked probes only), conflicts unknown',
+    );
+    expect(markdown).toContain('`default`: clean 6/6 (100%; checked probes only), conflicts 0');
+    expect(markdown).toContain('the base commit is gone');
+    expect(markdown).not.toContain('clean 0/0 (0%');
+    expect(markdown).not.toContain('use variant');
+  });
+
+  it('preserves unknown conflicts across mixed successful and failed checks', async () => {
+    const check: ProbeCheck = async (state) => {
+      if (state.run.id === 'probe-strong-4') throw new Error('check unavailable');
+      return { applied: true, conflicts: [] };
+    };
+    const { probes, launcher, states, store } = setup({}, check);
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 2,
+      maxRuns: 4,
+    });
+    await settleAll(probes, states, launcher, 2);
+    const view = await probes.show(started.experiment.id);
+    expect(view.comparison.scores[1]).toMatchObject({ errors: 1, conflicts: null });
+    const markdown = store.proposals.get(started.experiment.id)!;
+    expect(markdown).toContain(
+      '`strong`: clean 1/1 (100%; checked probes only), conflicts unknown',
+    );
+    expect(markdown).toContain('check unavailable');
+    expect(markdown).not.toContain('use variant');
+  });
+
+  it('does not report zero conflicts or a zero percentage when both checks throw', async () => {
+    const { probes, launcher, states, store } = setup({}, async () => {
+      throw new Error('check unavailable');
+    });
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    const view = await probes.show(started.experiment.id);
+    expect(view.comparison.scores.map((score) => score.conflicts)).toEqual([null, null]);
+    const markdown = store.proposals.get(started.experiment.id)!;
+    expect(markdown).toContain('check unavailable');
+    expect(markdown).toContain('conflicts unknown');
+    expect(markdown).toContain('clean 0/0 (unknown; checked probes only)');
+    expect(markdown).not.toMatch(/conflicts 0|clean 0\/0 \(0%|use variant/);
   });
 });

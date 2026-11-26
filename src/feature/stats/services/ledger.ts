@@ -66,6 +66,11 @@ export class StatsLedger {
     return this.tail;
   }
 
+  /** Reads the records currently in the journal, which can lag behind a saved run. */
+  read(runId: string) {
+    return this.dependencies.records.read(runId);
+  }
+
   /**
    * Moves the history into the journal once, when collection is on for the first time. Safe to
    * call again: it does nothing after the move.

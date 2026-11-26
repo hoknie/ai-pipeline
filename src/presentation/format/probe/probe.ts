@@ -1,4 +1,9 @@
-import type { ProbeScore, ProbeVersus, ProbeView } from '../../ipc/contract/index.ts';
+import type {
+  ProbeObservation,
+  ProbeScore,
+  ProbeVersus,
+  ProbeView,
+} from '../../ipc/contract/index.ts';
 import { type Style, plainStyle } from '../style.ts';
 
 function percent(rate: number): string {
@@ -6,10 +11,31 @@ function percent(rate: number): string {
 }
 
 /** The objective signal of one candidate, e.g. `clean 2/3 (67%), conflicts 0, denials 1`. */
-function signalLine(score: ProbeScore, baseline: boolean): string {
+function measuredTokens(observations: ProbeObservation[]): number | null {
+  if (observations.length === 0) return null;
+  let total = 0;
+  for (const observation of observations) {
+    const summary = observation.summary;
+    if (!observation.finished || summary?.inputTokens == null || summary.outputTokens == null)
+      return null;
+    total += summary.inputTokens + summary.outputTokens;
+  }
+  return total;
+}
+
+function signalLine(
+  score: ProbeScore,
+  baseline: boolean,
+  observations: ProbeObservation[],
+): string {
   const mark = baseline ? ' (baseline)' : '';
   const errors = score.errors === 0 ? '' : `, check errors ${score.errors}`;
-  return `\`${score.candidate}\`${mark}: clean ${score.clean}/${score.finished - score.errors} (${percent(score.cleanRate)}), conflicts ${score.conflicts}, denials ${score.denials}, outside changes ${score.outsideChanges}${errors}, tokens ${score.tokens}`;
+  const checked = score.finished - score.errors;
+  const rate = checked === 0 ? 'unknown' : percent(score.cleanRate);
+  const tokens = measuredTokens(
+    observations.filter((entry) => entry.candidate === score.candidate),
+  );
+  return `\`${score.candidate}\`${mark}: clean ${score.clean}/${checked} (${rate}; checked probes only), conflicts ${score.conflicts ?? 'unknown'}, denials ${score.denials}, outside changes ${score.outsideChanges}${errors}, tokens ${tokens ?? 'unknown'}`;
 }
 
 /** One paired comparison with the baseline and why it does or does not count. */
@@ -21,7 +47,7 @@ function versusLine(entry: ProbeVersus): string {
 function budgetLine(view: ProbeView): string {
   const { experiment, comparison } = view;
   const tokens = experiment.budget.maxTokens === null ? '' : ` of ${experiment.budget.maxTokens}`;
-  return `Created ${comparison.spent.runs}/${experiment.planned} planned run(s), limit ${experiment.budget.maxRuns}; spent ${comparison.spent.tokens} token(s)${tokens}`;
+  return `Created ${comparison.spent.runs}/${experiment.planned} planned run(s), limit ${experiment.budget.maxRuns}; spent ${measuredTokens(comparison.observations) ?? 'unknown'} token(s)${tokens}`;
 }
 
 /** The experiment, its objective signals, the comparison and the proposal it reaches. */
@@ -33,7 +59,9 @@ export function formatProbe(view: ProbeView, style: Style = plainStyle): string 
     `Source: run ${experiment.sourceRun}, group ${style.accent(experiment.sourceGroup)}, base ${experiment.baseCommit}`,
     `Candidates: ${experiment.candidates.map((candidate) => `\`${candidate}\``).join(', ')} · ${experiment.repetitions} repetition(s) each · baseline \`${baseline}\``,
     budgetLine(view),
-    ...comparison.scores.map((score) => `  ${signalLine(score, score.candidate === baseline)}`),
+    ...comparison.scores.map(
+      (score) => `  ${signalLine(score, score.candidate === baseline, comparison.observations)}`,
+    ),
   ];
   if (comparison.versus.length > 0) {
     lines.push('Comparison:');
