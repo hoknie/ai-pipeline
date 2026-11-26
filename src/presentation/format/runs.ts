@@ -94,6 +94,10 @@ function skillsLine(run: RunView, style: Style): string[] {
   return [`${style.muted('Skills:')} ${skills}`];
 }
 
+function runMetadata(run: RunView, style: Style): string[] {
+  return [...skillsLine(run, style), ...deliveryBranchLine(run, style)];
+}
+
 export function formatRun(
   run: RunView,
   now: number,
@@ -117,7 +121,7 @@ export function formatRun(
             .join(', ')}`,
         ]
       : []),
-    ...skillsLine(run, style),
+    ...runMetadata(run, style),
     ...(run.tags && run.tags.length > 0
       ? [`${style.muted('Tags:')} ${formatTagLabels(run.tags, style)}`]
       : []),
@@ -173,6 +177,14 @@ export function formatRun(
     .filter((block) => block.length > 0)
     .map((block) => block.join('\n'))
     .join('\n\n');
+}
+
+function deliveryBranchLine(run: RunView, style: Style): string[] {
+  return run.deliveryBranch
+    ? [
+        `${style.muted('Delivery branch:')} ${run.deliveryBranch.name} (${run.deliveryBranch.strategy})`,
+      ]
+    : [];
 }
 
 /** The table of the groups of a run. */

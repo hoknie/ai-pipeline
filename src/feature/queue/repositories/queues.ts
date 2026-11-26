@@ -111,8 +111,8 @@ export class QueueRepository {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, inherit_tags, skip_json, delivery_mode, run_id, postponed, number, variant, global_position, provider, author_id, created_by_system)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, inherit_tags, skip_json, delivery_mode, run_id, postponed, number, variant, global_position, provider, author_id, created_by_system, delivery_branch_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) => {
         this.links.replaceSource(
@@ -144,6 +144,7 @@ export class QueueRepository {
           item.provider,
           item.author,
           item.createdBySystem ? 1 : 0,
+          json(item.deliveryBranch ?? null),
         );
       });
     }
@@ -278,6 +279,7 @@ function hydrateItem(item: Row, after: string[]): QueueItem {
         ? null
         : Number(item.auto_deliver) === 1,
     deliveryMode: DELIVERY_MODES.find((mode) => mode === item.delivery_mode) ?? null,
+    deliveryBranch: nullable(item.delivery_branch_json ?? null),
     tags: item.tags_json ? parse(item.tags_json) : [],
     inheritTags: Number(item.inherit_tags ?? 1) === 1,
     skip: item.skip_json ? parse(item.skip_json) : [],

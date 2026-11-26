@@ -168,6 +168,7 @@ function itemView(
     title: item.title,
     autoDeliver: item.autoDeliver,
     deliveryMode: item.deliveryMode,
+    deliveryBranch: item.deliveryBranch ?? null,
     tags: tagViews(catalog, item.tags),
     inheritTags: item.inheritTags,
     skip: [...(item.run === null ? item.skip : (lookup(item.run)?.run.skippedSteps ?? []))],

@@ -36,6 +36,36 @@ function useRunDownload(run: RunView, api?: Api, onError?: (message: string) => 
   return { downloading, download };
 }
 
+function useBranchRow(run: RunView) {
+  const { t } = useTranslation();
+  const branch = run.deliveryBranch;
+  return branch
+    ? [
+        {
+          key: 'branch',
+          label: t('queue.form.deliveryBranch'),
+          value: t('queue.form.branchSelected', {
+            name: branch.name,
+            strategy: t(`queue.form.branchStrategy.${branch.strategy}`),
+          }),
+        },
+      ]
+    : [];
+}
+
+function SummaryRows({ rows }: { rows: { key: string; label: string; value: React.ReactNode }[] }) {
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 text-sm">
+      {rows.map((row) => (
+        <div key={row.key} className="contents">
+          <dt className="text-xs text-muted-foreground">{row.label}</dt>
+          <dd className="min-w-0 text-foreground tabular-nums">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** The summary block of a run: statuses, path, time and tokens. */
 export function RunSummary({
   run,
@@ -85,6 +115,7 @@ export function RunSummary({
       label: t('runs.header.summary.path'),
       value: <FilePath path={run.repository} variant="line" />,
     },
+    ...useBranchRow(run),
     {
       key: 'time',
       label: t('runs.header.summary.time'),
@@ -106,14 +137,7 @@ export function RunSummary({
       aria-label={t('runs.header.summary.label')}
       className="shrink-0 border-l pl-4 @3xl:w-[28rem]"
     >
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 text-sm">
-        {rows.map((row) => (
-          <div key={row.key} className="contents">
-            <dt className="text-xs text-muted-foreground">{row.label}</dt>
-            <dd className="min-w-0 text-foreground tabular-nums">{row.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <SummaryRows rows={rows} />
     </aside>
   );
 }

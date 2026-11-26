@@ -34,6 +34,11 @@ function queueKit(program: Command, io: CliIo, style: Style) {
         '--delivery-mode <mode>',
         `how the merged result is delivered: ${DELIVERY_MODES.join(', ')}; whatever delivery.mode says`,
       )
+      .option('--delivery-branch <name>', 'local target branch for automatic commit delivery')
+      .option(
+        '--delivery-branch-strategy <existing|create>',
+        'select an existing branch or create one',
+      )
       .option('--attach <path>', 'file to attach to the task; repeat for several', collect)
       .option('--tag <name>', 'tag of the task; repeat for several', collect)
       .option(

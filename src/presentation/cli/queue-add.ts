@@ -10,6 +10,7 @@ import {
   checkTitle,
   collect,
   parseDeliveryMode,
+  parseDeliveryBranch,
   parseNotes,
   readGroups,
   withDuplicateHint,
@@ -47,6 +48,10 @@ function checkRepos(options: AddOptions, several: boolean): void {
 function taskFields(pipeline: string, options: AddOptions) {
   checkTitle(options.title);
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
+  const deliveryBranch = parseDeliveryBranch(
+    options.deliveryBranch,
+    options.deliveryBranchStrategy,
+  );
   const links = linkInputsOf(options, {
     after: options.after !== undefined,
     parent: typeof options.parent === 'string',
@@ -58,6 +63,7 @@ function taskFields(pipeline: string, options: AddOptions) {
     ...(options.title !== undefined ? { title: options.title } : {}),
     ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
     ...(deliveryMode !== undefined ? { deliveryMode } : {}),
+    ...(deliveryBranch !== undefined ? { deliveryBranch } : {}),
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
     ...(typeof options.provider === 'string' ? { provider: options.provider } : {}),
     ...(options.provider === false ? { provider: null } : {}),

@@ -145,7 +145,33 @@ export function cancelDelivery(state: RunState): void {
   state.run.pendingDelivery = null;
 }
 
+/** A target is used by automatic delivery or any request retrying a failed target group. */
+export function targetDelivery(state: RunState): boolean {
+  const { run } = state;
+  const pending = run.pendingDelivery;
+  if (
+    !run.config.delivery.auto ||
+    run.config.delivery.mode !== 'commit' ||
+    !run.deliveryBranch ||
+    !pending
+  )
+    return false;
+  return (
+    pending.auto ||
+    (pending.groups.length > 0 &&
+      pending.groups.some((slug) =>
+        state.groups.some(
+          (group) =>
+            group.slug === slug &&
+            group.delivery.state === 'apply_failed' &&
+            (group.delivery as GroupDelivery & { targetAttempt?: boolean }).targetAttempt === true,
+        ),
+      ))
+  );
+}
+
 function shouldResolve(state: RunState, pending: PendingDelivery, result: DeliveryResult): boolean {
+  if (targetDelivery(state)) return false;
   // An observer repairs a delivery once: there are no resolver rounds.
   if (pending.repair) return false;
   const { resolver, resolverRounds } = state.run.config.delivery;
@@ -226,6 +252,7 @@ export function finishDelivery(
 ): DeliveryEffect[] {
   const pending = state.run.pendingDelivery;
   if (!pending) return [];
+  const usedTarget = targetDelivery(state);
   if (shouldResolve(state, pending, result)) {
     pending.round = (pending.round ?? 0) + 1;
     if (result.kind === 'refused' && result.files.length > 0) pending.conflicts = result.files;
@@ -243,6 +270,7 @@ export function finishDelivery(
     group.delivery = {
       ...deliveryOf(outcome, now),
       ...(outcome.kind === 'applied' ? { message: pending.message ?? null } : {}),
+      ...(outcome.kind !== 'applied' && usedTarget ? { targetAttempt: true } : {}),
     };
   }
   // The split result travels with the first delivery and is not applied again: a later delivery

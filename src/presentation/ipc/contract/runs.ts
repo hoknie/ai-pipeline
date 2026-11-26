@@ -1,7 +1,7 @@
 import { isAbsolute } from 'node:path';
 
 import { RUN_TITLE_LIMIT } from '../../../feature/agents/types/index.ts';
-import { HARNESSES } from '../../../feature/runs/types/index.ts';
+import { HARNESSES, validDeliveryBranchName } from '../../../feature/runs/types/index.ts';
 import { DELIVERY_MODES } from '../../../feature/swarm-config/types/index.ts';
 import { TAG_NAME_LIMIT } from '../../../feature/tags/types/index.ts';
 import { z } from 'zod';
@@ -47,6 +47,16 @@ export const afterIds = z.array(z.string().min(1)).max(50);
 
 export const deliveryModeSchema = z.enum(DELIVERY_MODES);
 
+/** An explicit local branch for automatic commit delivery. */
+export const deliveryBranchSchema = z
+  .object({
+    name: z
+      .string()
+      .refine(validDeliveryBranchName, { message: 'must be a valid local Git branch name' }),
+    strategy: z.enum(['existing', 'create']),
+  })
+  .strict();
+
 /** Files to attach to a task: absolute paths the daemon can read, each with an optional name. */
 export const attachmentSources = z
   .array(z.object({ path: z.string().min(1), name: z.string().min(1).optional() }))
@@ -74,6 +84,7 @@ const runParams = z
     title: z.string().trim().min(1).max(RUN_TITLE_LIMIT).optional(),
     autoDeliver: z.boolean().optional(),
     deliveryMode: deliveryModeSchema.optional(),
+    deliveryBranch: deliveryBranchSchema.optional(),
     tags: tagNames.optional(),
     parent: parentRef.optional(),
     skip: skipSteps.optional(),

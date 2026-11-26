@@ -23,8 +23,10 @@ import {
   filesWithMarkers,
   prepareResolve,
   deliver,
+  deliverToTarget,
   ensureWorktree,
   mergeBranch,
+  observeGit,
   prepareRunBranch,
   runWorktreeRoot,
   type DeliveryRequest,
@@ -40,6 +42,7 @@ const RUN = 'refs/aip/run000000003/run';
 async function setup(
   edit: (tree: string) => void,
   include: string[] = [],
+  beforeSnapshot?: (repo: string) => void,
 ): Promise<{ repo: string; change: GroupChange }> {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-deliver-test-')));
   const repo = join(base, 'repo');
@@ -55,6 +58,7 @@ async function setup(
   sh(repo, 'commit', '-q', '-m', 'base');
   mkdirSync(join(repo, 'plans'));
   writeFileSync(join(repo, 'plans', 'plan.md'), 'plan\n');
+  beforeSnapshot?.(repo);
   await prepareRunBranch(repo, RUN, { workingTree: true, include, snapshotRef: null });
   const root = runWorktreeRoot(join(base, 'work'), 'run000000003');
   const runTree = await ensureWorktree(repo, join(root, RUN_WORKTREE), RUN, null);
@@ -131,6 +135,215 @@ function request(
 }
 
 const editApp = (tree: string) => writeFileSync(join(tree, 'app.ts'), 'one\nTWO\nthree\n');
+
+describe('delivery to a target branch', () => {
+  it('creates from the source tip without touching the working copy or its staged changes', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'other.ts'), 'source advance\n');
+    sh(repo, 'commit', '-qam', 'advance');
+    const tip = sh(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'notes.md'), 'staged\n');
+    sh(repo, 'add', 'notes.md');
+    const before = sh(repo, 'status', '--porcelain');
+    const result = await deliverToTarget({
+      ...request(repo, change),
+      base,
+      sourceCommit: base,
+      sourceBranch: 'main',
+      target: { name: 'feature/test', strategy: 'create' },
+    });
+    expect(result).toMatchObject({ kind: 'applied', commit: expect.any(String) });
+    expect(sh(repo, 'rev-parse', 'feature/test^')).toBe(tip);
+    expect(sh(repo, 'show', 'feature/test:app.ts')).toContain('TWO');
+    expect(sh(repo, 'status', '--porcelain')).toBe(before);
+    expect(sh(repo, 'rev-parse', 'HEAD')).toBe(tip);
+  });
+
+  it('advances an existing free branch with one commit and leaves HEAD untouched', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    sh(repo, 'branch', 'target');
+    const calls: string[][] = [];
+    observeGit(({ args }) => calls.push(args));
+    let result;
+    try {
+      result = await deliverToTarget({
+        ...request(repo, change),
+        base,
+        sourceCommit: base,
+        sourceBranch: 'main',
+        target: { name: 'target', strategy: 'existing' },
+      });
+    } finally {
+      observeGit(null);
+    }
+    expect(calls.some((args) => args[0] === 'branch' && args.includes('-f'))).toBe(false);
+    expect(result).toMatchObject({ kind: 'applied', commit: expect.any(String) });
+    expect(sh(repo, 'rev-parse', 'target^')).toBe(base);
+    expect(sh(repo, 'rev-parse', 'HEAD')).toBe(base);
+    expect(sh(repo, 'show', 'target:app.ts')).toContain('TWO');
+    expect(sh(repo, 'status', '--porcelain')).toBe('');
+  });
+
+  it('refuses a target whose history does not contain the source commit', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    const unrelated = sh(repo, 'commit-tree', `${base}^{tree}`, '-m', 'unrelated');
+    sh(repo, 'update-ref', 'refs/heads/target', unrelated);
+    const result = await deliverToTarget({
+      ...request(repo, change),
+      base,
+      sourceCommit: base,
+      sourceBranch: 'main',
+      target: { name: 'target', strategy: 'existing' },
+    });
+    expect(result).toMatchObject({ kind: 'refused', reason: expect.stringContaining('descend') });
+    expect(sh(repo, 'rev-parse', 'target')).toBe(unrelated);
+    expect(sh(repo, 'rev-parse', 'HEAD')).toBe(base);
+  });
+
+  it('refuses conflicts even with force and rejects an occupied worktree', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    sh(repo, 'branch', 'target');
+    const tree = join(repo, '..', 'target');
+    sh(repo, 'worktree', 'add', '-q', tree, 'target');
+    const req = {
+      ...request(repo, change),
+      base,
+      sourceCommit: base,
+      sourceBranch: 'main',
+      target: { name: 'target', strategy: 'existing' as const },
+      force: true,
+    };
+    expect(await deliverToTarget(req)).toMatchObject({
+      kind: 'refused',
+      reason: expect.stringContaining('checked out'),
+    });
+    writeFileSync(join(tree, 'app.ts'), 'one\nconflict\nthree\n');
+    sh(tree, 'commit', '-qam', 'conflict');
+    sh(repo, 'worktree', 'remove', tree);
+    const tip = sh(repo, 'rev-parse', 'target');
+    expect(await deliverToTarget(req)).toMatchObject({
+      kind: 'refused',
+      files: ['app.ts'],
+      conflict: true,
+    });
+    expect(sh(repo, 'rev-parse', 'target')).toBe(tip);
+  });
+
+  it('refuses a concurrent branch update instead of overwriting it', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    sh(repo, 'branch', 'target');
+    const other = sh(repo, 'commit-tree', `${base}^{tree}`, '-p', base, '-m', 'concurrent');
+    observeGit(({ args }) => {
+      if (args[0] === 'update-ref' && args[1] === '--stdin') {
+        observeGit(null);
+        sh(repo, 'update-ref', 'refs/heads/target', other, base);
+      }
+    });
+    try {
+      const result = await deliverToTarget({
+        ...request(repo, change),
+        base,
+        sourceCommit: base,
+        sourceBranch: 'main',
+        target: { name: 'target', strategy: 'existing' },
+      });
+      expect(result).toMatchObject({ kind: 'refused', reason: expect.stringContaining('changed') });
+      expect(sh(repo, 'rev-parse', 'target')).toBe(other);
+    } finally {
+      observeGit(null);
+    }
+  });
+
+  it('creates the branch even if there are no changes to apply', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    const result = await deliverToTarget({
+      ...request(repo, change),
+      changes: [],
+      base,
+      sourceCommit: base,
+      sourceBranch: 'main',
+      target: { name: 'empty', strategy: 'create' },
+    });
+    expect(result).toMatchObject({ kind: 'applied', commit: expect.any(String) });
+    expect(sh(repo, 'rev-parse', 'empty^')).toBe(base);
+  });
+
+  it('recovers an interrupted delivery only for the same changes and a descendant branch', async () => {
+    const { repo, change } = await setup(editApp);
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    const req = {
+      ...request(repo, change),
+      base,
+      sourceCommit: base,
+      sourceBranch: 'main',
+      target: { name: 'recovery', strategy: 'create' as const },
+    };
+    const first = await deliverToTarget(req);
+    expect(first.kind).toBe('applied');
+    expect(await deliverToTarget(req)).toEqual(first);
+    const commit = sh(repo, 'rev-parse', 'recovery');
+    const next = sh(repo, 'commit-tree', `${commit}^{tree}`, '-p', commit, '-m', 'later');
+    sh(repo, 'update-ref', 'refs/heads/recovery', next, commit);
+    expect(await deliverToTarget(req)).toEqual(first);
+    expect(await deliverToTarget({ ...req, changes: [] })).toMatchObject({ kind: 'refused' });
+    sh(repo, 'update-ref', 'refs/heads/recovery', base, next);
+    expect(await deliverToTarget(req)).toMatchObject({
+      kind: 'refused',
+      reason: expect.stringContaining('no longer contains'),
+    });
+  });
+
+  it('uses the real source commit with an include snapshot and excludes include changes', async () => {
+    const { repo, change } = await setup(
+      (tree) => {
+        editApp(tree);
+        writeFileSync(join(tree, 'plans', 'plan.md'), 'agent plan\n');
+      },
+      ['plans/'],
+    );
+    const sourceCommit = sh(repo, 'rev-parse', 'HEAD');
+    const base = sh(repo, 'rev-parse', change.from);
+    expect(base).not.toBe(sourceCommit);
+    const result = await deliverToTarget({
+      ...request(repo, change),
+      base,
+      sourceCommit,
+      sourceBranch: 'main',
+      include: ['plans/'],
+      target: { name: 'snapshot', strategy: 'create' },
+    });
+    expect(result).toMatchObject({ kind: 'applied', files: ['app.ts'] });
+    expect(sh(repo, 'show', '--name-only', '--format=', 'snapshot')).toBe('app.ts');
+    expect(readFileSync(join(repo, 'plans', 'plan.md'), 'utf8')).toBe('plan\n');
+  });
+
+  it('does not deliver unrelated dirty files from a working-tree snapshot', async () => {
+    const { repo, change } = await setup(editApp, [], (dir) => {
+      writeFileSync(join(dir, 'other.ts'), 'private dirty change\n');
+      writeFileSync(join(dir, 'private.txt'), 'private untracked\n');
+    });
+    const sourceCommit = sh(repo, 'rev-parse', 'HEAD');
+    const base = sh(repo, 'rev-parse', change.from);
+    expect(base).not.toBe(sourceCommit);
+    const result = await deliverToTarget({
+      ...request(repo, change),
+      base,
+      sourceCommit,
+      sourceBranch: 'main',
+      target: { name: 'snapshot-dirty', strategy: 'create' },
+    });
+    expect(result).toMatchObject({ kind: 'applied', files: ['app.ts'] });
+    expect(sh(repo, 'show', '--name-only', '--format=', 'snapshot-dirty')).toBe('app.ts');
+    expect(sh(repo, 'show', 'snapshot-dirty:other.ts')).toBe('other');
+    expect(sh(repo, 'status', '--porcelain')).toContain('private.txt');
+  });
+});
 
 describe('delivery into the working tree', () => {
   it('leaves the changes uncommitted, without new commits, branches or staged files', async () => {

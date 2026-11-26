@@ -26,7 +26,7 @@ function queueSignature(view: QueueView): string {
     deliveryMode: view.deliveryMode,
     items: view.items.map((item) => [
       ...[item.id, item.readiness, item.after, item.postponed],
-      ...[item.links, item.linkedBy],
+      ...[item.links, item.linkedBy, item.deliveryBranch],
     ]),
   });
 }
@@ -41,7 +41,7 @@ function globalSignature(view: GlobalQueueView | null): string {
     skipped: view.skipped,
     items: view.items.map((item) => [
       ...[item.id, item.readiness, item.after, item.postponed],
-      ...[item.links, item.linkedBy],
+      ...[item.links, item.linkedBy, item.deliveryBranch],
       item.filtered,
       item.tags,
     ]),

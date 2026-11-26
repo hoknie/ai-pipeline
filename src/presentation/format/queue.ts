@@ -160,7 +160,10 @@ export function formatQueue(
         : item.autoDeliver
           ? ' · auto delivery'
           : ' · manual delivery') +
-      (item.deliveryMode === null ? '' : ` · delivery: ${item.deliveryMode}`);
+      (item.deliveryMode === null ? '' : ` · delivery: ${item.deliveryMode}`) +
+      (item.deliveryBranch
+        ? ` · delivery branch: ${item.deliveryBranch.name} (${item.deliveryBranch.strategy})`
+        : '');
     const variant = item.variant === 'default' ? '' : ` · variant: ${item.variant}`;
     const provider =
       item.provider === null

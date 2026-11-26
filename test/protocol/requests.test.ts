@@ -155,6 +155,7 @@ const SAMPLES: Record<Method, unknown> = {
   split: { token: 't', groups: [{ title: 'a', task: 'b' }] },
   worker_run_show: { token: 't', run: '#1' },
   repository_match: { remotes: ['git@github.com:a/b.git'] },
+  repository_branches: { repository: '/repo', query: 'feat' },
   auth_resolve: { session: 's' },
   auth_link_login: { code: 'c' },
   auth_logout: { session: 's' },
@@ -234,9 +235,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 158 methods, each in the request schema once', () => {
+  it('has 159 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(158);
+    expect(methods).toHaveLength(159);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -24,6 +24,7 @@ export interface QueueSettingsPatch {
 }
 
 export interface QueueApi {
+  branches(query: string, exact?: boolean): Promise<string[]>;
   /** The tag catalog of the repository of the client. */
   tags(): Promise<TagView[]>;
   /** Creates a tag (the daemon picks the color when none is given); returns the catalog. */
@@ -54,6 +55,8 @@ export interface QueueApi {
 
 export function queueApi(at: (path: string) => string): QueueApi {
   return {
+    branches: (query, exact) =>
+      call(at(`/api/repository/branches?query=${enc(query)}${exact ? '&exact=true' : ''}`)),
     tags: () => call(at('/api/tags')),
     addTag: (name, color) => post(at('/api/tags'), color ? { name, color } : { name }),
     editTag: (tag, patch) => post(at('/api/tags/edit'), { tag, ...patch }),

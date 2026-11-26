@@ -37,6 +37,8 @@ import type { QueueAdvance } from './advance.ts';
 import type { TaskLinks } from './links.ts';
 import type { QueueStore } from './store.ts';
 import type { TaskTags } from './task-tags.ts';
+import { ensureDeliveryTarget } from './target/target.ts';
+import { fields } from './target/fields.ts';
 
 export interface QueueItemsDependencies {
   store: QueueStore;
@@ -53,18 +55,6 @@ export interface QueueItemsDependencies {
   log?: (message: string) => void;
 }
 
-/** The fields of a new item without the tags, which are resolved separately. */
-function fields(
-  request: TaskFields & Pick<ItemFields, 'postponed' | 'author' | 'createdBySystem'>,
-): ItemFields {
-  const { pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode } = request;
-  const { skip, after, inheritTags, postponed, author, createdBySystem } = request;
-  return {
-    ...{ pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode },
-    ...{ skip, after, inheritTags, postponed, author, createdBySystem },
-  };
-}
-
 /** The tasks of a queue: added by the user or a specialist, and removed. */
 export class QueueItems {
   private readonly dependencies: QueueItemsDependencies;
@@ -79,6 +69,13 @@ export class QueueItems {
     const repository = await registry.rootOf(params.repository);
     registry.requireEnabled(repository);
     requireDeliveryMode(this.dependencies.config, params.deliveryMode);
+    await ensureDeliveryTarget(
+      this.dependencies.config,
+      repository,
+      params.deliveryBranch,
+      params.autoDeliver,
+      params.deliveryMode,
+    );
     const queue = store.of(repository);
     const moment = now();
     params = { ...params, provider: this.providerFor(repository, params.provider) };
@@ -237,6 +234,13 @@ export class QueueItems {
   ): Promise<QueueChange> {
     const { store, advance, tags, taskTags, links, now } = this.dependencies;
     this.dependencies.registry.requireEnabled(repository);
+    await ensureDeliveryTarget(
+      this.dependencies.config,
+      repository,
+      params.deliveryBranch,
+      params.autoDeliver,
+      params.deliveryMode,
+    );
     const queue = store.of(repository);
     const moment = now();
     params = { ...params, provider: this.providerFor(repository, params.provider) };

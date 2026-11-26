@@ -38,6 +38,9 @@ function editPayload(item: QueueItemView, fields: EditFields) {
     title: fields.title ?? null,
     autoDeliver: fields.autoDeliver ?? null,
     deliveryMode: fields.deliveryMode ?? null,
+    ...(item.deliveryBranch != null || fields.deliveryBranch !== undefined
+      ? { deliveryBranch: fields.deliveryBranch ?? null }
+      : {}),
     tags: fields.tags ?? [],
     skip: fields.skip ?? [],
     ...after,

@@ -73,6 +73,7 @@ export function projectsFields(
     ...(fields.allowDuplicate ? { allowDuplicate: true } : {}),
     ...(fields.autoDeliver !== undefined ? { autoDeliver: fields.autoDeliver } : {}),
     ...(fields.deliveryMode !== undefined ? { deliveryMode: fields.deliveryMode } : {}),
+    ...(fields.deliveryBranch !== undefined ? { deliveryBranch: fields.deliveryBranch } : {}),
     ...(fields.skip !== undefined && fields.skip.length > 0 ? { skip: fields.skip } : {}),
     ...((fields.links ?? []).some((link) => link.kind === 'blocked_by')
       ? {

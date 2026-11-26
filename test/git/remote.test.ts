@@ -80,7 +80,12 @@ describe('the remote of a repository', () => {
       snapshotRef: null,
       commit: fetched,
     });
-    expect(prepared).toEqual({ baseCommit: tip, dirty: false });
+    expect(prepared).toEqual({
+      baseCommit: tip,
+      dirty: false,
+      sourceCommit: null,
+      sourceBranch: null,
+    });
     expect(sh(repo, 'rev-parse', 'refs/aip/r1/run')).toBe(tip);
     expect(sh(repo, 'rev-parse', 'HEAD')).not.toBe(tip);
   });

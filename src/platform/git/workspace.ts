@@ -37,6 +37,9 @@ export async function repositoryRoot(directory: string): Promise<string> {
 
 export interface PreparedRun {
   baseCommit: string;
+  /** Local HEAD and its branch before a possible snapshot; null for an explicit remote base. */
+  sourceCommit: string | null;
+  sourceBranch: string | null;
   /** The repository has uncommitted changes that are not part of the run. */
   dirty: boolean;
 }
@@ -59,17 +62,37 @@ export async function prepareRunBranch(
   branch: string,
   base: RunBase = HEAD_BASE,
 ): Promise<PreparedRun> {
+  const sourceBranch = base.commit === undefined ? await currentBranch(repository) : null;
   const head = base.commit ?? (await git(repository, 'rev-parse', '--verify', 'HEAD^{commit}'));
   const dirty = (await git(repository, 'status', '--porcelain')) !== '';
   const baseCommit =
     base.workingTree || base.include.length > 0
-      ? await snapshotCommit(repository, base.workingTree, base.include)
+      ? await snapshotCommit(repository, base.workingTree, base.include, head)
       : head;
+  if (base.commit === undefined) {
+    const current = await git(repository, 'rev-parse', '--verify', 'HEAD^{commit}');
+    if (current !== head || (await currentBranch(repository)) !== sourceBranch) {
+      throw gitFailure('HEAD or its branch changed while preparing the run; retry');
+    }
+  }
   if (baseCommit !== head && base.snapshotRef !== null)
     await git(repository, 'update-ref', base.snapshotRef, baseCommit);
   if (isRef(branch)) await git(repository, 'update-ref', branch, baseCommit);
   else await git(repository, 'branch', branch, baseCommit);
-  return { baseCommit, dirty: dirty && !base.workingTree && base.commit === undefined };
+  return {
+    baseCommit,
+    sourceCommit: base.commit === undefined ? head : null,
+    sourceBranch,
+    dirty: dirty && !base.workingTree && base.commit === undefined,
+  };
+}
+
+async function currentBranch(repository: string): Promise<string | null> {
+  const result = await runGit(repository, ['symbolic-ref', '--quiet', 'HEAD'], {
+    allowFailure: true,
+  });
+  const ref = result.code === 0 ? result.stdout.trim() : '';
+  return ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : null;
 }
 
 /** Paths of `include` that exist in the directory, relative to it. */
@@ -89,17 +112,18 @@ export async function snapshotCommit(
   repository: string,
   workingTree: boolean,
   include: string[],
+  sourceCommit?: string,
 ): Promise<string> {
+  const head = sourceCommit ?? (await git(repository, 'rev-parse', '--verify', 'HEAD^{commit}'));
   const directory = mkdtempSync(join(tmpdir(), 'aip-snapshot-'));
   const env = { GIT_INDEX_FILE: join(directory, 'index') };
   try {
-    await runGit(repository, ['read-tree', 'HEAD'], { env });
+    await runGit(repository, ['read-tree', head], { env });
     if (workingTree) await runGit(repository, ['add', '-A'], { env });
     const extra = existingPaths(repository, include);
     if (extra.length > 0) await runGit(repository, ['add', '-A', '-f', '--', ...extra], { env });
     const tree = (await runGit(repository, ['write-tree'], { env })).stdout.trim();
-    const head = await git(repository, 'rev-parse', 'HEAD');
-    if (tree === (await git(repository, 'rev-parse', 'HEAD^{tree}'))) return head;
+    if (tree === (await git(repository, 'rev-parse', `${head}^{tree}`))) return head;
     return await git(
       repository,
       'commit-tree',
@@ -146,13 +170,7 @@ export async function excludeWorkspace(repository: string, workspace: string): P
   const path = relative(repository, workspace);
   if (path === '' || path.startsWith('..') || isAbsolute(path)) return false;
   const pattern = `/${path.split(sep).join('/')}/`;
-  const excludeFile = await git(
-    repository,
-    'rev-parse',
-    '--path-format=absolute',
-    '--git-path',
-    'info/exclude',
-  );
+  const excludeFile = await gitPath(repository, 'info/exclude');
   const current = existsSync(excludeFile) ? readFileSync(excludeFile, 'utf8') : '';
   if (current.split('\n').some((line) => line.trim() === pattern)) return false;
   mkdirSync(dirname(excludeFile), { recursive: true });
@@ -234,13 +252,8 @@ export async function mergeBranch(
   target: string | null = null,
 ): Promise<MergeResult> {
   const before = await git(runWorktree, 'rev-parse', 'HEAD');
-  const result = await runGit(
-    runWorktree,
-    ['merge', '--no-ff', '--no-edit', '-m', message, branch],
-    {
-      allowFailure: true,
-    },
-  );
+  const args = ['merge', '--no-ff', '--no-edit', '-m', message, branch];
+  const result = await runGit(runWorktree, args, { allowFailure: true });
   if (result.code === 0) {
     const after = await git(runWorktree, 'rev-parse', 'HEAD');
     if (target !== null && isRef(target)) await git(runWorktree, 'update-ref', target, after);
@@ -416,12 +429,7 @@ export async function hasRunLeftovers(plan: CleanPlan): Promise<boolean> {
       if (refs !== '') return true;
     }
     for (const branch of plan.groupBranches) {
-      const exists = await runGit(
-        plan.repository,
-        ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`],
-        { allowFailure: true },
-      );
-      if (exists.code === 0) return true;
+      if (await refExists(plan.repository, `refs/heads/${branch}`)) return true;
     }
     return false;
   } catch {
@@ -455,14 +463,7 @@ export async function cleanRun(plan: CleanPlan): Promise<string[]> {
   }
   const branches = plan.all ? [...plan.groupBranches, plan.runBranch] : plan.groupBranches;
   for (const branch of branches) {
-    const exists = await runGit(
-      plan.repository,
-      ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`],
-      {
-        allowFailure: true,
-      },
-    );
-    if (exists.code !== 0) continue;
+    if (!(await refExists(plan.repository, `refs/heads/${branch}`))) continue;
     await git(plan.repository, 'branch', '-D', branch);
     removed.push(branch);
   }

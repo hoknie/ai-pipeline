@@ -310,6 +310,7 @@ describe('worker MCP server', () => {
         'title',
         'autoDeliver',
         'deliveryMode',
+        'deliveryBranch',
         'skip',
         'after',
         'links',

@@ -8,6 +8,7 @@ import { DUPLICATE_TASK_CODE } from '../../feature/queue/types/index.ts';
 import { DELIVERY_MODES, type DeliveryMode } from '../../feature/swarm-config/types/index.ts';
 import { IpcError } from '../ipc/client/index.ts';
 import { proposedGroupSchema } from '../ipc/contract/index.ts';
+import { deliveryBranchSchema } from '../ipc/contract/runs.ts';
 
 import type { Command } from 'commander';
 
@@ -49,6 +50,8 @@ export interface QueueTaskOptions {
   title?: string;
   autoDeliver?: boolean;
   deliveryMode?: string;
+  deliveryBranch?: string;
+  deliveryBranchStrategy?: string;
   postpone?: boolean;
   repo: string;
   json?: boolean;
@@ -73,6 +76,23 @@ export function parseDeliveryMode(value: string | undefined): DeliveryMode | und
     throw usage(`--delivery-mode must be one of: ${DELIVERY_MODES.join(', ')}`);
   }
   return mode;
+}
+
+export function parseDeliveryBranch(name?: string, strategy?: string) {
+  if (name === undefined && strategy === undefined) return undefined;
+  if (name === undefined || strategy === undefined) {
+    throw usage('--delivery-branch and --delivery-branch-strategy must be passed together');
+  }
+  const parsed = deliveryBranchSchema.safeParse({ name, strategy });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw usage(
+      issue?.path[0] === 'strategy'
+        ? '--delivery-branch-strategy must be existing or create'
+        : '--delivery-branch must be a valid local Git branch name',
+    );
+  }
+  return parsed.data;
 }
 
 export function parseSwitch(flag: string, value: string | undefined): boolean | undefined {

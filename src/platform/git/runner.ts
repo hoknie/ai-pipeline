@@ -43,11 +43,16 @@ export function observeGit(callback: ((call: GitCall) => void) | null): void {
 export function runGit(
   cwd: string,
   args: string[],
-  options: { allowFailure?: boolean; timeoutMs?: number; env?: NodeJS.ProcessEnv } = {},
+  options: {
+    allowFailure?: boolean;
+    timeoutMs?: number;
+    env?: NodeJS.ProcessEnv;
+    input?: string;
+  } = {},
 ): Promise<GitResult> {
   observer?.({ cwd, args });
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       'git',
       args,
       {
@@ -64,6 +69,7 @@ export function runGit(
         else resolve(result);
       },
     );
+    if (options.input !== undefined) child.stdin?.end(options.input);
   });
 }
 

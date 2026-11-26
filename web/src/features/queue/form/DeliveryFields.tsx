@@ -1,8 +1,10 @@
 import { RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DeliveryMode } from '../../../../../src/feature/swarm-config/types/index.ts';
 import { isServerMode } from '../../../shared/api/http.ts';
+import type { Api } from '../../../shared/api/api.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import {
@@ -13,6 +15,7 @@ import {
   SelectValue,
 } from '../../../shared/ui/forms/select.tsx';
 import { DELIVERY_MODES } from '../../../shared/lib/pipeline/deliveryModes.ts';
+import { BranchField } from './branch/BranchField.tsx';
 import { SwitchRow } from './properties/FormSection.tsx';
 import type { FormState } from './TaskFields.tsx';
 
@@ -55,7 +58,9 @@ function AutoDeliver({ state, fallback }: { state: FormState; fallback: boolean 
       id={`${idPrefix}-auto-deliver`}
       label={t('queue.form.autoDeliver')}
       checked={effective.autoDeliver ?? fallback ?? true}
-      onCheckedChange={(autoDeliver) => change({ autoDeliver })}
+      onCheckedChange={(autoDeliver) =>
+        change({ autoDeliver, ...(autoDeliver ? {} : { deliveryBranch: null }) })
+      }
       badge={
         <SourceBadge
           own={effective.autoDeliver !== null}
@@ -67,7 +72,9 @@ function AutoDeliver({ state, fallback }: { state: FormState; fallback: boolean 
         effective.autoDeliver !== null ? (
           <ResetButton
             label={t('queue.form.autoDeliverReset')}
-            onClick={() => change({ autoDeliver: null })}
+            onClick={() =>
+              change({ autoDeliver: null, ...((fallback ?? true) ? {} : { deliveryBranch: null }) })
+            }
           />
         ) : null
       }
@@ -94,13 +101,23 @@ function ModeSelect({ state, fallback }: { state: FormState; fallback: DeliveryM
         {effective.deliveryMode !== null ? (
           <ResetButton
             label={t('queue.form.deliveryModeReset')}
-            onClick={() => change({ deliveryMode: null })}
+            onClick={() =>
+              change({
+                deliveryMode: null,
+                ...((fallback ?? 'worktree') === 'commit' ? {} : { deliveryBranch: null }),
+              })
+            }
           />
         ) : null}
       </div>
       <Select
         value={value}
-        onValueChange={(deliveryMode) => change({ deliveryMode: deliveryMode as DeliveryMode })}
+        onValueChange={(deliveryMode) =>
+          change({
+            deliveryMode: deliveryMode as DeliveryMode,
+            ...(deliveryMode === 'commit' ? {} : { deliveryBranch: null }),
+          })
+        }
       >
         <SelectTrigger id={`${idPrefix}-delivery-mode`} className="w-full">
           <SelectValue />
@@ -122,12 +139,53 @@ export function DeliveryFields(props: {
   state: FormState;
   autoDeliverDefault: boolean | null;
   deliveryModeDefault: DeliveryMode | null;
+  api?: Api | undefined;
+  repository?: string | null;
+  branchValidation?: 'valid' | 'pending' | 'invalid';
 }) {
   const { state } = props;
+  const { t } = useTranslation();
+  const [cleared, setCleared] = useState(false);
+  const [invalid, setInvalid] = useState(false);
+  const allowed =
+    !isServerMode() &&
+    (state.effective.autoDeliver ?? props.autoDeliverDefault ?? true) &&
+    (state.effective.deliveryMode ?? props.deliveryModeDefault ?? 'worktree') === 'commit';
+  useEffect(() => {
+    if (!allowed && state.effective.deliveryBranch) {
+      state.change({ deliveryBranch: null });
+      setCleared(true);
+    }
+  }, [allowed, state.effective.deliveryBranch]);
+  useEffect(() => {
+    if (allowed && state.effective.deliveryBranch && props.branchValidation === 'invalid') {
+      state.change({ deliveryBranch: null });
+      setInvalid(true);
+    }
+  }, [allowed, state.effective.deliveryBranch, props.branchValidation]);
+  const wrapped = {
+    ...state,
+    change: (patch: Parameters<typeof state.change>[0]) => {
+      if (state.effective.deliveryBranch && patch.deliveryBranch === null) setCleared(true);
+      state.change(patch);
+    },
+  };
   return (
     <fieldset disabled={state.locked} className="contents">
-      <AutoDeliver state={state} fallback={props.autoDeliverDefault} />
-      <ModeSelect state={state} fallback={props.deliveryModeDefault} />
+      <AutoDeliver state={wrapped} fallback={props.autoDeliverDefault} />
+      <ModeSelect state={wrapped} fallback={props.deliveryModeDefault} />
+      {cleared && !isServerMode() ? (
+        <p className="text-xs text-muted-foreground">{t('queue.form.branchCleared')}</p>
+      ) : null}
+      {invalid && allowed ? <p role="alert">{t('queue.form.branchInvalid')}</p> : null}
+      {allowed ? (
+        <BranchField
+          state={wrapped}
+          api={props.api}
+          repository={props.repository ?? null}
+          validation={props.branchValidation ?? 'valid'}
+        />
+      ) : null}
     </fieldset>
   );
 }

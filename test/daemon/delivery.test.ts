@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -37,6 +38,25 @@ async function finishedRun(
 const WRITE_LIB = { code: [{ write: { 'lib.ts': 'export const value = 2;\n' } }] };
 
 describe('delivery through the daemon', () => {
+  it('rejects an invalid target before a direct run starts', async () => {
+    const h = await start('  delivery: { mode: commit, auto: true }\n');
+    expect(() =>
+      execFileSync('git', ['check-ref-format', '--branch', 'a..b'], {
+        cwd: h.repo,
+        stdio: 'ignore',
+      }),
+    ).toThrow();
+    await expect(
+      startRun(h, {
+        repository: h.repo,
+        pipeline: 'feature',
+        groups: [{ title: 'Invalid', task: 'invalid' }],
+        deliveryBranch: { name: '@', strategy: 'create' },
+      }),
+    ).rejects.toThrow();
+    expect(git(h.repo, 'for-each-ref', '--format=%(refname)', 'refs/aip/')).toBe('');
+  });
+
   it('delivers into the working tree, cleans up and leaves no branches or commits', async () => {
     const h = await start();
     h.script(WRITE_LIB);
@@ -240,6 +260,114 @@ describe('delivery through the daemon', () => {
     expect(git(h.repo, 'for-each-ref', '--format=%(refname)', 'refs/aip/')).toContain(
       `refs/aip/${runId}/run`,
     );
+  });
+
+  it('recovers target delivery after restart without a second commit', async () => {
+    const h = await start('  delivery: { mode: commit, auto: true, keep: true }\n');
+    h.script(WRITE_LIB);
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Login', task: 'login' }],
+      deliveryBranch: { name: 'feature-restart', strategy: 'create' },
+    })) as RunCreated;
+    await h.waitFor(runId, (view) => view.delivery.applied === 1);
+    const commit = git(h.repo, 'rev-parse', 'feature-restart');
+    await h.restart(() => {
+      const store = openStorage(databasePath(h.state));
+      const state = store.runs.loadRun(runId)!;
+      state.groups[0]!.delivery.state = 'pending';
+      state.run.pendingDelivery = { groups: ['login'], force: false, auto: true };
+      store.runs.saveRun(state);
+      store.database.close();
+    });
+    await h.waitFor(runId, (view) => view.delivery.applied === 1 && !view.delivery.inProgress);
+    expect(git(h.repo, 'rev-parse', 'feature-restart')).toBe(commit);
+    expect(git(h.repo, 'rev-list', '--count', 'HEAD..feature-restart')).toBe('1');
+    expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 1;\n');
+  });
+
+  it('retries a failed target together with a newly merged group without touching HEAD', async () => {
+    const h = await start('  delivery: { mode: commit, auto: false, keep: true }\n');
+    h.script({
+      'code@First': [{ write: { 'first.txt': 'first\n' } }],
+      'code@Second': [{ write: { 'second.txt': 'second\n' } }],
+    });
+    const runId = await finishedRun(h, [
+      { title: 'First', task: 'first' },
+      { title: 'Second', task: 'second' },
+    ]);
+    const head = git(h.repo, 'rev-parse', 'HEAD');
+    git(h.repo, 'branch', 'retry-target');
+    await h.restart(() => {
+      const store = openStorage(databasePath(h.state));
+      const state = store.runs.loadRun(runId)!;
+      state.run.config.delivery.auto = true;
+      state.run.deliveryBranch = { name: 'retry-target', strategy: 'existing' };
+      state.groups[0]!.delivery = Object.assign({}, state.groups[0]!.delivery, {
+        state: 'apply_failed' as const,
+        reason: 'target unavailable',
+        targetAttempt: true,
+      });
+      store.runs.saveRun(state);
+      store.database
+        .prepare('UPDATE runs SET delivery_branch_json = ? WHERE id = ?')
+        .run(JSON.stringify(state.run.deliveryBranch), runId);
+      store.database.close();
+    });
+    const result = (await h.call('apply', { runId })) as ApplyResult;
+    expect(result.groups.map((group) => group.slug)).toEqual(['first', 'second']);
+    expect(
+      result.groups.map((group) => group.delivery),
+      JSON.stringify(result.groups),
+    ).toEqual([
+      expect.objectContaining({ state: 'applied' }),
+      expect.objectContaining({ state: 'applied' }),
+    ]);
+    expect(result.groups[0]?.delivery.files).toEqual(['first.txt', 'second.txt']);
+    expect(git(h.repo, 'rev-parse', 'retry-target')).not.toBe(head);
+    expect(git(h.repo, 'rev-parse', 'retry-target^')).toBe(head);
+    expect(git(h.repo, 'show', 'retry-target:first.txt')).toBe('first');
+    expect(git(h.repo, 'show', 'retry-target:second.txt')).toBe('second');
+    expect(git(h.repo, 'rev-parse', 'HEAD')).toBe(head);
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+    expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 1;\n');
+  });
+
+  it('runs after_delivery once for target delivery and does not recommit on recovery', async () => {
+    const h = await start(`  delivery: { mode: commit, auto: true, keep: true }
+  actions:
+    record: { run: "echo run >> $AIP_REPOSITORY/../target-action-count" }
+  stages:
+    after_delivery: [record]
+`);
+    h.script(WRITE_LIB);
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Login', task: 'login' }],
+      deliveryBranch: { name: 'feature-action', strategy: 'create' },
+    })) as RunCreated;
+    await h.waitFor(
+      runId,
+      (view) => view.delivery.applied === 1 && view.system[0]?.status === 'done',
+    );
+    const commit = git(h.repo, 'rev-parse', 'feature-action');
+    const count = join(h.repo, '..', 'target-action-count');
+    expect(readFileSync(count, 'utf8')).toBe('run\n');
+    await h.restart(() => {
+      const store = openStorage(databasePath(h.state));
+      const state = store.runs.loadRun(runId)!;
+      state.groups[0]!.delivery.state = 'pending';
+      state.run.pendingDelivery = { groups: ['login'], force: false, auto: true };
+      store.runs.saveRun(state);
+      store.database.close();
+    });
+    await h.waitFor(runId, (view) => view.delivery.applied === 1 && !view.delivery.inProgress);
+    expect((await h.status(runId)).system[0]?.status).toBe('done');
+    expect(readFileSync(count, 'utf8')).toBe('run\n');
+    expect(git(h.repo, 'rev-parse', 'feature-action')).toBe(commit);
+    expect(git(h.repo, 'rev-list', '--count', 'HEAD..feature-action')).toBe('1');
   });
 
   it('starts again a delivery cut off by a daemon restart', async () => {

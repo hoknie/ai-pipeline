@@ -26,6 +26,7 @@ import type { QueueAdvance } from './advance.ts';
 import type { QueueItems } from './items.ts';
 import type { QueueStore } from './store.ts';
 import type { TaskTags } from './task-tags.ts';
+import { ensureDeliveryTarget } from './target/target.ts';
 
 export interface QueueProjectsDependencies {
   database: Database;
@@ -58,6 +59,7 @@ function fields(
     title,
     autoDeliver,
     deliveryMode,
+    deliveryBranch,
     skip,
     after,
     inheritTags,
@@ -71,6 +73,7 @@ function fields(
     title,
     autoDeliver,
     deliveryMode,
+    deliveryBranch,
     skip,
     after,
     inheritTags,
@@ -184,6 +187,15 @@ export class QueueProjects {
     const label = this.labelOf(root);
     registry.requireEnabled(root);
     await this.ensureIn(root, label, params);
+    await this.inProject(label, () =>
+      ensureDeliveryTarget(
+        this.dependencies.config,
+        root,
+        task.deliveryBranch,
+        task.autoDeliver,
+        task.deliveryMode,
+      ),
+    );
     refuseDuplicate(store.of(root), task, params.allowDuplicate, ` of project \`${label}\``);
     await this.inProject(label, () => this.checkNewItem(store.of(root), task, moment));
   }

@@ -5,8 +5,8 @@ import { type Attempt, type Group, type RunState, allGroups } from '../types/ind
 function writeRunRow(database: Database, { run }: RunState): void {
   database
     .prepare(
-      `INSERT INTO runs (id, repository, pipeline, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number, hold, repair_json, variant, attachments_json, provider, author_id, created_by_system, remote_branch_json, pinned_skills_json, cleaned_at, harness, probe_of)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO runs (id, repository, pipeline, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number, hold, repair_json, variant, attachments_json, provider, author_id, created_by_system, remote_branch_json, pinned_skills_json, cleaned_at, harness, probe_of, delivery_branch_json, source_commit, source_branch)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET cleaned_at = excluded.cleaned_at, finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, remote_branch_json = excluded.remote_branch_json, pinned_skills_json = excluded.pinned_skills_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json, hold = excluded.hold, repair_json = excluded.repair_json, variant = excluded.variant, provider = excluded.provider, config_json = excluded.config_json`,
     )
     .run(
@@ -42,6 +42,9 @@ function writeRunRow(database: Database, { run }: RunState): void {
       run.cleanedAt,
       run.harness,
       run.probeOf,
+      json(run.deliveryBranch ?? null),
+      run.sourceCommit ?? null,
+      run.sourceBranch ?? null,
     );
 }
 

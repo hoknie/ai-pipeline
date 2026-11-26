@@ -1034,6 +1034,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     entries: [],
   };
   const base: Omit<Api, 'forRepository'> = {
+    branches: vi.fn(async () => []),
     runs: vi.fn(async () => [runView()]),
     finishedRuns: vi.fn(async () => ({ runs: [], next: null })),
     run: vi.fn(async () => {

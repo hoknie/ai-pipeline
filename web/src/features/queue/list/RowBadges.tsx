@@ -79,6 +79,14 @@ export function RowMeta({
           {t('queue.list.deliveryMode', { mode: t(`deliveryMode.${item.deliveryMode}`) })}
         </span>
       )}
+      {item.deliveryBranch ? (
+        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+          {t('queue.form.branchSelected', {
+            name: item.deliveryBranch.name,
+            strategy: t(`queue.form.branchStrategy.${item.deliveryBranch.strategy}`),
+          })}
+        </span>
+      ) : null}
       {item.attachments.length > 0 ? (
         <span
           className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"

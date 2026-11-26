@@ -1321,7 +1321,20 @@ describe('add and continue', () => {
       queueAdd: added(),
     });
 
-  it('sends the same request as "Add" and keeps tag, parent row and postpone, but not the blocked-by rows"', async () => {
+  const settingsPayload = {
+    provider: null,
+    pipeline: 'feature',
+    title: 'First',
+    task: 'Do it',
+    tags: ['auth'],
+    links: [
+      { kind: 'parent', target: 'run1' },
+      { kind: 'blocked_by', target: 'q1' },
+    ],
+    postponed: true,
+  };
+
+  it('sends the request and keeps tag, parent row and postpone, but not blocked-by rows', async () => {
     const api = withOld();
     const dialog = await openDialog(api);
     await fillSettings(dialog);
@@ -1332,17 +1345,7 @@ describe('add and continue', () => {
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(1));
-    const sent = vi.mocked(api.queueAdd).mock.calls[0]![0];
-    expect(sent).toMatchObject({
-      title: 'First',
-      task: 'Do it',
-      tags: ['auth'],
-      links: [
-        { kind: 'parent', target: 'run1' },
-        { kind: 'blocked_by', target: 'q1' },
-      ],
-      postponed: true,
-    });
+    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toEqual(settingsPayload);
     await waitFor(() =>
       expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe(''),
     );
@@ -1354,9 +1357,9 @@ describe('add and continue', () => {
       within(dialog).getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked'),
     ).toBe('true');
     expect(within(dialog).queryByText(/Old/)).toBeNull();
+  }, 15_000);
 
-    // the same input through "Add" gives the same request
-    cleanup();
+  it('sends the same settings through Add', async () => {
     const plain = withOld();
     const again = await openDialog(plain);
     await fillSettings(again);
@@ -1367,7 +1370,7 @@ describe('add and continue', () => {
     );
     fireEvent.click(within(again).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(plain.queueAdd).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(plain.queueAdd).mock.calls[0]![0]).toEqual(sent);
+    expect(vi.mocked(plain.queueAdd).mock.calls[0]![0]).toEqual(settingsPayload);
   }, 15_000);
 
   it('offers the added task among the tasks to wait for', async () => {
@@ -1432,11 +1435,15 @@ describe('new task in several projects', () => {
       app?: string[];
       lib?: string[];
       add?: Api['queueAddProjects'];
+      branches?: Api['branches'];
+      commit?: boolean;
     } = {},
   ) {
     const pipelinesOfIds = (ids: string[]) => ids.map((id) => pipelineOf({ id }));
     const api = fakeApi({
-      queue: vi.fn(async () => queueOf({ repository: APP })),
+      queue: vi.fn(async () =>
+        queueOf({ repository: APP, ...(options.commit ? { deliveryMode: 'commit' } : {}) }),
+      ),
       runs: vi.fn(async () => []),
       pipelines: vi.fn(async (repository?: string) =>
         repository === LIB
@@ -1450,6 +1457,7 @@ describe('new task in several projects', () => {
             }),
       ),
       ...(options.add ? { queueAddProjects: options.add } : {}),
+      ...(options.branches ? { branches: options.branches } : {}),
     });
     render(<App api={api as Api} openStream={openFake} />);
     act(() => {
@@ -1457,7 +1465,10 @@ describe('new task in several projects', () => {
         event: 'snapshot',
         seq: 1,
         runs: [],
-        queues: [queueOf({ repository: APP }), queueOf({ repository: LIB })],
+        queues: [
+          queueOf({ repository: APP, ...(options.commit ? { deliveryMode: 'commit' } : {}) }),
+          queueOf({ repository: LIB, ...(options.commit ? { deliveryMode: 'commit' } : {}) }),
+        ],
         repositories: [repositoryView(APP), repositoryView(LIB)],
       });
     });
@@ -1530,6 +1541,34 @@ describe('new task in several projects', () => {
     });
     expect(api.queueAdd).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+  });
+
+  it('checks and sends the same existing target for both projects', async () => {
+    const add = vi.fn(async () => []);
+    const branches = vi.fn(async () => ['feature/shared']);
+    const api = multiMount({ add, branches, commit: true });
+    const dialog = await openMulti();
+    await pickProject(dialog, 'lib');
+    fireEvent.change(within(dialog).getByLabelText('Task text'), {
+      target: { value: 'Shared task' },
+    });
+    fireEvent.change(await within(dialog).findByLabelText('Target branch'), {
+      target: { value: 'shared' },
+    });
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'feature/shared' }));
+    await waitFor(() => {
+      expect(api.calls).toContainEqual(['branches', APP]);
+      expect(api.calls).toContainEqual(['branches', LIB]);
+    });
+    await clickAdd(dialog);
+    await waitFor(() =>
+      expect(add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repositories: [APP, LIB],
+          deliveryBranch: { name: 'feature/shared', strategy: 'existing' },
+        }),
+      ),
+    );
   });
 
   it('changes the order of the projects and keeps the first one when the mode is switched off', async () => {

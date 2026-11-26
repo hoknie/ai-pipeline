@@ -22,6 +22,7 @@ import {
 } from './constants.ts';
 import { type Group, actionOf, actionPointOf, isRepairGroup } from './group.ts';
 import type { Harness } from './probe/harness.ts';
+import type { DeliveryBranch } from './delivery/target.ts';
 
 /** The branch of a delivery sent to a remote repository. */
 export interface RemoteBranch {
@@ -66,6 +67,11 @@ export interface Run {
   createdAt: number;
   finishedAt: number | null;
   config: ResolvedConfig;
+  /** Target of automatic commit delivery; absent on older snapshots. */
+  deliveryBranch?: DeliveryBranch | null;
+  /** Actual HEAD and checked-out branch at creation, before any workspace snapshot. */
+  sourceCommit?: string | null;
+  sourceBranch?: string | null;
   dirtyWarning: boolean;
   nextMergeSeq: number;
   pendingDelivery: PendingDelivery | null;

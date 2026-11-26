@@ -13,10 +13,9 @@ import type { QueueFields, PipelinesView } from '../../shared/api/types.ts';
 import { continueDraft, draftValid, fieldsOf, type QueueDraft } from './draft.ts';
 import { DuplicateNotice, useDuplicateRefusal } from './duplicate.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
-import { withCurrent } from './form/LinkFields.tsx';
-import { SideFields } from './form/properties/SideFields.tsx';
+import { FormColumns } from './form/properties/FormColumns.tsx';
 import { useEffectiveDraft } from './form/usePresetDraft.ts';
-import { TaskFields, type FormState } from './form/TaskFields.tsx';
+import { useFormBranch } from './form/branch/useFormBranch.ts';
 
 export { draftOf, draftValid, emptyDraft, fieldsOf, retarget, type QueueDraft } from './draft.ts';
 
@@ -80,6 +79,7 @@ function useSubmit(
   onSubmitAndContinue: ((fields: QueueFields) => Promise<void>) | undefined,
   onDraft: (draft: QueueDraft) => void,
   returned: boolean,
+  branchBlocked: boolean,
 ) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,7 +98,7 @@ function useSubmit(
     // only a new tick moves the focus
   }, [focusTick]);
   const send = async (keep: boolean, allowDuplicate = false) => {
-    if (!draftValid(effective) || busy) return;
+    if (!draftValid(effective) || busy || branchBlocked) return;
     setBusy(true);
     setError(null);
     duplicate.clear();
@@ -139,7 +139,7 @@ function useSubmit(
   };
 }
 
-interface QueueFormProps {
+export interface QueueFormProps {
   idPrefix: string;
   draft: QueueDraft;
   pipelines: PipelinesView | null;
@@ -229,35 +229,40 @@ function SubmitButtons({
   );
 }
 
-export function QueueForm({
-  idPrefix,
-  draft,
-  pipelines,
-  repository,
-  api,
-  autoDeliverDefault = null,
-  deliveryModeDefault = null,
-  linkChoices = () => [],
-  locked = false,
-  returnedRun = null,
-  repositoryField,
-  several = false,
-  providerRepositories,
-  extras,
-  projectsPanel,
-  blockedHint,
-  pending = false,
-  submitLabel,
-  onDraft,
-  onSubmit,
-  onSubmitAndContinue,
-  onCancel,
-  fill = false,
-  stickyActions = false,
-}: QueueFormProps) {
+export function QueueForm(props: QueueFormProps) {
+  const {
+    idPrefix,
+    draft,
+    pipelines,
+    repository,
+    api,
+    autoDeliverDefault = null,
+    deliveryModeDefault = null,
+    linkChoices = () => [],
+    locked = false,
+    returnedRun = null,
+    several = false,
+    providerRepositories,
+    blockedHint,
+    pending = false,
+    submitLabel,
+    onDraft,
+    onSubmit,
+    onSubmitAndContinue,
+    onCancel,
+    fill = false,
+    stickyActions = false,
+  } = props;
   const { t } = useTranslation();
   const { ids, effective, change } = useEffectiveDraft(draft, pipelines, onDraft);
-  const valid = draftValid(effective);
+  const { valid, branchValidation, branchBlocked } = useFormBranch({
+    effective,
+    api,
+    providerRepositories,
+    repository,
+    autoDeliverDefault,
+    deliveryModeDefault,
+  });
   const state = { idPrefix, effective, change, locked, several };
   const sent = useSubmit(
     effective,
@@ -267,9 +272,10 @@ export function QueueForm({
     onSubmitAndContinue,
     onDraft,
     locked,
+    branchBlocked,
   );
 
-  const blocked = pending || blockedHint !== undefined;
+  const blocked = pending || blockedHint !== undefined || branchBlocked;
   return (
     <form
       className={cn(
@@ -282,26 +288,11 @@ export function QueueForm({
       }}
       onKeyDown={(event) => sendOnShortcut(event, valid && !blocked, () => void sent.submit())}
     >
-      <div
-        className={cn(
-          'grid gap-4 @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]',
-          fill && 'flex-1',
-        )}
-      >
-        <TaskFields
-          state={state}
-          repositoryField={repositoryField}
-          extras={extras}
-          fill={fill}
-          api={api}
-        />
-        <SideFields
-          {...{ state, pipelines, repository, api, linkChoices, returnedRun, projectsPanel }}
-          {...{ autoDeliverDefault, deliveryModeDefault, providerError: sent.providerError }}
-          options={withCurrent(ids, effective.pipeline)}
-          repositories={providerRepositories ?? (repository ? [repository] : [])}
-        />
-      </div>
+      <FormColumns
+        {...props}
+        {...{ state, branchValidation, ids, effective }}
+        providerError={sent.providerError}
+      />
       <SubmitFailure sent={sent} />
       <SubmitButtons
         {...{ valid, blocked, blockedHint, sent, submitLabel, onCancel }}

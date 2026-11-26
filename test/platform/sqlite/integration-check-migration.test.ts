@@ -7,8 +7,8 @@ import { MIGRATIONS, SCHEMA_VERSION, migrate } from '../../../src/platform/sqlit
 describe('migration that adds the result of the last check of a connection', () => {
   it('adds the table of results to an older database, keeps its connections and is repeatable', () => {
     const old = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -6).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    MIGRATIONS.slice(0, -7).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     old
       .prepare(
         `INSERT INTO integration_connections
@@ -27,7 +27,11 @@ describe('migration that adds the result of the last check of a connection', () 
     old.exec('ALTER TABLE queue_items DROP COLUMN inherit_tags');
     old.exec('ALTER TABLE runs DROP COLUMN harness');
     old.exec('ALTER TABLE runs DROP COLUMN probe_of');
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    old.exec('ALTER TABLE queue_items DROP COLUMN delivery_branch_json');
+    old.exec('ALTER TABLE runs DROP COLUMN delivery_branch_json');
+    old.exec('ALTER TABLE runs DROP COLUMN source_commit');
+    old.exec('ALTER TABLE runs DROP COLUMN source_branch');
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     migrate(old);
     expect(
       (old.prepare('PRAGMA user_version').get() as { user_version: number }).user_version,

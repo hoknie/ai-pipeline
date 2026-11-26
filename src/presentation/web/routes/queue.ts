@@ -52,6 +52,18 @@ async function editTask(
 function linkRoutes({ call }: RouteKit): Route[] {
   return [
     {
+      method: 'GET',
+      pattern: /^\/api\/repository\/branches$/,
+      handle: (_match, _body, repository, query) =>
+        call('repository_branches', {
+          repository,
+          query: parseBody(z.string().max(256), query.get('query') ?? ''),
+          exact:
+            parseBody(z.enum(['true', 'false']).optional(), query.get('exact') ?? undefined) ===
+            'true',
+        }),
+    },
+    {
       method: 'POST',
       pattern: /^\/api\/tasks\/link$/,
       handle: (_match, body, repository) =>

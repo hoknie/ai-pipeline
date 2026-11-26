@@ -4,6 +4,7 @@ import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
 import { FEEDBACK_LIMIT } from '../../feature/runs/types/index.ts';
 import { RUN_TITLE_LIMIT, WORKER_TOOLS } from '../../feature/agents/types/index.ts';
 import { invalid } from '../../platform/errors/index.ts';
+import { deliveryBranchSchema } from '../ipc/contract/runs.ts';
 import { attempt, hintDuplicate } from './tools.ts';
 import { linkInputs, present } from './host-links.ts';
 import type { WorkerKit } from './worker-tools.ts';
@@ -74,6 +75,9 @@ export function registerQueueAdd(kit: WorkerKit): void {
             .enum(DELIVERY_MODES)
             .optional()
             .describe('worktree, commit or branch; omit to follow delivery.mode'),
+          deliveryBranch: deliveryBranchSchema
+            .optional()
+            .describe('Local target branch for automatic commit delivery'),
           variant: z
             .string()
             .optional()
@@ -146,6 +150,10 @@ const editFields = {
     .nullable()
     .optional()
     .describe('worktree, commit or branch; null: follow delivery.mode'),
+  deliveryBranch: deliveryBranchSchema
+    .nullable()
+    .optional()
+    .describe('Local target branch; null removes it'),
   variant: z.string().optional().describe('Id of a variant of the pipeline'),
   provider: z.string().nullable().optional().describe('Id of a provider of the run; null: none'),
   skip: z.array(z.string()).optional().describe('Ids of pipeline steps to skip; replaces the list'),

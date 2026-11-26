@@ -1,5 +1,5 @@
 import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/index.ts';
-import type { AttachmentView, QueueFields } from '../../shared/api/types.ts';
+import type { AttachmentView, DeliveryBranch, QueueFields } from '../../shared/api/types.ts';
 import { pruneSkip } from '../../shared/ui/forms/picker/SkipSteps.tsx';
 import type { LinkRow } from '../runs/index.ts';
 
@@ -37,6 +37,7 @@ export interface QueueDraft {
   autoDeliver: boolean | null;
   /** `null`: follow the setting. */
   deliveryMode: DeliveryMode | null;
+  deliveryBranch?: DeliveryBranch | null;
   /** Ids of the chosen tags. */
   tags: string[];
   links: LinkRow[];
@@ -74,6 +75,7 @@ export function emptyDraft(pipeline = ''): QueueDraft {
     title: '',
     autoDeliver: null,
     deliveryMode: null,
+    deliveryBranch: null,
     tags: [],
     links: [],
     skip: [],
@@ -103,6 +105,7 @@ export function draftOf(item: {
   title: string | null;
   autoDeliver: boolean | null;
   deliveryMode?: DeliveryMode | null;
+  deliveryBranch?: DeliveryBranch | null;
   tags?: { id: string; task?: { run: string } | null }[];
   links?: { id: string; kind: LinkRow['kind'] }[];
   skip?: string[];
@@ -118,6 +121,7 @@ export function draftOf(item: {
     title: item.title ?? '',
     autoDeliver: item.autoDeliver,
     deliveryMode: item.deliveryMode ?? null,
+    deliveryBranch: item.deliveryBranch ?? null,
     tags: (item.tags ?? []).map((tag) => tag.id),
     links: (item.links ?? []).map((ref) => ({ kind: ref.kind, target: ref.id })),
     skip: [...(item.skip ?? [])],
@@ -221,6 +225,7 @@ export function fieldsOf(
     ...(draft.postponed ? { postponed: true } : {}),
     ...(draft.autoDeliver !== null ? { autoDeliver: draft.autoDeliver } : {}),
     ...(draft.deliveryMode !== null ? { deliveryMode: draft.deliveryMode } : {}),
+    ...(draft.deliveryBranch ? { deliveryBranch: draft.deliveryBranch } : {}),
     ...(allTags || tags.length > 0 ? { tags } : {}),
     ...(allTags || draft.skip.length > 0 ? { skip: draft.skip } : {}),
     ...(returned

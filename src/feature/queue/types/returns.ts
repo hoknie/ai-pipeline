@@ -24,6 +24,7 @@ export function returnItem(state: RunState, id: string, now: number): QueueItem 
     title: state.run.title,
     autoDeliver: null,
     deliveryMode: null,
+    deliveryBranch: state.run.deliveryBranch ?? null,
     tags: [...state.run.tags],
     inheritTags: true,
     skip: [],

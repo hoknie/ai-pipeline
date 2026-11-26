@@ -3,6 +3,7 @@ import {
   commitMessage,
   commitResolve,
   deliver,
+  deliverToTarget,
   filesWithMarkers,
   git,
   mergeBranch,
@@ -11,6 +12,7 @@ import {
   type GroupChange,
 } from '../../../../platform/git/index.ts';
 import type { DeliveryResult, MergeOutcome } from '../../machine/index.ts';
+import { targetDelivery } from '../../machine/delivery-flow.ts';
 import {
   RESOLVE_GROUP,
   SPLIT_GROUP,
@@ -215,9 +217,11 @@ export class GitEffects {
 
   async deliver(state: RunState, slugs: string[], force: boolean, message: string): Promise<void> {
     let result: DeliveryResult;
+    const target = targetDelivery(state) ? state.run.deliveryBranch : null;
     try {
       const stamp = this.dependencies.commits.stamp(state.run, message);
-      result = await deliver({
+      const run = state.run;
+      const request = {
         repository: state.run.repository,
         changes: groupChanges(state, slugs),
         mode: state.run.config.delivery.mode,
@@ -228,11 +232,22 @@ export class GitEffects {
         include: state.run.config.workspace.include,
         base: state.run.baseCommit,
         ...(stamp ? { identity: stamp.identity } : {}),
-      });
+      };
+      if (target) {
+        if (!run.sourceCommit)
+          throw new Error('the run has no recorded source commit for target delivery');
+        result = await deliverToTarget({
+          ...request,
+          base: run.baseCommit,
+          target,
+          sourceCommit: run.sourceCommit,
+          sourceBranch: run.sourceBranch ?? null,
+        });
+      } else result = await deliver(request);
     } catch (error) {
       result = { kind: 'failed', message: (error as Error).message };
     }
-    await this.outside.accept(state, result);
+    if (!target) await this.outside.accept(state, result);
     await this.dependencies.context.apply(state, { kind: 'delivery_finished', result });
   }
 

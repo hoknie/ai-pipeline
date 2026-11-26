@@ -17,6 +17,7 @@ export const readingMethods: readonly Method[] = [
   'queue',
   'repositories',
   'repository_match',
+  'repository_branches',
   'integration_types',
   'integration_list',
   'integration_skills',

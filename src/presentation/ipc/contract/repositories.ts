@@ -8,6 +8,14 @@ const projectColor = z.string().min(1);
 export const repositoriesRequests = [
   z.object({ method: z.literal('repositories'), params: z.object({}).default({}) }),
   z.object({
+    method: z.literal('repository_branches'),
+    params: z.strictObject({
+      repository: queueRepository,
+      query: z.string().max(256),
+      exact: z.boolean().optional(),
+    }),
+  }),
+  z.object({
     method: z.literal('repository_match'),
     params: z.object({ remotes: z.array(z.string().min(1).max(2048)).min(1).max(16) }),
   }),

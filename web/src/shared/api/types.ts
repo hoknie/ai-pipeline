@@ -148,6 +148,7 @@ export interface QueueProjectsFields {
   allowDuplicate?: boolean;
   autoDeliver?: boolean;
   deliveryMode?: DeliveryMode;
+  deliveryBranch?: DeliveryBranch;
   skip?: string[];
   after?: string[];
   /** Additions to the text by project path. */
@@ -182,6 +183,7 @@ export interface QueueFields {
   autoDeliver?: boolean;
   /** Absent: follow `delivery.mode` when the task starts. */
   deliveryMode?: DeliveryMode;
+  deliveryBranch?: DeliveryBranch;
   /** Tag names. */
   tags?: string[];
   /** Ids of pipeline steps the task skips. */
@@ -213,6 +215,7 @@ export interface QueuePatch {
   autoDeliver?: boolean | null;
   /** `null`: follow `delivery.mode` again. */
   deliveryMode?: DeliveryMode | null;
+  deliveryBranch?: DeliveryBranch | null;
   /** Tag names; replaces the tags of the item. */
   tags?: string[];
   /** Ids of pipeline steps to skip; replaces the list of the item. */
@@ -230,6 +233,7 @@ export interface QueuePatch {
   /** Names of attachments to remove. */
   detach?: string[];
 }
+export type DeliveryBranch = { name: string; strategy: 'existing' | 'create' };
 export type {
   EditorMcpServer,
   EditorMcpServerValues,

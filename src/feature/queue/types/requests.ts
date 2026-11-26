@@ -1,5 +1,5 @@
 import type { AttachmentSource } from '../../attachments/types/index.ts';
-import type { NewGroup, RunCreated } from '../../runs/types/index.ts';
+import type { DeliveryBranch, NewGroup, RunCreated } from '../../runs/types/index.ts';
 import type { DeliveryMode } from '../../swarm-config/types/index.ts';
 
 import type { ItemPatch } from './edit.ts';
@@ -18,6 +18,7 @@ export interface TaskFields {
   title?: string | undefined;
   autoDeliver?: boolean | undefined;
   deliveryMode?: DeliveryMode | undefined;
+  deliveryBranch?: DeliveryBranch | undefined;
   skip?: string[] | undefined;
   /** Ids of queue items or runs this task waits for. */
   after?: string[] | undefined;

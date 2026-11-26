@@ -78,6 +78,47 @@ describe('parseSource', () => {
     expect(parsed.functions).toContainEqual({ name: 'Panel', line: 3, lines: 4 });
   });
 
+  it('visits nested type annotations, computed keys and JSX expressions', () => {
+    const parsed = parseText(
+      'panel.tsx',
+      [
+        `type Props = import('./props.ts').Props;`,
+        `const panel = { [process.env.KEY]: () => <div>{new PanelService()}</div> };`,
+      ].join('\n'),
+    );
+    expect(parsed.imports).toEqual([
+      { specifier: './props.ts', typeOnly: true, dynamic: false, reexport: false, line: 1 },
+    ]);
+    expect(parsed.processEnv).toBe(1);
+    expect(parsed.created).toEqual([{ name: 'PanelService', line: 2 }]);
+    expect(parsed.functions).toHaveLength(1);
+  });
+
+  it('preserves code lines and positions around multiple comments and comment-like strings', () => {
+    const text = [
+      '/* first *//* second */',
+      'import { value } from "./value.ts"; // trailing',
+      'const text = "/* not a comment */ // still text";',
+      '/* block',
+      '   comment */ export const outer = () => {',
+      '  // inside',
+      '  const inner = () => new StoreService(); /* inline */',
+      '  return inner();',
+      '};',
+    ].join('\n');
+    const parsed = parseText('a.ts', text);
+    expect(codeLines(text)).toBe(6);
+    expect(parsed.codeLines).toBe(6);
+    expect(parsed.imports).toEqual([
+      { specifier: './value.ts', typeOnly: false, dynamic: false, reexport: false, line: 2 },
+    ]);
+    expect(parsed.functions).toEqual([
+      { name: 'outer', line: 5, lines: 4 },
+      { name: 'inner', line: 7, lines: 1 },
+    ]);
+    expect(parsed.created).toEqual([{ name: 'StoreService', line: 7 }]);
+  });
+
   it('measures functions, methods and arrows in code lines', () => {
     const text = [
       'export function alpha() {',

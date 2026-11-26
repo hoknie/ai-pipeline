@@ -28,6 +28,7 @@ const reads: MethodAccess = { action: 'config.read', target: project };
 export const settingsMethods = {
   repositories: { action: 'project.read', target: anywhere },
   repository_match: { action: 'project.read', target: anywhere },
+  repository_branches: onProject('project.read'),
   repository_add: onShared('project.add'),
   repository_update: onShared('project.update'),
   repository_move: onShared('project.update'),

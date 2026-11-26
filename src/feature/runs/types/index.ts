@@ -1,6 +1,7 @@
 export * from './attempt.ts';
 export * from './constants.ts';
 export * from './create.ts';
+export * from './delivery/target.ts';
 export * from './group.ts';
 export * from './history/attempt-history.ts';
 export * from './launch/launch.ts';

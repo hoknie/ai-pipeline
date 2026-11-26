@@ -4,6 +4,8 @@ import { rejected } from '../../../platform/errors/index.ts';
 import {
   excludeWorkspace,
   prepareRunBranch,
+  refExists,
+  runGit,
   resolveBase,
   workspaceRoot,
 } from '../../../platform/git/index.ts';
@@ -17,6 +19,7 @@ import { findPipeline } from '../../swarm-config/types/index.ts';
 import type { Event } from '../machine/index.ts';
 import {
   checkSkip,
+  checkDeliveryBranch,
   createRun,
   groupsFromTask,
   oppositeHarness,
@@ -113,6 +116,13 @@ export class RunRequests {
     if (skipError !== null) throw rejected(skipError);
     const id = runId(now(), randomInt(36 ** 4));
     requireDeliveryMode(configs, params.deliveryMode);
+    checkDeliveryBranch(
+      params.deliveryBranch,
+      params.autoDeliver ?? config.delivery.auto,
+      params.deliveryMode ?? config.delivery.mode,
+      serverModeOn(configs),
+    );
+    await checkTargetRef(repository, params.deliveryBranch);
     // The server mode: the run starts from the main branch of the remote repository, fetched now.
     const { remote, baseBranch } = config.delivery;
     const remoteBase = serverModeOn(configs)
@@ -139,6 +149,9 @@ export class RunRequests {
       number: queueItem.number,
       autoDeliver: params.autoDeliver,
       deliveryMode: params.deliveryMode,
+      deliveryBranch: params.deliveryBranch,
+      sourceCommit: prepared.sourceCommit,
+      sourceBranch: prepared.sourceBranch,
       skip: params.skip,
       variant: params.variant,
       provider: params.provider,
@@ -253,6 +266,26 @@ export class RunRequests {
       dirty ? ['the repository has uncommitted changes; they are not part of this run'] : [],
     );
   }
+}
+
+async function checkTargetRef(
+  repository: string,
+  target: RunRequest['deliveryBranch'],
+): Promise<void> {
+  if (!target) return;
+  if (
+    (
+      await runGit(repository, ['check-ref-format', '--branch', target.name], {
+        allowFailure: true,
+      })
+    ).code !== 0
+  )
+    throw rejected('deliveryBranch must contain a valid local branch name');
+  const exists = await refExists(repository, `refs/heads/${target.name}`);
+  if (target.strategy === 'existing' && !exists)
+    throw rejected(`deliveryBranch \`${target.name}\` does not exist`);
+  if (target.strategy === 'create' && exists)
+    throw rejected(`deliveryBranch \`${target.name}\` already exists`);
 }
 
 /** The groups of a probe: the split task again, or the groups of the run as they were given. */

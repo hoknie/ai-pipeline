@@ -24,8 +24,27 @@ delivery:
 ## Modes
 
 - `worktree` (the default) puts the changes in your working tree as uncommitted changes and leaves the index alone.
-- `commit` puts the changes in the working tree and makes one commit on the current branch, with the run's files only. Your other uncommitted edits are not touched. If anything is staged in the index, delivery refuses.
+- `commit`, without a target branch, puts the changes in the working tree and makes one commit on the current branch, with the run's files only. Your other uncommitted edits are not touched. If anything is staged in the index, delivery refuses.
 - `branch` creates an `aip/<run-id>` branch with the result and leaves the working tree alone.
+
+For a local task with automatic delivery in `commit` mode, an optional target
+branch directs the delivery commit to a different local branch without checking
+it out. Choose an existing branch (`existing`) or explicitly request a new one
+(`create`). Without a target, `commit` keeps its usual current-branch behavior.
+The target is not available for manual delivery except when retrying a failed
+automatic delivery. It is unavailable for other modes and server mode; it is
+separate from the `branch` delivery mode and does not push a branch.
+
+An existing target must descend from the source commit recorded when the run
+started and must not be checked out in any worktree. A new target starts from
+the current tip of the run's source branch, which must still exist and descend
+from that source commit; the new branch is created only when delivery succeeds.
+Conflicts, an occupied branch or a concurrent update leave the target unchanged
+and allow a retry. A configured `resolver` is not used for target-branch
+conflicts, and `--force` cannot write conflict markers to a target branch. If auto
+delivery is cancelled, a later manual delivery uses the usual current branch,
+not the saved target. An unsuccessful automatic delivery can be retried with
+`aip run apply` while auto delivery remains enabled.
 
 In [server mode](server.md#authors-and-commits) only `branch` is allowed, see [Server mode](#server-mode); its commit is by the person whose task it was.
 
@@ -55,9 +74,28 @@ Ready groups can be delivered in parts, and a group cannot be delivered twice. I
 
 A task without a value takes `delivery.mode` and `delivery.auto` at the moment it starts. The panel's [queue modes](../web/queue.md#queue-modes) change the settings themselves.
 
+For an automatically delivered `commit` task, MCP and IPC accept
+`deliveryBranch: {name: "feature/profile", strategy: "existing"}` to use an
+existing local branch, or `deliveryBranch: {name: "feature/new", strategy: "create"}`
+to create a new one at delivery. Editing a queued task accepts
+`deliveryBranch: null` to clear the target; omitting it keeps the old value.
+The CLI takes `--delivery-branch <name>` together with
+`--delivery-branch-strategy <existing|create>` on `aip run start`, `aip queue add`
+and `aip queue edit`. To clear a queued task's target, use
+`aip queue edit <item> --clear-delivery-branch` instead of the pair.
+
+```sh
+aip queue add feature --task "Update profile" --auto-deliver --delivery-mode commit --delivery-branch feature/profile --delivery-branch-strategy existing
+aip queue add feature --task "Add profile" --auto-deliver --delivery-mode commit --delivery-branch feature/new --delivery-branch-strategy create
+```
+
+For several `--repo` arguments the same name and strategy apply to every project;
+each must satisfy the strategy or the entire request is refused. The effective
+delivery settings and branch existence are checked again when a queued task starts.
+
 ## Safety
 
-The run's changes are merged with the current content of your working tree, including uncommitted edits, using a three-way merge.
+Without a target branch, the run's changes are merged with the current content of your working tree, including uncommitted edits, using a three-way merge.
 
 - If you edited other places in the same files, your edits stay together with the run's changes.
 - If the merge conflicts and `resolver` is not set, delivery changes nothing and lists the files.

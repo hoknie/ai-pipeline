@@ -34,6 +34,7 @@ import {
 import type { TaskLinks } from './links.ts';
 import type { QueueScope } from './scope.ts';
 import type { QueueStore } from './store.ts';
+import { ensureDeliveryTarget } from './target/target.ts';
 
 export interface QueueAdvanceDependencies {
   store: QueueStore;
@@ -63,6 +64,7 @@ function itemRequest(repository: string, item: QueueItem): RunRequest {
     ...(item.title !== null ? { title: item.title } : {}),
     ...(item.autoDeliver !== null ? { autoDeliver: item.autoDeliver } : {}),
     ...(item.deliveryMode !== null ? { deliveryMode: item.deliveryMode } : {}),
+    ...(item.deliveryBranch != null ? { deliveryBranch: item.deliveryBranch } : {}),
     ...(item.skip.length > 0 ? { skip: item.skip } : {}),
   };
 }
@@ -260,6 +262,13 @@ export class QueueAdvance {
   async createRun(queue: Queue, item: QueueItem): Promise<RunCreated> {
     const { attachments, runs, store } = this.dependencies;
     const repository = store.lines.repositoryOf(queue, item);
+    await ensureDeliveryTarget(
+      this.dependencies.config,
+      repository,
+      item.deliveryBranch,
+      item.autoDeliver,
+      item.deliveryMode,
+    );
     const tags = knownTags(this.dependencies.tags.of(repository), item.tags);
     // The run keeps a snapshot of the attachments; the files themselves change owner, not place.
     const files = attachments.listOf(item.id);

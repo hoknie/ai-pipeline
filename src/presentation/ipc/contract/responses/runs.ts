@@ -202,6 +202,8 @@ export interface RunView {
   autoDeliver: boolean;
   /** How the merged result is delivered. */
   deliveryMode: DeliveryMode;
+  /** Explicit local target branch, if any. */
+  deliveryBranch?: { name: string; strategy: 'existing' | 'create' } | null;
   /** The branch of the delivery in the remote repository (`url`: its page at a known host); null before it is sent. */
   remoteBranch: { remote: string; branch: string; url: string | null; address: string } | null;
   /** The commit the run started from. */

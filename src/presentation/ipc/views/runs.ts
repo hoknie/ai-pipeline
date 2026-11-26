@@ -239,6 +239,7 @@ function runHead(state: RunState, observers: RepairPolicy) {
     dirtyWarning: state.run.dirtyWarning,
     autoDeliver: state.run.config.delivery.auto,
     deliveryMode: state.run.config.delivery.mode,
+    deliveryBranch: state.run.deliveryBranch ?? null,
     remoteBranch: state.run.remoteBranch,
     baseCommit: state.run.baseCommit,
     fromQueue: state.run.fromQueue,

@@ -871,6 +871,33 @@ describe('automatic delivery switch', () => {
       }),
     );
   });
+
+  it('clears an edited delivery branch explicitly', async () => {
+    const branch = { name: 'feature/x', strategy: 'existing' as const };
+    const api = show(
+      queueOf({
+        deliveryMode: 'commit',
+        items: [
+          queueItem('q1', 'A', 1, {
+            autoDeliver: true,
+            deliveryMode: 'commit',
+            deliveryBranch: branch,
+          }),
+        ],
+      }),
+      { branches: vi.fn(async () => ['feature/x']) },
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await screen.findByLabelText('Target branch');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith(
+        'q1',
+        expect.objectContaining({ deliveryBranch: null }),
+      ),
+    );
+  });
 });
 
 describe('items', () => {

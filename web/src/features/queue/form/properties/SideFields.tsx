@@ -28,6 +28,7 @@ export function SideFields(props: {
   projectsPanel?: ReactNode;
   returnedRun?: string | null;
   providerError?: string | undefined;
+  branchValidation: 'valid' | 'pending' | 'invalid';
 }) {
   const { state, pipelines, repository, api } = props;
   const { t } = useTranslation();
@@ -79,6 +80,9 @@ export function SideFields(props: {
           state={state}
           autoDeliverDefault={props.autoDeliverDefault}
           deliveryModeDefault={props.deliveryModeDefault}
+          api={api}
+          repository={repository}
+          branchValidation={props.branchValidation}
         />
       </FormSection>
     </div>

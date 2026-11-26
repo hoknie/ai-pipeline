@@ -12,6 +12,7 @@ import {
   variantSkip,
 } from '../../swarm-config/types/index.ts';
 import { SPLIT_GROUP } from './constants.ts';
+import { checkDeliveryBranch, type DeliveryBranch } from './delivery/target.ts';
 import { newGroup } from './group.ts';
 import { type Harness, probeFields } from './probe/index.ts';
 import { type RunAttachment, type RunState, emptyRepair } from './run.ts';
@@ -32,6 +33,7 @@ export interface RunRequest {
   title?: string | undefined;
   autoDeliver?: boolean | undefined;
   deliveryMode?: DeliveryMode | undefined;
+  deliveryBranch?: DeliveryBranch | undefined;
   skip?: string[] | undefined;
   /** Id of a variant of the pipeline; absent: `default`. */
   variant?: string | undefined;
@@ -106,6 +108,9 @@ export interface NewRun {
   autoDeliver?: boolean | undefined;
   /** Overrides `delivery.mode` of the configuration for this run only. */
   deliveryMode?: DeliveryMode | undefined;
+  deliveryBranch?: DeliveryBranch | undefined;
+  sourceCommit?: string | null | undefined;
+  sourceBranch?: string | null | undefined;
   /** Ids of catalog tags. */
   tags?: string[] | undefined;
   /** Ids of pipeline steps this run skips. */
@@ -187,6 +192,7 @@ export function createRun(input: NewRun): RunState {
     ? (input.provider ?? null)
     : checkedProvider(input.config, input.provider);
   const config = withDelivery(resolved, input);
+  checkDeliveryBranch(input.deliveryBranch, config.delivery.auto, config.delivery.mode);
   const splitting = input.split && pipeline.split !== null && input.groups.length === 1;
   const slugs = groupSlugs(input.groups.map((group) => group.title));
   const state: RunState = {
@@ -203,6 +209,9 @@ export function createRun(input: NewRun): RunState {
       createdAt: input.now,
       finishedAt: null,
       config,
+      deliveryBranch: input.deliveryBranch ? { ...input.deliveryBranch } : null,
+      sourceCommit: input.sourceCommit ?? null,
+      sourceBranch: input.sourceBranch ?? null,
       dirtyWarning: input.dirtyWarning,
       nextMergeSeq: 0,
       ...{ pendingDelivery: null, remoteBranch: null, cleanedAt: null },

@@ -9,6 +9,7 @@ import {
   attachmentSources,
   collect,
   parseDeliveryMode,
+  parseDeliveryBranch,
   parseSwitch,
   readGroups,
   type QueueTaskOptions,
@@ -38,6 +39,7 @@ interface EditOptions extends QueueTaskOptions {
   workflow?: string;
   defaultAutoDeliver?: boolean;
   defaultDeliveryMode?: boolean;
+  clearDeliveryBranch?: boolean;
   tags?: boolean;
   skips?: boolean;
   detach?: string[];
@@ -86,6 +88,11 @@ function checkEdit(options: EditOptions, flags: EditFlags): void {
       !!options.defaultDeliveryMode && options.deliveryMode !== undefined,
       '--default-delivery-mode cannot be combined with --delivery-mode',
     ],
+    [
+      !!options.clearDeliveryBranch &&
+        (options.deliveryBranch !== undefined || options.deliveryBranchStrategy !== undefined),
+      '--clear-delivery-branch cannot be combined with --delivery-branch or --delivery-branch-strategy',
+    ],
   ];
   const found = conflicts.find(([clash]) => clash);
   if (found) throw usage(found[1]);
@@ -95,6 +102,10 @@ function checkEdit(options: EditOptions, flags: EditFlags): void {
 function editParams(item: string, options: EditOptions, flags: EditFlags) {
   const pipeline = options.pipeline ?? options.workflow;
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
+  const deliveryBranch = parseDeliveryBranch(
+    options.deliveryBranch,
+    options.deliveryBranchStrategy,
+  );
   const links = linkInputsOf(options, flags);
   return {
     repository: repositoryArgument(options.repo),
@@ -117,6 +128,11 @@ function editParams(item: string, options: EditOptions, flags: EditFlags) {
       ? { deliveryMode: null }
       : deliveryMode !== undefined
         ? { deliveryMode }
+        : {}),
+    ...(options.clearDeliveryBranch
+      ? { deliveryBranch: null }
+      : deliveryBranch !== undefined
+        ? { deliveryBranch }
         : {}),
     ...(options.tags === false ? { tags: [] } : {}),
     ...(options.tag !== undefined ? { tags: options.tag } : {}),
@@ -161,6 +177,7 @@ export function addEdit(kit: QueueKit): void {
         .addOption(new Option('-w, --workflow <id>', 'old name of --pipeline').hideHelp())
         .option('--default-auto-deliver', 'follow delivery.auto of the configuration again')
         .option('--default-delivery-mode', 'follow delivery.mode of the configuration again')
+        .option('--clear-delivery-branch', 'remove the target delivery branch')
         .option('--no-provider', 'remove the provider of the task')
         .option('--no-tags', 'remove all tags of the task')
         .option('--no-parent', 'remove the linked task tags of the task')

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
+import { deliveryBranchSchema } from '../ipc/contract/runs.ts';
 import { ALLOW_DUPLICATE, attempt, hintDuplicate, HOST_DUPLICATE_HINT } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
 import { linkInputs, present } from './host-links.ts';
@@ -33,6 +34,9 @@ export const deliveryFields = {
     .describe(
       'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
     ),
+  deliveryBranch: deliveryBranchSchema
+    .optional()
+    .describe('Local target branch for automatic commit delivery'),
 };
 
 export function registerQueueAdd(kit: HostKit): void {
@@ -79,6 +83,7 @@ export function registerQueueAdd(kit: HostKit): void {
       title,
       autoDeliver,
       deliveryMode,
+      deliveryBranch,
       tags: tagNames,
       parent: parentRef,
       skip: skipSteps,
@@ -98,8 +103,7 @@ export function registerQueueAdd(kit: HostKit): void {
               pipeline,
               ...present({ variant: variantId, provider: providerId }),
               ...present({ task, groups, title }),
-              ...(autoDeliver !== undefined ? { autoDeliver } : {}),
-              ...(deliveryMode !== undefined ? { deliveryMode } : {}),
+              ...present({ autoDeliver, deliveryMode, deliveryBranch }),
               ...(tagNames !== undefined ? { tags: tagNames } : {}),
               ...(parentRef !== undefined ? { parent: parentRef } : {}),
               ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),
@@ -142,6 +146,10 @@ function queueEditInput(kit: HostKit) {
       .nullable()
       .optional()
       .describe('Delivery mode of this task; null follows delivery.mode again'),
+    deliveryBranch: deliveryBranchSchema
+      .nullable()
+      .optional()
+      .describe('Local target branch; null removes it'),
     tags,
     parent: parent
       .nullable()
@@ -183,6 +191,7 @@ export function registerQueueEdit(kit: HostKit): void {
       position,
       autoDeliver,
       deliveryMode,
+      deliveryBranch,
       tags: tagNames,
       parent: parentRef,
       skip: skipSteps,
@@ -203,6 +212,7 @@ export function registerQueueEdit(kit: HostKit): void {
             ...(position !== undefined ? { position } : {}),
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
             ...(deliveryMode !== undefined ? { deliveryMode } : {}),
+            ...(deliveryBranch !== undefined ? { deliveryBranch } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(parentRef !== undefined ? { parent: parentRef } : {}),
             ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),

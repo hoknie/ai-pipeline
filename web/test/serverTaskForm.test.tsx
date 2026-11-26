@@ -24,5 +24,6 @@ describe('the task form in the server mode', () => {
     const options = screen.queryAllByRole('option').map((option) => option.textContent);
     expect(options).toHaveLength(1);
     expect(options.join(' ').toLowerCase()).not.toMatch(/worktree|commit/);
+    expect(screen.queryByLabelText('Target branch')).toBeNull();
   });
 });

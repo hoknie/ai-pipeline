@@ -41,6 +41,11 @@ A task with links shows them on a second line, grouped by kind; see [Links](#lin
 - **"Postpone"** adds the task [postponed](../usage/queue.md#postponed-tasks). The switch is only in the new task; for an existing task the "Postpone" button in the list changes the flag.
 - **"Attachments"** has an "Attach files" button and a drop zone. Each file is uploaded at once, with its progress shown. A file over 20 MB, an eleventh file and a repeated name are refused with a message and stay out of the list; a failed upload shows its error and is not sent with the task. "Add" is unavailable while a file is uploading.
 - **Tags** and **delivery** (a switch "Auto delivery" and the delivery mode, each with a badge: as in the settings or for this task, and a reset icon for its own value) are the [tags](../usage/tags.md) and [delivery settings](../configuration/delivery.md#settings-for-one-task) of the task.
+- For local automatic `commit` delivery, **"Target branch"** searches existing
+  local branches; **"Create this branch on delivery"** selects a new branch to
+  create on successful delivery. For example, select existing `feature/profile`,
+  or create `feature/new`; neither choice switches the user's working tree. The
+  target is unavailable in server mode or with another delivery mode.
 - **"Variant"** chooses a [variant of the pipeline](../usage/queue.md#variants); it is shown only when the pipeline has variants, and changing the pipeline resets it to `default`. The queue and the cards of runs show a badge with the variant name next to the pipeline badge, except for `default`.
 - **"Skip steps"** is a multiselect that looks like "Pipeline": it shows the [skipped steps](../usage/queue.md#skipping-steps) by name, or "Do not skip", and opens the list of the steps. Choosing a step toggles its mark and the list stays open. The last unmarked step is unavailable; steps of the chosen variant are marked and fixed.
 
@@ -73,6 +78,9 @@ The left half holds what is shared: name, pipeline and variant, text and the sha
 - Under the text there is an optional **"Addition for <project>"** field per project; it is appended to the shared text of that project.
 - **"Shared tag"** is filled from the title (up to 30 characters, cut at the last whole word); an empty field means no tag. See [shared tag](../usage/tags.md#shared-tag-of-a-task-in-several-projects).
 - **"In turn"** makes the task of each project wait for the previous one; off by default.
+- A target such as existing `feature/profile` or new `feature/new` applies to
+  every selected project separately. Each repository must satisfy the selected
+  strategy; if one does not, none of the tasks is added.
 - Groups, attachments and the project tags field are not shown. An error of the daemon names the project and the entered data stays. See [one task in several projects](../usage/queue.md#one-task-in-several-projects).
 
 ### The text editor

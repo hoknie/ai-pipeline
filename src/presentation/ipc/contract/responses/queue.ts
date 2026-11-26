@@ -46,6 +46,8 @@ export interface QueueItemView {
   autoDeliver: boolean | null;
   /** `null`: follows `delivery.mode` when the task starts. */
   deliveryMode: DeliveryMode | null;
+  /** Explicit local target branch, if any. */
+  deliveryBranch?: { name: string; strategy: 'existing' | 'create' } | null;
   tags: TagView[];
   /** `false`: the task takes no tags of its predecessors in `after`, now and later. */
   inheritTags: boolean;

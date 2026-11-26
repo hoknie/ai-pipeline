@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { parseSync } from 'oxc-parser';
+import { parseSync, visitorKeys } from 'oxc-parser';
 
 export interface SourceImport {
   specifier: string;
@@ -54,12 +54,17 @@ function parse(file: string, text: string): { program: Node; comments: Comment[]
 }
 
 function maskComments(text: string, comments: Comment[]): string {
-  let masked = text;
+  const chunks: string[] = [];
+  let end = 0;
   for (const comment of comments) {
-    const blank = text.slice(comment.start, comment.end).replace(/[^\n]/g, ' ');
-    masked = masked.slice(0, comment.start) + blank + masked.slice(comment.end);
+    chunks.push(
+      text.slice(end, comment.start),
+      text.slice(comment.start, comment.end).replace(/[^\n]/g, ' '),
+    );
+    end = comment.end;
   }
-  return masked;
+  chunks.push(text.slice(end));
+  return chunks.join('');
 }
 
 /** Number of lines of code: blank lines and comment-only lines are not counted. */
@@ -213,30 +218,33 @@ export function parseText(file: string, text: string): ParsedSource {
       });
     }
 
-    for (const [key, value] of Object.entries(node)) {
+    // Traverse parser-declared child nodes rather than inspecting every AST property. Keep a
+    // generic fallback for node types not yet present in the parser's visitor table.
+    const keys = (visitorKeys as Record<string, readonly string[]>)[node.type] ?? Object.keys(node);
+    for (const key of keys) {
+      const value = node[key];
       if (key === 'type' || value === null || typeof value !== 'object') continue;
-      const children: unknown[] = Array.isArray(value) ? value : [value];
-      for (const child of children) {
-        if (
-          child === null ||
-          typeof child !== 'object' ||
-          typeof (child as Node).type !== 'string'
-        ) {
-          continue;
-        }
-        let childHint: string | undefined;
-        if (node.type === 'VariableDeclarator' && key === 'init') childHint = keyName(node.id);
-        else if (
-          (node.type === 'MethodDefinition' ||
-            node.type === 'Property' ||
-            node.type === 'PropertyDefinition') &&
-          key === 'value'
-        ) {
-          childHint = keyName(node.key);
-        } else if (node.type === 'ExportDefaultDeclaration') childHint = 'default';
-        visit(child as Node, childHint);
-      }
+      if (Array.isArray(value)) {
+        for (const child of value) visitChild(node, child, key);
+      } else visitChild(node, value, key);
     }
+  };
+
+  const visitChild = (node: Node, child: unknown, key: string): void => {
+    if (child === null || typeof child !== 'object' || typeof (child as Node).type !== 'string') {
+      return;
+    }
+    let childHint: string | undefined;
+    if (node.type === 'VariableDeclarator' && key === 'init') childHint = keyName(node.id);
+    else if (
+      (node.type === 'MethodDefinition' ||
+        node.type === 'Property' ||
+        node.type === 'PropertyDefinition') &&
+      key === 'value'
+    ) {
+      childHint = keyName(node.key);
+    } else if (node.type === 'ExportDefaultDeclaration') childHint = 'default';
+    visit(child as Node, childHint);
   };
 
   const body: Node[] = program.body ?? [];

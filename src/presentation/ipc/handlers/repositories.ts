@@ -1,4 +1,6 @@
 import { catalogView } from '../views/index.ts';
+import { searchLocalBranches } from '../../../platform/git/index.ts';
+import { notFound } from '../../../platform/errors/index.ts';
 
 import { visible } from './access/visible.ts';
 
@@ -11,6 +13,13 @@ const listed = (context: IpcContext) =>
 /** The registry of repositories and the tag catalogs. */
 export const repositoryHandlers = {
   repositories: async (_params, context) => listed(context),
+  repository_branches: async ({ repository, query, exact }, { services, actor }) => {
+    const root = await services.registry.resolve(repository);
+    if (!services.access.can(actor, 'project.read', { repository: root })) {
+      throw notFound('ipc.guard', 'unknown repository');
+    }
+    return searchLocalBranches(root, query, exact);
+  },
   repository_match: async (params, { services, actor }) => {
     const found = await services.projects.matchRemotes(params.remotes);
     // a project the actor cannot read is not there for the actor

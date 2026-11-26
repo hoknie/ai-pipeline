@@ -31,6 +31,7 @@ import type { QueueItems } from './items.ts';
 import type { TaskLinks } from './links.ts';
 import type { QueueStore } from './store.ts';
 import type { TaskTags } from './task-tags.ts';
+import { ensureEditedTarget, itemPatch } from './target/target.ts';
 
 export interface QueueEditDependencies {
   store: QueueStore;
@@ -86,25 +87,9 @@ export class QueueEdit {
     if (existing?.run && runProvider !== undefined) await this.providerInRun(existing, runProvider);
     requireDeliveryMode(this.dependencies.config, params.deliveryMode);
     await this.ensureFields(repository, existing, params, skip);
+    await ensureEditedTarget(this.dependencies.config, repository, existing, params);
     const after = params.after === undefined ? undefined : items.resolveDependencies(params.after);
-    const {
-      pipeline,
-      variant,
-      provider,
-      task,
-      groups,
-      title,
-      position,
-      autoDeliver,
-      deliveryMode,
-      postponed,
-      inheritTags,
-    } = params;
-    const patch = {
-      ...{ pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode },
-      position: global ? undefined : position,
-    };
-    const fields = { ...patch, skip, after, inheritTags, postponed };
+    const fields = { ...itemPatch(params, global), skip, after };
     const tags = await this.tagsOf(queue, existing, params, fields, moment);
     if (existing && changesAttachments) {
       // The edit is checked on a copy first: no file is stored for an edit that is refused.
@@ -167,6 +152,7 @@ export class QueueEdit {
       tags: params.tags,
       autoDeliver: params.autoDeliver,
       deliveryMode: params.deliveryMode,
+      deliveryBranch: params.deliveryBranch,
       skip,
     });
   }
@@ -229,6 +215,7 @@ export class QueueEdit {
         tags: params.tags,
         autoDeliver,
         deliveryMode,
+        deliveryBranch: params.deliveryBranch,
         skip,
       },
       true,

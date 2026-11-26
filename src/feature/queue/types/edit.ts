@@ -1,9 +1,11 @@
 import { rejected } from '../../../platform/errors/index.ts';
 import {
   type NewGroup,
+  type DeliveryBranch,
   type RunState,
   RUN_TITLE_LIMIT,
   cleanSkip,
+  checkDeliveryBranch,
 } from '../../runs/types/index.ts';
 import {
   type DeliveryMode,
@@ -71,6 +73,7 @@ export function addItem(
   find: ItemLookup = lookupIn(queue),
 ): QueueItem {
   const after = [...new Set(fields.after ?? [])];
+  checkDeliveryBranch(fields.deliveryBranch, fields.autoDeliver, fields.deliveryMode);
   checkDependencies(find, id, after);
   const item: QueueItem = {
     id,
@@ -84,6 +87,7 @@ export function addItem(
     title: cleanTitle(fields.title),
     autoDeliver: fields.autoDeliver ?? null,
     deliveryMode: cleanDeliveryMode(fields.deliveryMode) ?? null,
+    deliveryBranch: fields.deliveryBranch ? { ...fields.deliveryBranch } : null,
     tags: [...new Set(fields.tags ?? [])],
     inheritTags: fields.inheritTags ?? true,
     skip: cleanSkip(fields.skip ?? []),
@@ -108,6 +112,7 @@ export interface ItemPatch {
   title?: string | null | undefined;
   autoDeliver?: boolean | null | undefined;
   deliveryMode?: DeliveryMode | null | undefined;
+  deliveryBranch?: DeliveryBranch | null | undefined;
   tags?: string[] | undefined;
   inheritTags?: boolean | undefined;
   skip?: string[] | undefined;
@@ -147,6 +152,12 @@ export function editItem(
   const after = patch.after === undefined ? undefined : [...new Set(patch.after)];
   if (after !== undefined) checkDependencies(find, id, after);
   const deliveryMode = cleanDeliveryMode(patch.deliveryMode);
+  const branch = patch.deliveryBranch === undefined ? item.deliveryBranch : patch.deliveryBranch;
+  checkDeliveryBranch(
+    branch,
+    patch.autoDeliver === undefined ? item.autoDeliver : patch.autoDeliver,
+    deliveryMode === undefined ? item.deliveryMode : deliveryMode,
+  );
   if (pipeline !== null) item.pipeline = pipeline;
   if (patch.variant !== undefined) item.variant = patch.variant;
   if (patch.provider !== undefined) item.provider = patch.provider;
@@ -154,6 +165,8 @@ export function editItem(
   if (title !== undefined) item.title = title;
   if (patch.autoDeliver !== undefined) item.autoDeliver = patch.autoDeliver;
   if (deliveryMode !== undefined) item.deliveryMode = deliveryMode;
+  if (patch.deliveryBranch !== undefined)
+    item.deliveryBranch = patch.deliveryBranch ? { ...patch.deliveryBranch } : null;
   if (patch.tags !== undefined) item.tags = [...new Set(patch.tags)];
   if (patch.inheritTags !== undefined) item.inheritTags = patch.inheritTags;
   if (patch.skip !== undefined) item.skip = cleanSkip(patch.skip);

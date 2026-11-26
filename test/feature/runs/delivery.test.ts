@@ -17,6 +17,7 @@ import {
   transition,
 } from '../../../src/feature/runs/machine/index.ts';
 import { groupChanges } from '../../../src/feature/runs/services/effects/git.ts';
+import { targetDelivery } from '../../../src/feature/runs/machine/delivery-flow.ts';
 
 import { CONFIG_TEXT, finish, group, run, runningAttempt, step } from './helpers.ts';
 
@@ -57,6 +58,53 @@ function request(state: RunState, groups: string[] | null = null, force = false)
 const applied = { kind: 'applied' as const, files: ['src/app.ts'], conflicts: [], commit: null };
 
 describe('delivery requests', () => {
+  it('targets only auto or a retry of a failed target attempt, not a manual attempt', () => {
+    const state = mergedRun(1);
+    state.run.config.delivery.mode = 'commit';
+    state.run.config.delivery.auto = true;
+    state.run.deliveryBranch = { name: 'feature', strategy: 'existing' };
+    request(state);
+    expect(targetDelivery(state)).toBe(false);
+    transition(
+      state,
+      { kind: 'delivery_finished', result: { kind: 'failed', message: 'manual' } },
+      7000,
+    );
+    request(state);
+    expect(targetDelivery(state)).toBe(false);
+    state.run.pendingDelivery!.auto = true;
+    expect(targetDelivery(state)).toBe(true);
+    transition(
+      state,
+      { kind: 'delivery_finished', result: { kind: 'failed', message: 'auto' } },
+      8000,
+    );
+    request(state);
+    expect(targetDelivery(state)).toBe(true);
+    state.run.config.delivery.auto = false;
+    expect(targetDelivery(state)).toBe(false);
+  });
+  it('keeps a mixed retry on the target and preserves manual delivery after cancelling auto', () => {
+    const state = mergedRun(2);
+    state.run.config.delivery.mode = 'commit';
+    state.run.config.delivery.auto = true;
+    state.run.deliveryBranch = { name: 'feature', strategy: 'existing' };
+    request(state, ['group-1']);
+    state.run.pendingDelivery!.auto = true;
+    transition(
+      state,
+      { kind: 'delivery_finished', result: { kind: 'failed', message: 'x' } },
+      7000,
+    );
+    request(state);
+    expect(state.run.pendingDelivery?.groups).toEqual(['group-1', 'group-2']);
+    expect(targetDelivery(state)).toBe(true);
+    state.run.config.delivery.auto = false;
+    expect(targetDelivery(state)).toBe(false);
+    state.run.config.delivery.auto = true;
+    transition(state, { kind: 'delivery_finished', result: applied }, 8000);
+    expect(state.groups.map((group) => group.delivery.state)).toEqual(['applied', 'applied']);
+  });
   it('delivers only merged groups and leaves the rest for later', () => {
     const state = mergedRun(3, { leaveLast: true });
     expect(state.groups.map((group) => group.status)).toEqual(['merged', 'merged', 'running']);

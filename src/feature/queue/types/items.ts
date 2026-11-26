@@ -1,5 +1,11 @@
 import { rejected } from '../../../platform/errors/index.ts';
-import type { NewGroup, OnLimit, ProblemReason, RunState } from '../../runs/types/index.ts';
+import type {
+  DeliveryBranch,
+  NewGroup,
+  OnLimit,
+  ProblemReason,
+  RunState,
+} from '../../runs/types/index.ts';
 import type { DeliveryMode } from '../../swarm-config/types/index.ts';
 import { queueItemId } from './ids.ts';
 
@@ -28,6 +34,7 @@ export interface QueueItem {
   autoDeliver: boolean | null;
   /** `null`: follow `delivery.mode` when the task starts. */
   deliveryMode: DeliveryMode | null;
+  deliveryBranch: DeliveryBranch | null;
   /** Ids of catalog tags. */
   tags: string[];
   /** `false`: the task takes no tags of its predecessors in `after`, now and later. */
@@ -112,6 +119,7 @@ export interface ItemFields {
   title?: string | null | undefined;
   autoDeliver?: boolean | undefined;
   deliveryMode?: DeliveryMode | undefined;
+  deliveryBranch?: DeliveryBranch | undefined;
   tags?: string[] | undefined;
   inheritTags?: boolean | undefined;
   skip?: string[] | undefined;
