@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ReasoningEffort } from '../../../shared/api/types.ts';
-import { ModelField } from '../../../shared/ui/forms/picker/ModelField.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
@@ -16,15 +15,10 @@ import {
 } from '../../../shared/ui/forms/select.tsx';
 import { Switch } from '../../../shared/ui/forms/switch.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
-import type { ModelEntry } from '../../../shared/api/types.ts';
-import {
-  levelOf,
-  roleModelOptions,
-  useProviderRegistry,
-  useProvidersScope,
-} from '../../providers/index.ts';
+import { ChainItemModel } from './ChainItemModel.tsx';
 import { ItemProvider, type ItemErrors } from './ChainItemProvider.tsx';
 import type { ChainRuntimeDraft, SpecialistRuntimeName } from './types.ts';
+import { sourceText } from './draft.ts';
 
 const RUNTIMES: readonly SpecialistRuntimeName[] = [
   'claude',
@@ -131,29 +125,35 @@ function ItemHeader({
 }
 
 function ItemFields({
+  api,
   index,
   item,
   disabled,
-  extra,
   onRuntime,
-  onModel,
+  onChange,
 }: {
+  api: Api;
   index: number;
   item: ChainRuntimeDraft;
   disabled: boolean;
-  /** The models of the roles of the provider of the item. */
-  extra: ModelEntry[];
   onRuntime: (val: SpecialistRuntimeName) => void;
-  onModel: (val: string) => void;
+  onChange: (item: ChainRuntimeDraft) => void;
 }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`chain-item-${index}-runtime`}>{t('chains.item.runtime')}</Label>
-        <Select value={item.runtime} disabled={disabled} onValueChange={onRuntime}>
-          <SelectTrigger id={`chain-item-${index}-runtime`}>
-            <SelectValue />
+        <Select
+          value={item.invalidRuntime ? '' : item.runtime}
+          disabled={disabled}
+          onValueChange={onRuntime}
+        >
+          <SelectTrigger
+            id={`chain-item-${index}-runtime`}
+            aria-invalid={Boolean(item.invalidRuntime)}
+          >
+            <SelectValue placeholder={sourceText(item.invalidRuntime?.value)} />
           </SelectTrigger>
           <SelectContent>
             {RUNTIMES.map((rt) => (
@@ -164,19 +164,7 @@ function ItemFields({
           </SelectContent>
         </Select>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`chain-item-${index}-model`}>{t('chains.item.model')}</Label>
-        <ModelField
-          id={`chain-item-${index}-model`}
-          runtime={item.runtime}
-          label={t('chains.item.model')}
-          value={item.model}
-          disabled={disabled}
-          placeholder={t('chains.item.modelPlaceholder')}
-          extra={extra}
-          onChange={onModel}
-        />
-      </div>
+      <ChainItemModel {...{ api, index, item, disabled, onChange }} />
     </div>
   );
 }
@@ -195,6 +183,15 @@ function ItemOpencodeFields({
   onEffort: (val: ReasoningEffort | '') => void;
 }) {
   const { t } = useTranslation();
+  const sourceEffort = Object.hasOwn(item.sourceOptions ?? {}, 'reasoning_effort')
+    ? item.sourceOptions!.reasoning_effort
+    : item.reasoning_effort;
+  const effort =
+    typeof sourceEffort === 'string' && REASONING_EFFORTS.includes(sourceEffort as ReasoningEffort)
+      ? sourceEffort
+      : item.reasoning_effort === '' && !Object.hasOwn(item.sourceOptions ?? {}, 'reasoning_effort')
+        ? INHERIT
+        : '';
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
@@ -202,6 +199,10 @@ function ItemOpencodeFields({
         <Input
           id={`chain-item-${index}-variant`}
           value={item.variant}
+          aria-invalid={
+            Object.hasOwn(item.sourceOptions ?? {}, 'variant') &&
+            typeof item.sourceOptions!.variant !== 'string'
+          }
           disabled={disabled}
           placeholder={t('chains.item.variantPlaceholder')}
           onChange={(e) => onVariant(e.target.value)}
@@ -210,12 +211,18 @@ function ItemOpencodeFields({
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`chain-item-${index}-effort`}>{t('chains.item.reasoningEffort')}</Label>
         <Select
-          value={item.reasoning_effort === '' ? INHERIT : item.reasoning_effort}
+          value={effort}
           disabled={disabled}
           onValueChange={(val) => onEffort(val === INHERIT ? '' : (val as ReasoningEffort))}
         >
-          <SelectTrigger id={`chain-item-${index}-effort`}>
-            <SelectValue />
+          <SelectTrigger id={`chain-item-${index}-effort`} aria-invalid={effort === ''}>
+            <SelectValue
+              placeholder={
+                typeof sourceEffort === 'string'
+                  ? sourceEffort
+                  : `(${Array.isArray(sourceEffort) ? 'array' : typeof sourceEffort})`
+              }
+            />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={INHERIT}>{t('specialists.byDefault')}</SelectItem>
@@ -244,20 +251,11 @@ export function ChainRuntimeItem({
   onMoveDown,
   onRemove,
 }: ChainRuntimeItemProps) {
-  const { t } = useTranslation();
-  const scope = useProvidersScope();
-  const { view } = useProviderRegistry(api, null, levelOf(scope));
-  const provider = view?.providers.find((candidate) => candidate.slug === item.provider);
-  // the models of the roles of the provider through the CLI of the item, before the catalog
-  const extra: ModelEntry[] = provider
-    ? roleModelOptions(provider, view?.roles ?? [], item.runtime).map((option) => ({
-        id: option.model,
-        name: `${option.name} — ${option.model}`,
-        group: t('providers.chainRoles'),
-      }))
-    : [];
-  const setField = <K extends keyof ChainRuntimeDraft>(key: K, val: ChainRuntimeDraft[K]) =>
-    onChange({ ...item, [key]: val });
+  const setField = <K extends keyof ChainRuntimeDraft>(key: K, val: ChainRuntimeDraft[K]) => {
+    const sourceOptions = { ...item.sourceOptions };
+    delete sourceOptions[key];
+    onChange({ ...item, [key]: val, sourceOptions });
+  };
 
   return (
     <Card className={`flex flex-col gap-3 p-4 ${item.enabled ? '' : 'bg-muted/40 opacity-70'}`}>
@@ -281,12 +279,20 @@ export function ChainRuntimeItem({
         onChange={(patch) => onChange({ ...item, ...patch })}
       />
       <ItemFields
+        api={api}
         index={index}
         item={item}
         disabled={disabled}
-        extra={extra}
-        onRuntime={(val) => setField('runtime', val)}
-        onModel={(val) => setField('model', val)}
+        onRuntime={(val) =>
+          onChange({
+            ...item,
+            runtime: val,
+            invalidRuntime: undefined,
+            sourceOptions: undefined,
+            ...(val !== 'opencode' ? { variant: '', reasoning_effort: '' } : {}),
+          })
+        }
+        onChange={onChange}
       />
       {item.runtime === 'opencode' ? (
         <ItemOpencodeFields

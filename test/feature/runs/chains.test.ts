@@ -8,6 +8,9 @@ import {
 } from '../../../src/feature/runs/types/index.ts';
 import { dispatch, planDispatch, transition } from '../../../src/feature/runs/machine/index.ts';
 import { group, run, runningAttempt } from './helpers.ts';
+import { config, finish } from './helpers.ts';
+import { permissionsOf, specialistsOf } from '../../../src/feature/agents/types/index.ts';
+import { openStorage } from '../storage.ts';
 
 const CHAIN_CONFIG = `swarm:
   max: 5
@@ -245,9 +248,28 @@ describe('selectAttemptRuntime', () => {
 describe('execution with on_error runtime chains', () => {
   it('does not hold group when first runtime has limit but second runtime is available', () => {
     const state = run(1, { configText: CHAIN_CONFIG });
-    const holds = new Map<string, number>([['claude', 50_000]]);
-    const plan = planDispatch([state], 1000);
-    expect(plan.start).toHaveLength(1);
+    const limited = run(1, { configText: CHAIN_CONFIG });
+    dispatch([limited], 1000);
+    transition(
+      limited,
+      {
+        kind: 'attempt_exited',
+        group: 'group-1',
+        seq: 1,
+        exit: {
+          sessionId: null,
+          usage: null,
+          outsideChanges: [],
+          failure: { kind: 'usage_limit', resetsAt: 50_000 },
+        },
+      },
+      1100,
+    );
+    expect(limitHolds([limited, state], 1200).size).toBeGreaterThan(0);
+    const plan = planDispatch([limited, state], 1200);
+    expect(plan.start.some((entry) => entry.state === state)).toBe(true);
+    dispatch([state, limited], 1200);
+    expect(group(state).attempts[0]?.runtime).toBe('opencode');
     expect(plan.waits.size).toBe(0);
   });
 
@@ -555,6 +577,147 @@ describe('qualified model preservation across chain modes and attempt creation',
     expect(selected.model).toBeNull();
     expect(selected.runtime).toBe('opencode');
     expect(selected.chainIndex).toBe(0);
+  });
+});
+
+describe('resolved chain model snapshots', () => {
+  const source = `swarm:
+  max: 5
+  roles:
+    think: { name: Think }
+  providers:
+    example:
+      name: Example
+      access: [{ kind: cli, runtime: opencode, model_prefix: example }]
+      models: { think: A }
+  chains:
+    thinking:
+      name: Thinking
+      mode: on_error
+      runtimes: [{ runtime: opencode, provider: example, model_role: think }]
+  specialists:
+    worker: { name: Worker, runtime_chain: thinking }
+  pipelines:
+    feature:
+      steps: [{ id: work, specialist: worker }]
+`;
+
+  it('restores a concrete old snapshot and keeps A on an ordinary retry despite fresh B permissions', () => {
+    // Old snapshots have concrete chain items, with no source role metadata.
+    const state = run(1, { configText: source.replace('model_role: think', 'model: example/A') });
+    dispatch([state], 1000);
+    transition(state, { kind: 'cancel', group: 'group-1' }, 2000);
+    const store = openStorage(':memory:');
+    try {
+      store.runs.saveRun(state);
+      const restored = store.runs.loadRun(state.run.id)!;
+      const fresh = config(source.replace('think: A', 'think: B'));
+      transition(
+        restored,
+        {
+          kind: 'retry',
+          group: 'group-1',
+          permissions: permissionsOf(fresh),
+        },
+        3000,
+      );
+      dispatch([restored], 3100);
+      expect(group(restored).attempts.map((attempt) => attempt.model)).toEqual([
+        'example/A',
+        'example/A',
+      ]);
+      expect(restored.run.config.chains[0]?.runtimes[0]?.model).toBe('example/A');
+    } finally {
+      store.database.close();
+    }
+  });
+
+  it('continues the original session with its saved model and options after a fresh role load', () => {
+    const withOptions = source.replace(
+      'think: A',
+      'think: { model: A, variant: deep, reasoning_effort: high }',
+    );
+    const state = run(2, { configText: withOptions });
+    dispatch([state], 1000);
+    finish(state, 'needs_human');
+    transition(state, { kind: 'cancel', group: 'group-2' }, 2100);
+    const history = structuredClone(group(state).attempts);
+    const fresh = config(
+      withOptions.replace(
+        'model: A, variant: deep, reasoning_effort: high',
+        'model: B, variant: fast, reasoning_effort: low',
+      ),
+    );
+    transition(state, { kind: 'retry', group: 'group-2', specialists: specialistsOf(fresh) }, 2500);
+    expect(state.run.config.chains[0]?.runtimes[0]?.model).toBe('example/B');
+    transition(
+      state,
+      {
+        kind: 'answer',
+        group: 'group-1',
+        answer: 'continue',
+        permissions: permissionsOf(fresh),
+      },
+      3000,
+    );
+    dispatch([state], 3100);
+    expect(group(state).attempts[1]).toMatchObject({
+      runtime: 'opencode',
+      model: 'example/A',
+      chainIndex: 0,
+      resumeSession: 'session-1',
+      variant: 'deep',
+      reasoningEffort: 'high',
+    });
+    expect(group(state).attempts[0]).toEqual(history[0]);
+    expect(group(state, 'group-2').attempts[1]).toMatchObject({
+      model: 'example/B',
+      variant: 'fast',
+      reasoningEffort: 'low',
+    });
+  });
+
+  it('refreshes resolved chains for following selections of every group without rewriting A history', () => {
+    const state = run(2, { configText: source });
+    dispatch([state], 1000);
+    transition(state, { kind: 'cancel', group: null }, 2000);
+    const history = structuredClone(state.groups.map((g) => g.attempts));
+    const fresh = config(source.replace('think: A', 'think: B'));
+    transition(
+      state,
+      {
+        kind: 'retry',
+        group: 'group-1',
+        specialists: specialistsOf(fresh),
+      },
+      3000,
+    );
+    transition(state, { kind: 'retry', group: 'group-2' }, 3000);
+    dispatch([state], 3100);
+    for (const [index, g] of state.groups.entries()) {
+      expect(g.attempts[0]).toEqual(history[index]?.[0]);
+      expect(g.attempts[1]?.model).toBe('example/B');
+    }
+    expect(state.run.config.chains).toEqual(fresh.chains);
+    expect(state.run.config.chains[0]).not.toBe(fresh.chains[0]);
+  });
+
+  it('rejects refresh of a running group without changing its snapshot or attempts', () => {
+    const state = run(1, { configText: source });
+    dispatch([state], 1000);
+    const before = structuredClone(state);
+    expect(() =>
+      transition(
+        state,
+        {
+          kind: 'retry',
+          group: 'group-1',
+          specialists: specialistsOf(config(source.replace('think: A', 'think: B'))),
+        },
+        2000,
+      ),
+    ).toThrow();
+    expect(state).toEqual(before);
   });
 });
 

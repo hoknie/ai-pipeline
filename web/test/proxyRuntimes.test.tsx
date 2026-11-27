@@ -15,14 +15,14 @@ describe('the four CLIs in the panel', () => {
     expect(RUNTIMES).toEqual(['claude', 'opencode', 'agy', ...NEW]);
   });
 
-  it.each(NEW)('keeps %s in a chain without OpenCode-only fields', (runtime) => {
+  it.each(NEW)('keeps %s and unsupported source fields for server validation', (runtime) => {
     const draft = draftOfChain({
       slug: 'pair',
       raw: { name: 'Pair', mode: 'on_error', runtimes: [{ runtime, model: 'm', variant: 'x' }] },
     } as never);
     expect(draft.runtimes[0]?.runtime).toBe(runtime);
     const value = valueOfChain(draft) as { runtimes: Record<string, unknown>[] };
-    expect(value.runtimes[0]).toEqual({ runtime, enabled: true, model: 'm' });
+    expect(value.runtimes[0]).toEqual({ runtime, enabled: true, model: 'm', variant: 'x' });
   });
 
   it('falls back to claude for an unknown runtime of an old chain', () => {

@@ -1734,6 +1734,9 @@ export const es: Dictionary = {
       runtime: 'Ejecutor',
       model: 'Modelo',
       modelPlaceholder: 'Modelo predeterminado o específico',
+      unresolvedRole:
+        'Esta función no se puede resolver para este proveedor y ejecutor. Elija otra función o un modelo fijo.',
+      chooseRole: 'El proveedor ha cambiado. Vuelva a elegir una función o un modelo fijo.',
       variant: 'Variante',
       variantPlaceholder: 'Variante OpenCode',
       reasoningEffort: 'Esfuerzo de razonamiento',

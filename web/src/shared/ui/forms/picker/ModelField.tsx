@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ModelEntry } from '../../../api/types.ts';
 import { modelsOf, useModelCatalog } from '../../../lib/catalog/models.tsx';
-import { ModelPicker } from '../ModelPicker.tsx';
+import { ModelPicker, type ModelChoice } from '../ModelPicker.tsx';
 
 /** The field `model` of a runtime: its models come from the catalog the page provides. */
 export function ModelField({
@@ -16,6 +15,8 @@ export function ModelField({
   invalid,
   placeholder,
   extra,
+  selectedKey,
+  onSelect,
 }: {
   id: string;
   runtime: string;
@@ -27,7 +28,9 @@ export function ModelField({
   invalid?: boolean;
   placeholder?: string;
   /** Models that stand before the ones of the runtime, in a group of their own. */
-  extra?: ModelEntry[];
+  extra?: ModelChoice[];
+  selectedKey?: string;
+  onSelect?: (model: ModelChoice) => void;
 }) {
   const { t } = useTranslation();
   const { catalog, error, loading, ensure, refresh } = useModelCatalog();
@@ -39,6 +42,8 @@ export function ModelField({
       label={label ?? t('specialists.fields.model')}
       value={value}
       onChange={onChange}
+      onSelect={onSelect}
+      selectedKey={selectedKey}
       models={[...(extra ?? []), ...(entry?.models ?? [])]}
       error={entry?.error ?? error}
       loading={loading}

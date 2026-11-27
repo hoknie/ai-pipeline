@@ -110,7 +110,8 @@ export function roleModelOf(
   access: ProviderAccess,
   role: string,
 ): RoleModel | null {
-  const record = access.models[role] ?? provider.models[role];
+  const own = Object.hasOwn(access.models, role) ? access.models[role] : undefined;
+  const record = own ?? (Object.hasOwn(provider.models, role) ? provider.models[role] : undefined);
   if (record === undefined) return null;
   const prefix = access.kind === 'cli' ? access.modelPrefix : undefined;
   return { ...record, model: prefix ? `${prefix}/${record.model}` : record.model };

@@ -15,7 +15,7 @@ import { clearRole, roleModelOf, setRoleModel, type ModelOptions } from './edit.
 export function overrideHint(provider: ProviderView, role: string): string {
   return provider.access
     .flatMap((access) => {
-      const own = access.models[role];
+      const own = Object.hasOwn(access.models, role) ? access.models[role] : undefined;
       return own ? [`${access.runtime ?? 'api'}: ${own.model}`] : [];
     })
     .join('\n');

@@ -44,6 +44,58 @@ roles:
 
 A model is `<model>` or `{ model, variant, reasoning_effort }`; the options need a provider with an `opencode` route. A role the provider has no model for is an empty cell: it is not an error, `aip config check` warns about it. A model of an unknown role is an error.
 
+### Role references in chains
+
+A chain item can use `model_role` instead of a fixed `model`. It must name both a defined role and a provider:
+
+```yaml
+name: Coding
+mode: on_error
+runtimes:
+  - runtime: opencode
+    provider: zai
+    model_role: code
+```
+
+This works in all chain modes: `on_error`, `random`, `round_robin` and `by_provider`.
+Changing the provider's model for `code` changes the chain's resolved model on the next
+configuration load; the chain file keeps the role reference. Existing `model` strings
+remain fixed and are not reinterpreted as roles. `model` and `model_role` cannot be combined.
+
+Resolution uses the first enabled `cli` route of that provider matching the item's `runtime`,
+not a route for another runtime or an API route. The route's record for the role replaces
+the provider's entire record; absent options are not inherited from the provider record.
+If the route has no record for the role, the provider's record is used. A `model_prefix`
+is prepended to the resolved model, just as for other role-based model selection.
+
+For `opencode`, the selected record also supplies `variant` and `reasoning_effort`.
+An explicit chain item option overrides that option independently, leaving the other
+inherited option unchanged. Other runtimes receive only the model, not OpenCode options;
+explicitly setting those options on another runtime is still an error.
+
+An unknown role or provider, a missing provider, a missing enabled matching CLI route,
+or a role without a model on the selected route and provider is a configuration error.
+These checks also apply to disabled chains and items. Project provider and chain files
+replace shared files with the same slug as a whole; resolution happens after those
+replacements, without rewriting either source file.
+
+For example, a shared `chains/coding.yaml` containing the reference above uses the shared
+`zai` provider in the global scope. In a project with its own `providers/zai.yaml`, it uses
+that project's model for `code` instead. To pin a model, replace the chain in
+`aip/chains/coding.yaml` with a fixed ID:
+
+```yaml
+name: Coding
+mode: on_error
+runtimes:
+  - runtime: opencode
+    provider: zai
+    model: gproxy/glmcode/GLM-5.3-Flash
+```
+
+This project chain replaces the entire shared chain. Its fixed model receives no prefix
+or role options and stays unchanged when either provider file assigns another model to `code`.
+
 ## Default provider
 
 `default_provider: <slug>` in `settings.yaml` names the provider a new task goes to when none is chosen. There is one value per level: the shared `settings.yaml` sets it for every project, a project `settings.yaml` replaces it. The shared value must name a shared provider; the project value any provider of the project. An unknown slug is an error at `swarm.default_provider`.

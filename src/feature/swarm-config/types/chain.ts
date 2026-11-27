@@ -4,6 +4,7 @@ export const CHAIN_MODES = ['on_error', 'random', 'round_robin', 'by_provider'] 
 
 export type ChainMode = (typeof CHAIN_MODES)[number];
 
+/** Executable snapshot item: source `model_role` references are resolved at configuration load. */
 export interface ChainRuntimeItem {
   runtime: Runtime;
   model: string | null;

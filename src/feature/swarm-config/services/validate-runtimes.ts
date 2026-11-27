@@ -17,7 +17,12 @@ import {
   type RuntimeChain,
 } from '../types/chain.ts';
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
-import { type ProviderRegistry, unknownProviderMessage } from '../types/providers/provider.ts';
+import {
+  type ProviderRegistry,
+  type Role,
+  unknownProviderMessage,
+} from '../types/providers/provider.ts';
+import { resolveChainRole } from './chains/model.ts';
 import { type RuntimeSettings } from '../types/settings.ts';
 import {
   REASONING_EFFORTS,
@@ -36,6 +41,7 @@ export const CHAIN_KEYS = ['name', 'mode', 'runtimes', 'enabled'];
 export const CHAIN_RUNTIME_KEYS = [
   'runtime',
   'model',
+  'model_role',
   'enabled',
   'variant',
   'reasoning_effort',
@@ -46,7 +52,7 @@ export const CHAIN_RUNTIME_KEYS = [
 export function checkChains(
   ctx: ValidateContext,
   value: unknown,
-  registry: ProviderRegistry,
+  registry: ProviderRegistry & { roles: readonly Role[] },
 ): RuntimeChain[] {
   const mapping = readMapping(ctx, value, 'swarm.chains');
   if (!mapping) return [];
@@ -63,7 +69,7 @@ export function checkChain(
   slug: string,
   value: unknown,
   path: string,
-  registry: ProviderRegistry,
+  registry: ProviderRegistry & { roles: readonly Role[] },
 ): RuntimeChain | null {
   const mapping = readMapping(ctx, value, path);
   if (!mapping) return null;
@@ -96,7 +102,7 @@ function checkChainRuntimes(
   ctx: ValidateContext,
   value: unknown,
   path: string,
-  registry: ProviderRegistry,
+  registry: ProviderRegistry & { roles: readonly Role[] },
 ): ChainRuntimeItem[] {
   if (!Array.isArray(value)) {
     addError(ctx, path, 'must be a list');
@@ -133,8 +139,10 @@ function checkChainRuntimes(
       }
     }
     if (!('runtime' in mapping)) addError(ctx, join(itemPath, 'runtime'), 'is required');
+    resolveChainRole(ctx, mapping, itemPath, runtimeItem, registry);
     const modelProblem = modelIdProblem(runtimeItem.runtime, runtimeItem.model);
-    if (modelProblem) addError(ctx, join(itemPath, 'model'), modelProblem);
+    if (modelProblem)
+      addError(ctx, join(itemPath, 'model_role' in mapping ? 'model_role' : 'model'), modelProblem);
     checkChainRuntimeOpencode(ctx, mapping, itemPath, runtimeItem);
     items.push(runtimeItem);
   }

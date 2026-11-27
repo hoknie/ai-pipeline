@@ -111,6 +111,19 @@ An ordinary retry keeps the model, the runtime and the prompt of the snapshot, s
 - The retried group gets a warning with the changes, for example `config refreshed: reviewer model opsu → opus`. A changed prompt is listed as `reviewer prompt`, without its text. Nothing changed gives `config refreshed: no changes`.
 - If the configuration does not load or pass validation, the retry is refused with `configuration not loaded: …`, and the run does not change.
 
+### Chain models that follow a provider role
+
+A [chain item](../configuration/providers.md) with `provider: example` and `model_role: think` follows that role when the configuration is loaded, not whenever an attempt starts. The run stores the resolved model and its options in its own snapshot.
+
+For example, suppose Think resolves to `example/A` when a run starts, then you change only the provider file so Think resolves to `example/B`:
+
+- A new run uses `example/B`. An item with explicit `model: example/A` still uses A; matching a role's old model does not turn a fixed item into a role reference.
+- An attempt already running on A is not stopped. Its history remains A, and the old run keeps A for ordinary retries, session continuation and daemon recovery.
+- `aip group retry <run-id> <group> --refresh-config` loads the current configuration and accepts the newly resolved chain for subsequent selections in all groups of that run. The next fresh selection uses B; earlier attempts remain A. Existing rules for continuing a saved session still apply.
+- If the provider or role reference is invalid, the refresh and retry are refused together: neither the snapshot nor the attempt history changes.
+
+Changing a role does not edit the chain file, migrate existing fixed model IDs, or refresh active runs automatically.
+
 ## Skipping a step
 
 ```sh

@@ -41,8 +41,9 @@ function checkFullIds(
     if (access.kind !== 'cli' || access.runtime !== 'opencode') return;
     const roles = new Set([...Object.keys(provider.models), ...Object.keys(access.models)]);
     for (const role of roles) {
-      const own = access.models[role];
-      const record = own ?? provider.models[role];
+      const own = Object.hasOwn(access.models, role) ? access.models[role] : undefined;
+      const record =
+        own ?? (Object.hasOwn(provider.models, role) ? provider.models[role] : undefined);
       if (record === undefined) continue;
       const full = access.modelPrefix ? `${access.modelPrefix}/${record.model}` : record.model;
       const problem = modelIdProblem('opencode', full);

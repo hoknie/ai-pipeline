@@ -191,6 +191,7 @@ export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsR
   config.claude.settings = refresh.claudeSettings;
   applyRuntimeRefresh(config, refresh);
   if (refresh.chains) {
+    if (chainValues(config.chains) !== chainValues(refresh.chains)) changes.push('chains');
     config.chains = refresh.chains.map((chain) => ({
       ...chain,
       runtimes: chain.runtimes.map((r) => ({ ...r })),
@@ -198,6 +199,15 @@ export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsR
   }
   config.providers = copyProviders(refresh.providers);
   return changes;
+}
+
+/** Object key order is not configuration; array order still determines chain selection. */
+function chainValues(chains: RuntimeChain[]): string {
+  return JSON.stringify(chains, (_key, value: unknown) =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+      : value,
+  );
 }
 
 function applyRuntimeRefresh(config: ResolvedConfig, refresh: RuntimeRefresh): void {

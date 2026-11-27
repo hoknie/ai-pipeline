@@ -1728,6 +1728,9 @@ export const ru: Dictionary = {
       runtime: 'Исполнитель',
       model: 'Модель',
       modelPlaceholder: 'Модель по умолчанию или конкретная модель',
+      unresolvedRole:
+        'Роль недоступна для этого провайдера и исполнителя. Выберите другую роль или фиксированную модель.',
+      chooseRole: 'Провайдер изменён. Заново выберите роль или фиксированную модель.',
       variant: 'Вариант',
       variantPlaceholder: 'Вариант OpenCode',
       reasoningEffort: 'Усилие рассуждения',

@@ -24,7 +24,9 @@ export interface ModelPickerProps {
   /** The chosen model id; empty is «by default». */
   value: string;
   onChange: (value: string) => void;
-  models: ModelEntry[];
+  onSelect?: (model: ModelChoice) => void;
+  selectedKey?: string;
+  models: ModelChoice[];
   /** Why the runtime could not list its models. */
   error?: string | null;
   loading?: boolean;
@@ -42,17 +44,22 @@ export interface ModelPickerProps {
   onOpen?: () => void;
 }
 
+export interface ModelChoice extends ModelEntry {
+  /** Selection identity independent of the model ID (for example, a role slug). */
+  selectionKey?: string;
+}
+
 function ModelOption({
   model,
   chosen,
   onSelect,
 }: {
-  model: ModelEntry;
+  model: ModelChoice;
   chosen: boolean;
   onSelect: () => void;
 }) {
   return (
-    <CommandItem value={`model:${model.id}`} onSelect={onSelect}>
+    <CommandItem value={choiceKey(model)} onSelect={onSelect}>
       <Check className={chosen ? 'opacity-100' : 'opacity-0'} />
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <span className="break-all">{model.name}</span>
@@ -62,6 +69,10 @@ function ModelOption({
       </span>
     </CommandItem>
   );
+}
+
+function choiceKey(model: ModelChoice): string {
+  return model.selectionKey === undefined ? `model:${model.id}` : `reference:${model.selectionKey}`;
 }
 
 function ModelFooter({
@@ -144,14 +155,16 @@ function ModelTrigger(
 }
 
 function ModelGroups(props: {
-  models: ModelEntry[];
+  models: ModelChoice[];
   value: string;
+  selectedKey?: string;
+  select: (model: ModelChoice) => void;
   typed: string;
   canCreate: boolean;
   emptyOption?: string;
   pick: (next: string) => void;
 }) {
-  const { models, value, typed, canCreate, emptyOption, pick } = props;
+  const { models, value, selectedKey, select, typed, canCreate, emptyOption, pick } = props;
   const { t } = useTranslation();
   return (
     <>
@@ -170,10 +183,14 @@ function ModelGroups(props: {
         >
           {entries.map((model) => (
             <ModelOption
-              key={model.id}
+              key={choiceKey(model)}
               model={model}
-              chosen={model.id === value}
-              onSelect={() => pick(model.id)}
+              chosen={
+                selectedKey !== undefined
+                  ? model.selectionKey === selectedKey
+                  : !model.selectionKey && model.id === value
+              }
+              onSelect={() => select(model)}
             />
           ))}
         </CommandGroup>
@@ -200,10 +217,20 @@ export function ModelPicker(props: ModelPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const typed = query.trim();
-  const known = models.find((model) => model.id === value);
+  const typed = query;
+  const known = models.find((model) =>
+    props.selectedKey !== undefined
+      ? model.selectionKey === props.selectedKey
+      : !model.selectionKey && model.id === value,
+  );
   const pick = (next: string) => {
     onChange(next);
+    setOpen(false);
+    setQuery('');
+  };
+  const select = (model: ModelChoice) => {
+    if (props.onSelect) props.onSelect(model);
+    else onChange(model.id);
     setOpen(false);
     setQuery('');
   };
@@ -239,8 +266,13 @@ export function ModelPicker(props: ModelPickerProps) {
             <ModelGroups
               models={matchingModels(models, query)}
               value={value}
+              selectedKey={props.selectedKey}
+              select={select}
               typed={typed}
-              canCreate={typed !== '' && !models.some((model) => model.id === typed)}
+              canCreate={
+                typed.trim() !== '' &&
+                !models.some((model) => !model.selectionKey && model.id === typed)
+              }
               emptyOption={emptyOption}
               pick={pick}
             />

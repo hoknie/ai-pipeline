@@ -24,9 +24,10 @@ function mount(options: {
   overrides?: Parameters<typeof fakeApi>[0];
   /** The level of the file of each provider; the project scope writes only «project». */
   levels?: Record<string, 'global' | 'project'>;
+  roles?: ReturnType<typeof roleView>[];
 }) {
   counter += 1;
-  const roles = [roleView('think', 'Think'), roleView('code', 'Code')];
+  const roles = options.roles ?? [roleView('think', 'Think'), roleView('code', 'Code')];
   const view = providersView({ roles, providers: options.providers });
   const files = options.files ?? {};
   const api = fakeApi({
@@ -112,6 +113,24 @@ describe('the matrix role × provider', () => {
     mount({ providers: [provider] });
     const mark = await screen.findByRole('img', { name: /claude: glm-5\.3/ });
     expect(mark.getAttribute('title')).toContain('claude: glm-5.3');
+  });
+
+  it('does not mark an inherited constructor as an access override', async () => {
+    mount({
+      roles: [roleView('constructor', 'Constructor')],
+      providers: [
+        providerView('example', {
+          name: 'Example',
+          models: { constructor: { model: 'A' } },
+          access: [{ ...accessState({ runtime: 'claude' }), models: {} }],
+        }),
+      ],
+    });
+    const cell = await screen.findByRole('combobox', { name: 'Constructor × Example' });
+    expect(cell.textContent).toContain('A');
+    const matrix = screen.getByRole('region', { name: 'Role × provider matrix' });
+    expect(within(matrix).queryByRole('img')).toBeNull();
+    expect(matrix.textContent).not.toContain('undefined');
   });
 
   it('writes a typed model of a cell into the file with its revision', async () => {

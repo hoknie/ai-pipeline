@@ -2,8 +2,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { modelValues } from './modelField.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parse, stringify } from 'yaml';
 
 import type { EditorChain } from '../src/shared/api/types.ts';
+import { ModelCatalogProvider } from '../src/shared/lib/catalog/models.tsx';
 import {
   defaultChainDraft,
   draftOfChain,
@@ -14,8 +16,8 @@ import { ChainForm } from '../src/features/specialists/chains/ChainForm.tsx';
 import { ChainsList } from '../src/features/specialists/chains/ChainsList.tsx';
 import SpecialistsPage from '../src/features/specialists/SpecialistsPage.tsx';
 import { SharedChainsGroup } from '../src/features/swarm/global/SharedChainsGroup.tsx';
-import { configView, fakeApi } from './fixtures.ts';
-import { providersView, providerView, roleView } from './providerFixtures.ts';
+import { configView, fakeApi, modelsView } from './fixtures.ts';
+import { accessState, providersView, providerView, roleView } from './providerFixtures.ts';
 
 afterEach(() => {
   cleanup();
@@ -62,6 +64,24 @@ const sharedChain: EditorChain = {
 };
 
 describe('chain draft logic', () => {
+  it.each(['model_role: think', 'model: proxy/A', 'model: role:think'])(
+    'roundtrips source YAML through the form draft: %s',
+    (selection) => {
+      const raw = parse(
+        `name: Thinking\nmode: on_error\nenabled: true\nruntimes:\n  - runtime: opencode\n    enabled: true\n    provider: proxy\n    ${selection}\n`,
+      );
+      const draft = draftOfChain({ ...chainFixture, raw });
+      expect(parse(stringify(valueOfChain(draft, raw)))).toEqual(raw);
+      const other = {
+        ...draft,
+        runtimes: draft.runtimes.map((item) => ({
+          ...item,
+          model_role: item.model_role ? 'code' : 'think',
+        })),
+      };
+      expect(sameChainDraft(draft, other)).toBe(false);
+    },
+  );
   it('converts EditorChain to ChainDraft and back', () => {
     const draft = draftOfChain(chainFixture);
     expect(draft.slug).toBe('fast-to-strong');
@@ -71,6 +91,7 @@ describe('chain draft logic', () => {
     expect(draft.runtimes[0]).toEqual({
       runtime: 'claude',
       model: 'haiku',
+      model_role: '',
       variant: '',
       reasoning_effort: '',
       enabled: true,
@@ -96,6 +117,825 @@ describe('chain draft logic', () => {
     expect(sameChainDraft(d1, d2)).toBe(true);
     const d3 = { ...d1, name: 'Changed' };
     expect(sameChainDraft(d1, d3)).toBe(false);
+  });
+});
+
+describe('source role selection in chains', () => {
+  const raw = {
+    name: 'Thinking',
+    mode: 'on_error',
+    enabled: true,
+    runtimes: [{ runtime: 'opencode', enabled: true, provider: 'proxy', model_role: 'think' }],
+  };
+  const entry = (source: Record<string, unknown> = raw): EditorChain => ({
+    ...chainFixture,
+    raw: source,
+    sources: { project: { ...chainFixture.sources.project!, raw: source } },
+  });
+  function apiFor(model = 'A', roleName?: string) {
+    return fakeApi({
+      providers: vi.fn(async () =>
+        providersView({
+          roles: [roleView('think', roleName ?? 'Think'), roleView('code', roleName ?? 'Code')],
+          providers: ['proxy', 'other'].map((slug) =>
+            providerView(slug, {
+              models: { think: { model }, code: { model } },
+              access: [
+                { ...accessState({ runtime: 'opencode', modelPrefix: 'proxy' }), models: {} },
+              ],
+            }),
+          ),
+        }),
+      ),
+    });
+  }
+  function mount(api = apiFor(), chain = entry(), onDirty = vi.fn()) {
+    return render(
+      <ModelCatalogProvider api={api}>
+        <ChainForm
+          api={api}
+          chain={chain}
+          onDirty={onDirty}
+          onSaved={vi.fn(async () => undefined)}
+          onDeleted={vi.fn(async () => undefined)}
+        />
+      </ModelCatalogProvider>,
+    );
+  }
+  const picker = () => screen.getByRole('combobox', { name: 'Model' });
+
+  it('preserves a spaced fixed Claude ID after editing saved role YAML and renaming', async () => {
+    const api = fakeApi({
+      providers: vi.fn(async () =>
+        providersView({
+          roles: [roleView('think', 'Think')],
+          providers: [providerView('proxy', { models: { think: { model: ' A ' } } })],
+        }),
+      ),
+    });
+    const role = {
+      ...raw,
+      runtimes: [{ runtime: 'claude', enabled: true, provider: 'proxy', model_role: 'think' }],
+    };
+    const form = (source: Record<string, unknown>) => (
+      <ChainForm
+        api={api}
+        chain={entry(source)}
+        onDirty={vi.fn()}
+        onSaved={vi.fn(async () => undefined)}
+        onDeleted={vi.fn(async () => undefined)}
+      />
+    );
+    const view = render(form(role));
+    await waitFor(() => expect(picker().textContent).toContain('Think —  A '));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(chainFixture.slug, role, 'c1', 'project'),
+    );
+    const yaml = stringify(vi.mocked(api.writeChain).mock.calls[0]![1]);
+    const fixedYaml = yaml.replace('model_role: think', 'model: " A "');
+    expect(fixedYaml).not.toBe(yaml);
+    const fixed = parse(fixedYaml);
+    view.rerender(form(fixed));
+    await waitFor(() => {
+      expect(picker().dataset.value).toBe(' A ');
+      expect(picker().textContent).not.toContain('Think');
+    });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenLastCalledWith(
+        chainFixture.slug,
+        { ...fixed, name: 'Renamed' },
+        'c1',
+        'project',
+      ),
+    );
+    expect(vi.mocked(api.writeChain).mock.calls[1]![1].runtimes).toEqual([
+      { runtime: 'claude', enabled: true, provider: 'proxy', model: ' A ' },
+    ]);
+  });
+
+  it('reloads edits of the saved YAML into the mounted form, from role to fixed model and back', async () => {
+    const api = apiFor('A');
+    const form = (chain: EditorChain) => (
+      <ModelCatalogProvider api={api}>
+        <ChainForm
+          api={api}
+          chain={chain}
+          onDirty={vi.fn()}
+          onSaved={vi.fn(async () => undefined)}
+          onDeleted={vi.fn(async () => undefined)}
+        />
+      </ModelCatalogProvider>
+    );
+    const view = render(form(entry()));
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(chainFixture.slug, raw, 'c1', 'project'),
+    );
+    const roleYaml = stringify(vi.mocked(api.writeChain).mock.calls[0]![1]);
+    const fixedYaml = roleYaml.replace('model_role: think', 'model: proxy/A');
+    expect(fixedYaml).not.toBe(roleYaml);
+    const fixed = parse(fixedYaml);
+    view.rerender(
+      form({
+        ...entry(fixed),
+        sources: { project: { ...entry(fixed).sources.project!, revision: 'c2' } },
+      }),
+    );
+    await waitFor(() => {
+      expect(picker().textContent).toContain('proxy/A');
+      expect(picker().textContent).not.toContain('Think');
+      expect(picker().textContent).not.toContain('Code');
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenLastCalledWith(chainFixture.slug, fixed, 'c2', 'project'),
+    );
+    const savedFixedYaml = stringify(vi.mocked(api.writeChain).mock.calls[1]![1]);
+    expect(savedFixedYaml).not.toContain('model_role');
+    const restoredYaml = savedFixedYaml.replace('model: proxy/A', 'model_role: think');
+    expect(restoredYaml).not.toBe(savedFixedYaml);
+    const restored = entry(parse(restoredYaml));
+    view.rerender(
+      form({ ...restored, sources: { project: { ...restored.sources.project!, revision: 'c3' } } }),
+    );
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenLastCalledWith(chainFixture.slug, raw, 'c3', 'project'),
+    );
+    expect(stringify(vi.mocked(api.writeChain).mock.calls[2]![1])).toContain('model_role: think');
+  });
+
+  it('selects Think independently from Code with the same ID, saves and reopens the reference', async () => {
+    const api = apiFor();
+    mount(
+      api,
+      entry({
+        ...raw,
+        runtimes: [{ runtime: 'opencode', enabled: true, provider: 'proxy', model: 'proxy/A' }],
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLButtonElement>('combobox', { name: 'Provider' }).disabled).toBe(
+        false,
+      ),
+    );
+    expect(picker().textContent).toContain('proxy/A');
+    expect(picker().textContent).not.toContain('Think');
+    fireEvent.click(picker());
+    const think = await screen.findByRole('option', { name: /Think — proxy\/A/ });
+    const code = screen.getByRole('option', { name: /Code — proxy\/A/ });
+    expect(think.getAttribute('data-value')).not.toBe(code.getAttribute('data-value'));
+    fireEvent.click(code);
+    fireEvent.click(picker());
+    fireEvent.click(await screen.findByRole('option', { name: /Think — proxy\/A/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(chainFixture.slug, raw, 'c1', 'project'),
+    );
+    const saved = vi.mocked(api.writeChain).mock.calls[0]![1];
+    cleanup();
+    mount(apiFor('B'), entry(saved));
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/B'));
+    expect(picker().textContent).not.toContain('Code');
+  });
+
+  it('keeps a manually typed full model ID fixed instead of selecting the role with that slug', async () => {
+    const api = apiFor();
+    mount(api);
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+    fireEvent.click(picker());
+    fireEvent.change(await screen.findByPlaceholderText('Search or type a value…'), {
+      target: { value: 'proxy/think' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /Use.*proxy\/think/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        {
+          ...raw,
+          runtimes: [
+            { runtime: 'opencode', enabled: true, provider: 'proxy', model: 'proxy/think' },
+          ],
+        },
+        'c1',
+        'project',
+      ),
+    );
+  });
+
+  it.each([false, true])(
+    'keeps a manually typed spaced Claude ID fixed (catalogue A: %s)',
+    async (catalogued) => {
+      const api = apiFor();
+      const catalog = modelsView();
+      api.models = vi.fn(async () => ({
+        ...catalog,
+        runtimes: {
+          ...catalog.runtimes,
+          claude: {
+            models: catalogued ? [{ id: 'A', name: 'A', group: 'aliases' }] : [],
+            error: null,
+          },
+        },
+      }));
+      mount(
+        api,
+        entry({ ...raw, runtimes: [{ runtime: 'claude', enabled: true, provider: 'proxy' }] }),
+      );
+      fireEvent.click(picker());
+      fireEvent.change(await screen.findByPlaceholderText('Search or type a value…'), {
+        target: { value: ' A ' },
+      });
+      if (catalogued) expect(await screen.findByRole('option', { name: 'A' })).toBeTruthy();
+      fireEvent.click(await screen.findByRole('option', { name: /Use.*A/ }));
+      expect(picker().dataset.value).toBe(' A ');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenCalledWith(
+          chainFixture.slug,
+          {
+            ...raw,
+            runtimes: [{ runtime: 'claude', enabled: true, provider: 'proxy', model: ' A ' }],
+          },
+          'c1',
+          'project',
+        ),
+      );
+    },
+  );
+
+  it.each([
+    { runtime: 'claude', provider: ' proxy ' },
+    { runtime: 'unknown', provider: 'proxy' },
+    { provider: 'proxy' },
+  ])('preserves the invalid source route %j after renaming', async (route) => {
+    const source = { ...raw, runtimes: [{ ...route, enabled: true, model_role: 'think' }] };
+    const api = apiFor();
+    // A real Claude route exists: normalizing the source would silently repair it.
+    api.providers = vi.fn(async () =>
+      providersView({
+        roles: [roleView('think', 'Think')],
+        providers: [providerView('proxy', { models: { think: { model: 'A' } } })],
+      }),
+    );
+    mount(api, entry(source));
+    await waitFor(() => expect(picker().getAttribute('aria-invalid')).toBe('true'));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed invalid route' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        { ...source, name: 'Renamed invalid route' },
+        'c1',
+        'project',
+      ),
+    );
+  });
+
+  it('keeps a catalogue selection fixed when it has the same model ID as a role', async () => {
+    const catalog = modelsView();
+    const api = apiFor();
+    api.models = vi.fn(async () => ({
+      ...catalog,
+      runtimes: {
+        ...catalog.runtimes,
+        opencode: { models: [{ id: 'proxy/A', name: 'proxy/A', group: 'proxy' }], error: null },
+      },
+    }));
+    mount(api);
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+    fireEvent.click(picker());
+    fireEvent.click(await screen.findByRole('option', { name: 'proxy/A' }));
+    expect(picker().textContent).not.toContain('Think');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        {
+          ...raw,
+          runtimes: [{ runtime: 'opencode', enabled: true, provider: 'proxy', model: 'proxy/A' }],
+        },
+        'c1',
+        'project',
+      ),
+    );
+    const saved = vi.mocked(api.writeChain).mock.calls[0]![1];
+    cleanup();
+    mount(apiFor('B'), entry(saved));
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLButtonElement>('combobox', { name: 'Provider' }).disabled).toBe(
+        false,
+      ),
+    );
+    expect(picker().textContent).toContain('proxy/A');
+    expect(picker().textContent).not.toContain('Think');
+    expect(picker().textContent).not.toContain('proxy/B');
+  });
+
+  it.each([null, '', '   ', 'proxy/A'])(
+    'preserves the conflicting model %j after renaming until an explicit role selection',
+    async (model) => {
+      const source = { ...raw, runtimes: [{ ...raw.runtimes[0], model }] };
+      const api = apiFor();
+      mount(api, entry(source));
+      await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed conflict' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenCalledWith(
+          chainFixture.slug,
+          { ...source, name: 'Renamed conflict' },
+          'c1',
+          'project',
+        ),
+      );
+      const saved = vi.mocked(api.writeChain).mock.calls[0]![1];
+      const item = (saved.runtimes as Record<string, unknown>[])[0]!;
+      expect(Object.hasOwn(item, 'model')).toBe(true);
+      expect(item.model).toBe(model);
+      fireEvent.click(picker());
+      fireEvent.click(await screen.findByRole('option', { name: /Code — proxy\/A/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenLastCalledWith(
+          chainFixture.slug,
+          {
+            ...raw,
+            name: 'Renamed conflict',
+            runtimes: [{ ...raw.runtimes[0], model_role: 'code' }],
+          },
+          'c1',
+          'project',
+        ),
+      );
+    },
+  );
+
+  it.each([
+    { reasoning_effort: 'high' },
+    { variant: ' v1 ' },
+    { variant: '', reasoning_effort: null },
+    { variant: null, reasoning_effort: '' },
+    { variant: 'v1', reasoning_effort: 'high' },
+  ])('preserves unsupported Claude options %j after renaming', async (options) => {
+    const source = {
+      ...raw,
+      runtimes: [{ ...raw.runtimes[0], runtime: 'claude', ...options }],
+    };
+    const api = apiFor();
+    mount(api, entry(source));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed options' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        { ...source, name: 'Renamed options' },
+        'c1',
+        'project',
+      ),
+    );
+  });
+
+  it.each([
+    { variant: '   ', reasoning_effort: null },
+    { variant: 42, reasoning_effort: null },
+    { variant: null, reasoning_effort: 42 },
+    { variant: '', reasoning_effort: '' },
+    { variant: ' v1 ', reasoning_effort: 'invalid' },
+    { variant: 'v1', reasoning_effort: '__inherit' },
+  ])('preserves explicit OpenCode options %j until each field is edited', async (options) => {
+    const source = { ...raw, runtimes: [{ ...raw.runtimes[0], ...options }] };
+    const api = apiFor();
+    mount(api, entry(source));
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+    if (options.reasoning_effort === '__inherit') {
+      const effort = screen.getByRole('combobox', { name: 'Reasoning effort' });
+      expect(effort.textContent).toBe('__inherit');
+      expect(effort.getAttribute('aria-invalid')).toBe('true');
+    }
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed options' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenLastCalledWith(
+        chainFixture.slug,
+        { ...source, name: 'Renamed options' },
+        'c1',
+        'project',
+      ),
+    );
+    const saved = vi.mocked(api.writeChain).mock.calls[0]![1];
+    expect((saved.runtimes as Record<string, unknown>[])[0]).toStrictEqual(source.runtimes[0]);
+
+    // Explicit inheritance removes only this option, leaving the other source error intact.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reasoning effort' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'default' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenLastCalledWith(
+        chainFixture.slug,
+        {
+          ...raw,
+          name: 'Renamed options',
+          runtimes: [{ ...raw.runtimes[0], variant: options.variant }],
+        },
+        'c1',
+        'project',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('Variant'), { target: { value: 'temporary' } });
+    fireEvent.change(screen.getByLabelText('Variant'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenLastCalledWith(
+        chainFixture.slug,
+        { ...raw, name: 'Renamed options' },
+        'c1',
+        'project',
+      ),
+    );
+    const inherited = vi.mocked(api.writeChain).mock.calls.at(-1)![1];
+    const item = (inherited.runtimes as Record<string, unknown>[])[0]!;
+    expect(Object.hasOwn(item, 'reasoning_effort')).toBe(false);
+    expect(Object.hasOwn(item, 'variant')).toBe(false);
+  });
+
+  it.each([{ reasoning_effort: ['high'] }, { reasoning_effort: { toString: 1 } }])(
+    'preserves non-string effort %j and repairs it with one high selection',
+    async ({ reasoning_effort }) => {
+      const source = {
+        ...raw,
+        runtimes: [{ ...raw.runtimes[0], variant: 'v1', reasoning_effort }],
+      };
+      const api = apiFor();
+      mount(api, entry(source));
+      const effort = screen.getByRole('combobox', { name: 'Reasoning effort' });
+      expect(effort.getAttribute('aria-invalid')).toBe('true');
+      expect(effort.textContent).toBe(Array.isArray(reasoning_effort) ? '(array)' : '(object)');
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed effort' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenLastCalledWith(
+          chainFixture.slug,
+          { ...source, name: 'Renamed effort' },
+          'c1',
+          'project',
+        ),
+      );
+      const saved = vi.mocked(api.writeChain).mock.calls.at(-1)![1];
+      expect((saved.runtimes as Record<string, unknown>[])[0]!.reasoning_effort).toStrictEqual(
+        reasoning_effort,
+      );
+      fireEvent.click(effort);
+      fireEvent.click(await screen.findByRole('option', { name: 'high' }));
+      expect(effort.getAttribute('aria-invalid')).toBe('false');
+      expect(effort.textContent).toBe('high');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenLastCalledWith(
+          chainFixture.slug,
+          {
+            ...source,
+            name: 'Renamed effort',
+            runtimes: [{ ...source.runtimes[0], reasoning_effort: 'high' }],
+          },
+          'c1',
+          'project',
+        ),
+      );
+    },
+  );
+
+  it.each(['variant', 'model', 'runtime'] as const)(
+    'opens malformed %s objects and preserves them until explicit correction',
+    async (field) => {
+      const malformed = { toString: 1 };
+      const source = { ...raw, runtimes: [{ ...raw.runtimes[0], [field]: malformed }] };
+      const api = apiFor();
+      mount(api, entry(source));
+      if (field === 'variant') {
+        expect(screen.getByLabelText('Variant').getAttribute('aria-invalid')).toBe('true');
+        expect(screen.getByLabelText<HTMLInputElement>('Variant').value).toBe('(object)');
+      } else if (field === 'runtime') {
+        const runtime = screen.getByRole('combobox', { name: 'Runtime' });
+        expect(runtime.getAttribute('aria-invalid')).toBe('true');
+        expect(runtime.textContent).toBe('(object)');
+      } else {
+        expect(picker().getAttribute('aria-invalid')).toBe('true');
+      }
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed object' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenLastCalledWith(
+          chainFixture.slug,
+          { ...source, name: 'Renamed object' },
+          'c1',
+          'project',
+        ),
+      );
+      const saved = vi.mocked(api.writeChain).mock.calls.at(-1)![1];
+      expect((saved.runtimes as Record<string, unknown>[])[0]![field]).toStrictEqual(malformed);
+      if (field === 'variant') {
+        fireEvent.change(screen.getByLabelText('Variant'), { target: { value: 'v1' } });
+      } else if (field === 'runtime') {
+        fireEvent.click(screen.getByRole('combobox', { name: 'Runtime' }));
+        fireEvent.click(await screen.findByRole('option', { name: 'opencode' }));
+      } else {
+        await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+        fireEvent.click(picker());
+        fireEvent.click(await screen.findByRole('option', { name: /Code — proxy\/A/ }));
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenLastCalledWith(
+          chainFixture.slug,
+          {
+            ...raw,
+            name: 'Renamed object',
+            runtimes: [
+              {
+                ...raw.runtimes[0],
+                ...(field === 'variant' ? { variant: 'v1' } : {}),
+                ...(field === 'model' ? { model_role: 'code' } : {}),
+              },
+            ],
+          },
+          'c1',
+          'project',
+        ),
+      );
+    },
+  );
+
+  it('clears dirty after toggling an item without options off and back on', async () => {
+    const onDirty = vi.fn();
+    mount(apiFor(), entry(), onDirty);
+    expect(onDirty).toHaveBeenLastCalledWith(false);
+    const enabled = screen
+      .getAllByRole('switch', { name: 'Enabled' })
+      .find((el) => el.id === 'chain-item-0-enabled')!;
+    fireEvent.click(enabled);
+    expect(onDirty).toHaveBeenLastCalledWith(true);
+    fireEvent.click(enabled);
+    expect(onDirty).toHaveBeenLastCalledWith(false);
+  });
+
+  it('clears dirty after restoring valid options but not after removing explicit null', async () => {
+    const onDirty = vi.fn();
+    mount(
+      apiFor(),
+      entry({
+        ...raw,
+        runtimes: [{ ...raw.runtimes[0], variant: 'v1', reasoning_effort: 'high' }],
+      }),
+      onDirty,
+    );
+    fireEvent.change(screen.getByLabelText('Variant'), { target: { value: 'v2' } });
+    expect(onDirty).toHaveBeenLastCalledWith(true);
+    fireEvent.change(screen.getByLabelText('Variant'), { target: { value: 'v1' } });
+    expect(onDirty).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reasoning effort' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'low' }));
+    expect(onDirty).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reasoning effort' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'high' }));
+    expect(onDirty).toHaveBeenLastCalledWith(false);
+    cleanup();
+    onDirty.mockClear();
+    const api = apiFor();
+    mount(
+      api,
+      entry({ ...raw, runtimes: [{ ...raw.runtimes[0], reasoning_effort: null }] }),
+      onDirty,
+    );
+    expect(onDirty).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reasoning effort' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'default' }));
+    expect(onDirty).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(chainFixture.slug, raw, 'c1', 'project'),
+    );
+  });
+
+  it('clears unsupported options only after an intentional runtime selection', async () => {
+    const source = {
+      ...raw,
+      runtimes: [
+        { ...raw.runtimes[0], runtime: 'claude', variant: 'v1', reasoning_effort: 'high' },
+      ],
+    };
+    const api = apiFor();
+    mount(api, entry(source));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Runtime' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'opencode' }));
+    expect(screen.getByLabelText('Variant')).toHaveProperty('value', 'v1');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        {
+          ...raw,
+          runtimes: [{ ...raw.runtimes[0], variant: 'v1', reasoning_effort: 'high' }],
+        },
+        'c1',
+        'project',
+      ),
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Runtime' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'claude' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenLastCalledWith(
+        chainFixture.slug,
+        { ...raw, runtimes: [{ ...raw.runtimes[0], runtime: 'claude' }] },
+        'c1',
+        'project',
+      ),
+    );
+    // Switching back must not resurrect hidden source options.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Runtime' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'opencode' }));
+    expect(screen.getByLabelText('Variant')).toHaveProperty('value', '');
+  });
+
+  it.each([42, null, ''])(
+    'preserves invalid model_role %j when editing another field',
+    async (model_role) => {
+      const source = { ...raw, runtimes: [{ ...raw.runtimes[0], model_role }] };
+      const api = apiFor();
+      mount(api, entry(source));
+      fireEvent.change(screen.getByLabelText('Name'), {
+        target: { value: 'Renamed invalid role' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.writeChain).toHaveBeenCalledWith(
+          chainFixture.slug,
+          { ...source, name: 'Renamed invalid role' },
+          'c1',
+          'project',
+        ),
+      );
+    },
+  );
+
+  it('disambiguates equal role names and models by slug and allows searching for the slug', async () => {
+    const api = apiFor('A', 'Same');
+    mount(api);
+    await waitFor(() => expect(picker().textContent).toContain('Same (think) — proxy/A'));
+    fireEvent.click(picker());
+    const think = await screen.findByRole('option', { name: /Same \(think\) — proxy\/A/ });
+    const code = screen.getByRole('option', { name: /Same \(code\) — proxy\/A/ });
+    expect(think.getAttribute('data-value')).not.toBe(code.getAttribute('data-value'));
+    fireEvent.change(screen.getByPlaceholderText('Search or type a value…'), {
+      target: { value: 'code' },
+    });
+    expect(screen.queryByRole('option', { name: /Same \(think\)/ })).toBeNull();
+    fireEvent.click(screen.getByRole('option', { name: /Same \(code\) — proxy\/A/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        { ...raw, runtimes: [{ ...raw.runtimes[0], model_role: 'code' }] },
+        'c1',
+        'project',
+      ),
+    );
+  });
+
+  it('moves the provider-change warning with its row and clears it on explicit Default selection', async () => {
+    const api = apiFor();
+    mount(
+      api,
+      entry({
+        ...raw,
+        runtimes: [
+          raw.runtimes[0],
+          { runtime: 'opencode', enabled: true, provider: 'proxy', model: 'proxy/fixed' },
+        ],
+      }),
+    );
+    const warning = 'Provider changed. Choose a role or a fixed model again.';
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole<HTMLButtonElement>('combobox', { name: 'Provider' })[0]!.disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getAllByRole('combobox', { name: 'Provider' })[0]!);
+    fireEvent.click(await screen.findByRole('option', { name: /other/ }));
+    expect(await screen.findByText(warning)).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Move down' })[0]!);
+    const providers = screen.getAllByRole<HTMLButtonElement>('combobox', { name: 'Provider' });
+    expect(providers.map((button) => button.dataset.providerValue)).toEqual(['proxy', 'other']);
+    const models = screen.getAllByRole('combobox', { name: 'Model' });
+    expect(screen.getByText(warning).parentElement?.querySelector('#chain-item-1-provider')).toBe(
+      providers[1],
+    );
+    expect(
+      screen.getByText(warning).parentElement?.querySelector('#chain-item-0-provider'),
+    ).toBeNull();
+    fireEvent.click(models[1]!);
+    fireEvent.click(await screen.findByRole('option', { name: 'Default' }));
+    expect(screen.queryByText(warning)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        {
+          ...raw,
+          runtimes: [
+            { runtime: 'opencode', enabled: true, provider: 'proxy', model: 'proxy/fixed' },
+            { runtime: 'opencode', enabled: true, provider: 'other' },
+          ],
+        },
+        'c1',
+        'project',
+      ),
+    );
+  });
+
+  it('clears a role on provider change with a request to choose again', async () => {
+    const api = apiFor();
+    mount(api);
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Provider' }));
+    fireEvent.click(await screen.findByRole('option', { name: /other/ }));
+    expect(
+      await screen.findByText('Provider changed. Choose a role or a fixed model again.'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        {
+          ...raw,
+          runtimes: [{ runtime: 'opencode', enabled: true, provider: 'other' }],
+        },
+        'c1',
+        'project',
+      ),
+    );
+  });
+
+  it('keeps an unresolved role on incompatible runtime and exposes validation feedback', async () => {
+    const api = apiFor();
+    mount(api);
+    await waitFor(() => expect(picker().textContent).toContain('Think — proxy/A'));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Runtime' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'claude' }));
+    expect(await screen.findByText(/This role cannot be resolved/)).toBeTruthy();
+    expect(picker().getAttribute('aria-invalid')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        {
+          ...raw,
+          runtimes: [{ runtime: 'claude', enabled: true, provider: 'proxy', model_role: 'think' }],
+        },
+        'c1',
+        'project',
+      ),
+    );
+  });
+
+  it('keeps a removed role visible instead of converting it to a model', async () => {
+    const api = fakeApi({
+      providers: vi.fn(async () =>
+        providersView({
+          providers: [
+            providerView('proxy', {
+              models: { code: { model: 'A' } },
+              access: [
+                { ...accessState({ runtime: 'opencode', modelPrefix: 'proxy' }), models: {} },
+              ],
+            }),
+          ],
+          roles: [roleView('code', 'Code')],
+        }),
+      ),
+    });
+    mount(api);
+    expect(await screen.findByText(/This role cannot be resolved/)).toBeTruthy();
+    expect(picker().textContent).toContain('think');
+    fireEvent.click(picker());
+    fireEvent.click(await screen.findByRole('option', { name: /Code — proxy\/A/ }));
+    expect(screen.queryByText(/This role cannot be resolved/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeChain).toHaveBeenCalledWith(
+        chainFixture.slug,
+        { ...raw, runtimes: [{ ...raw.runtimes[0], model_role: 'code' }] },
+        'c1',
+        'project',
+      ),
+    );
   });
 });
 
@@ -685,13 +1525,47 @@ describe('shared chains and the roles of providers', () => {
     });
 
   it('puts the models of the roles of the provider first in the model choice of an item', async () => {
-    renderTier(withRoles());
+    const api = withRoles();
+    render(
+      <ModelCatalogProvider api={api}>
+        <ChainForm
+          api={api}
+          chain={tierFixture}
+          onDirty={vi.fn()}
+          onSaved={vi.fn(async () => undefined)}
+          onDeleted={vi.fn(async () => undefined)}
+        />
+      </ModelCatalogProvider>,
+    );
     await waitFor(() => expect(providerButtons()[0]!.disabled).toBe(false));
+    expect(screen.getAllByRole('combobox', { name: 'Model' })[0]!.textContent).not.toContain(
+      'Think',
+    );
     fireEvent.click(screen.getAllByRole('combobox', { name: 'Model' })[0]!);
-    expect(await screen.findByText('Roles of the provider')).toBeTruthy();
+    const heading = await screen.findByText('Roles of the provider');
     const option = await screen.findByRole('option', { name: /Think — opus/ });
+    const list = screen.getByRole('listbox');
+    const headings = Array.from(list.querySelectorAll('[cmdk-group-heading]'));
+    expect(headings[0]).toBe(heading);
+    const options = within(list).getAllByRole('option');
+    expect(options[0]!.textContent).toBe('Default');
+    expect(options[1]).toBe(option);
+    const catalogueOptions = options
+      .slice(2)
+      .filter((item) => item.dataset.value?.startsWith('model:'));
+    expect(catalogueOptions.length).toBeGreaterThan(0);
+    expect(headings.length).toBeGreaterThan(1);
     fireEvent.click(option);
     expect(screen.getAllByRole('combobox', { name: 'Model' })[0]!.dataset.value).toBe('opus');
+    expect(screen.getAllByRole('combobox', { name: 'Model' })[0]!.textContent).toContain(
+      'Think — opus',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.writeChain).toHaveBeenCalled());
+    expect(vi.mocked(api.writeChain).mock.calls[0]![1].runtimes).toEqual([
+      { runtime: 'claude', enabled: true, provider: 'anthropic', model_role: 'think' },
+      tierRaw.runtimes[1],
+    ]);
   });
 
   it('gives no role models when the provider has no access for the runtime of the item', async () => {

@@ -1704,6 +1704,9 @@ export const en = {
       runtime: 'Runtime',
       model: 'Model',
       modelPlaceholder: 'Default model or specific model',
+      unresolvedRole:
+        'This role cannot be resolved for this provider and runtime. Choose another role or a fixed model.',
+      chooseRole: 'Provider changed. Choose a role or a fixed model again.',
       variant: 'Variant',
       variantPlaceholder: 'OpenCode variant',
       reasoningEffort: 'Reasoning effort',

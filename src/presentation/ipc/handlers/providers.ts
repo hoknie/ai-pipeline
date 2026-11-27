@@ -64,8 +64,8 @@ function loaded(
   try {
     const { config, files } =
       level === 'global'
-        ? services.config.loadGlobalSources(repository)
-        : services.config.loadSources(repository);
+        ? services.config.loadGlobalSources(repository, true)
+        : services.config.loadSources(repository, true);
     return { config, files };
   } catch (error) {
     if (error instanceof ConfigLoadError) return error;

@@ -12,7 +12,7 @@ import {
   planEdit,
   revisionOf,
 } from '../../../src/feature/swarm-edit/services/index.ts';
-import { configPaths } from '../../../src/feature/swarm-config/services/index.ts';
+import { configPaths, loadConfig } from '../../../src/feature/swarm-config/services/index.ts';
 
 function temporaryPaths(): ConfigPaths {
   const root = mkdtempSync(join(tmpdir(), 'aip-edit-chains-'));
@@ -25,6 +25,63 @@ function write(path: string, text: string): void {
 }
 
 describe('chains in editor', () => {
+  it('reads, validates and saves a source role reference without resolved fields', () => {
+    const paths = temporaryPaths();
+    write(
+      join(paths.project.directory, 'settings.yaml'),
+      'max: 3\nroles:\n  think: { name: Think }\n',
+    );
+    write(
+      join(paths.project.directory, 'providers', 'proxy.yaml'),
+      'name: Proxy\nmodels:\n  think: { model: A, variant: deep, reasoning_effort: high }\naccess:\n  - kind: cli\n    runtime: opencode\n    model_prefix: proxy\n',
+    );
+    const initial =
+      '# source\nname: Thinking\nmode: on_error\nruntimes:\n  - runtime: opencode\n    provider: proxy\n    model_role: think\n';
+    const file = join(paths.project.directory, 'chains', 'thinking.yaml');
+    write(file, initial);
+    expect(loadConfig(paths).chains[0]?.runtimes[0]).toMatchObject({
+      model: 'proxy/A',
+      variant: 'deep',
+      reasoningEffort: 'high',
+    });
+    const source = editorView(paths).chains.find((chain) => chain.slug === 'thinking')!;
+    expect(source.raw.runtimes).toEqual([
+      { runtime: 'opencode', provider: 'proxy', model_role: 'think' },
+    ]);
+    const plan = planEdit(paths, {
+      kind: 'chain',
+      id: 'thinking',
+      value: { ...source.raw, name: 'Updated' },
+      revision: source.revision,
+      level: 'project',
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) throw new Error('expected valid role reference');
+    expect(plan.text).toContain('# source');
+    expect(plan.text).toContain('model_role: think');
+    expect(plan.text).not.toMatch(/\bmodel:|variant:|reasoning_effort:/);
+    write(plan.file, plan.text!);
+    expect(
+      editorView(paths).chains.find((chain) => chain.slug === 'thinking')?.raw.runtimes,
+    ).toEqual(source.raw.runtimes);
+    const invalid = planEdit(paths, {
+      kind: 'chain',
+      id: 'thinking',
+      value: {
+        ...source.raw,
+        runtimes: [{ runtime: 'opencode', provider: 'proxy', model_role: 'missing' }],
+      },
+      revision: revisionOf(plan.text!),
+      level: 'project',
+    });
+    expect(invalid).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+      errors: expect.arrayContaining([
+        expect.objectContaining({ path: 'swarm.chains.thinking.runtimes[0].model_role' }),
+      ]),
+    });
+  });
   it('lists chains in editorView with levels and revisions', () => {
     const paths = temporaryPaths();
     write(

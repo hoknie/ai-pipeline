@@ -160,7 +160,8 @@ function sharedDefaultProviderProblems(global: Level): FieldError[] {
   const swarm = isMapping(global.tree) ? global.tree.swarm : undefined;
   const slug = isMapping(swarm) ? swarm.default_provider : undefined;
   const providers = isMapping(swarm) ? swarm.providers : undefined;
-  if (typeof slug !== 'string' || (isMapping(providers) && slug in providers)) return [];
+  if (typeof slug !== 'string' || (isMapping(providers) && Object.hasOwn(providers, slug)))
+    return [];
   const file = global.origins.get('swarm.default_provider');
   return [
     {
@@ -218,25 +219,27 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
               isMapping(projectSwarm) && 'default_provider' in projectSwarm ? 'project' : 'global',
           },
     specialists: result.config.specialists.map((specialist) =>
-      isMapping(projectSpecialists) && specialist.slug in projectSpecialists
+      isMapping(projectSpecialists) && Object.hasOwn(projectSpecialists, specialist.slug)
         ? specialist
         : { ...specialist, level: 'global' },
     ),
     chains: (result.config.chains ?? []).map((chain) =>
-      isMapping(projectChains) && chain.slug in projectChains
+      isMapping(projectChains) && Object.hasOwn(projectChains, chain.slug)
         ? chain
         : { ...chain, level: 'global' },
     ),
     providers: result.config.providers.map((provider) =>
-      isMapping(projectProviders) && provider.slug in projectProviders
+      isMapping(projectProviders) && Object.hasOwn(projectProviders, provider.slug)
         ? provider
         : { ...provider, level: 'global' },
     ),
     roles: result.config.roles.map((role) =>
-      isMapping(projectRoles) && role.slug in projectRoles ? role : { ...role, level: 'global' },
+      isMapping(projectRoles) && Object.hasOwn(projectRoles, role.slug)
+        ? role
+        : { ...role, level: 'global' },
     ),
     actions: result.config.actions.map((action) =>
-      isMapping(projectActions) && action.id in projectActions
+      isMapping(projectActions) && Object.hasOwn(projectActions, action.id)
         ? action
         : { ...action, level: 'global' },
     ),

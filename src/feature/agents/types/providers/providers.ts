@@ -111,7 +111,7 @@ export function modelMatrix(roles: readonly Role[], providers: readonly Provider
     providers.map((provider) => ({
       role: role.slug,
       provider: provider.slug,
-      model: provider.models[role.slug] ?? null,
+      model: Object.hasOwn(provider.models, role.slug) ? provider.models[role.slug]! : null,
       access: provider.access.map((access, index) => ({
         index,
         model: roleModelOf(provider, access, role.slug),
@@ -125,8 +125,8 @@ export function emptyRoles(roles: readonly Role[], provider: Provider): string[]
   return roles
     .filter(
       (role) =>
-        provider.models[role.slug] === undefined &&
-        provider.access.every((access) => access.models[role.slug] === undefined),
+        !Object.hasOwn(provider.models, role.slug) &&
+        provider.access.every((access) => !Object.hasOwn(access.models, role.slug)),
     )
     .map((role) => role.slug);
 }

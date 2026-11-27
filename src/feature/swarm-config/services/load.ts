@@ -17,6 +17,7 @@ import {
   CHAINS_DIR,
   type ConfigPaths,
   type LevelFiles,
+  type Level,
   type LevelPaths,
   type LoadedConfig,
   PIPELINES_DIR,
@@ -24,7 +25,7 @@ import {
   SETTINGS_NAME,
   SPECIALISTS_DIR,
 } from '../types/levels.ts';
-import { type ConfigSource } from '../types/merge.ts';
+import { type ConfigSource, isMapping } from '../types/merge.ts';
 import {
   type AttachmentSettings,
   defaultAttachments,
@@ -67,37 +68,60 @@ export function levelIsEmpty(files: LevelFiles): boolean {
   );
 }
 
-export function loadConfigSources(paths: ConfigPaths): LoadedConfig {
-  const global = readLevel(paths.global);
-  const project = readLevel(paths.project);
+/** Validate only the registry and its runtime routes, independently of chains being edited. */
+function providerLevel(level: Level): Level {
+  const swarm = isMapping(level.tree) && isMapping(level.tree.swarm) ? level.tree.swarm : {};
+  const sections = ['roles', 'providers', 'default_provider', 'runtimes'];
+  return {
+    ...level,
+    tree: {
+      swarm: Object.fromEntries(Object.entries(swarm).filter(([key]) => sections.includes(key))),
+    },
+    problems: level.problems.filter(
+      (problem) =>
+        problem.path === 'swarm' ||
+        sections.some(
+          (section) =>
+            problem.path === `swarm.${section}` || problem.path.startsWith(`swarm.${section}.`),
+        ),
+    ),
+  };
+}
+
+export function loadConfigSources(paths: ConfigPaths, registryOnly = false): LoadedConfig {
+  const global = readLevel(paths.global, { registryOnly });
+  const project = readLevel(paths.project, { registryOnly });
   const levels: [LevelPaths, LevelFiles][] = [
     [paths.project, project],
     [paths.global, global],
   ];
   for (const [level, files] of levels) {
-    if (!levelIsEmpty(files)) continue;
+    // A filtered registry is allowed to be empty; it says nothing about other sections.
+    if (registryOnly || !levelIsEmpty(files)) continue;
     const found = level.legacy.find((path) => existsSync(path));
     if (found !== undefined) {
       throw new ConfigLoadError({ kind: 'legacy', found, expected: level.directory });
     }
   }
-  if (levelIsEmpty(global) && levelIsEmpty(project)) {
+  if (!registryOnly && levelIsEmpty(global) && levelIsEmpty(project)) {
     throw new ConfigLoadError({
       kind: 'no_files',
       expected: [paths.global.directory, paths.project.directory],
     });
   }
-  const loaded = resolveLevels(assembleLevel(global), assembleLevel(project));
+  const scope = registryOnly ? providerLevel : (level: Level) => level;
+  const loaded = resolveLevels(scope(assembleLevel(global)), scope(assembleLevel(project)));
   return { ...loaded, legacy: [...(global.legacy ?? []), ...(project.legacy ?? [])] };
 }
 
 /** The shared level alone: the project files do not take part; throws `ConfigLoadError` without shared files. */
-export function loadGlobalConfigSources(paths: ConfigPaths): LoadedConfig {
-  const global = readLevel(paths.global);
-  if (levelIsEmpty(global)) {
+export function loadGlobalConfigSources(paths: ConfigPaths, registryOnly = false): LoadedConfig {
+  const global = readLevel(paths.global, { registryOnly });
+  if (!registryOnly && levelIsEmpty(global)) {
     throw new ConfigLoadError({ kind: 'no_files', expected: [paths.global.directory] });
   }
-  const loaded = resolveLevels(assembleLevel(global), emptyLevel());
+  const level = assembleLevel(global);
+  const loaded = resolveLevels(registryOnly ? providerLevel(level) : level, emptyLevel());
   return { ...loaded, legacy: [...(global.legacy ?? [])] };
 }
 

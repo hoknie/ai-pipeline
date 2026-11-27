@@ -61,3 +61,38 @@ it('copies the refreshed provider registry instead of sharing it', () => {
   expect(snapshot.providers[0]?.access[0]).not.toBe(fresh.providers[0]?.access[0]);
   expect(snapshot.providers[0]?.models).not.toBe(fresh.providers[0]?.models);
 });
+
+it('summarizes chain-only model and option changes, without reporting unchanged chains', () => {
+  const text = `${PROVIDERS}  chains:
+    fallback:
+      name: Fallback
+      mode: on_error
+      runtimes: [{ runtime: opencode, model: example/A, variant: low }]
+`;
+  const snapshot = config(text);
+  expect(refreshSpecialists(snapshot, specialistsOf(config(text)))).toEqual([]);
+  const oldChain = snapshot.chains[0]!;
+  const fresh = config(text.replace('example/A, variant: low', 'example/B, variant: high'));
+  expect(refreshSpecialists(snapshot, specialistsOf(fresh))).toEqual(['chains']);
+  expect(snapshot.chains[0]?.runtimes[0]).toMatchObject({ model: 'example/B', variant: 'high' });
+  expect(oldChain.runtimes[0]).toMatchObject({ model: 'example/A', variant: 'low' });
+  expect(snapshot.chains[0]).not.toBe(fresh.chains[0]);
+  expect(snapshot.chains[0]?.runtimes[0]).not.toBe(fresh.chains[0]?.runtimes[0]);
+});
+
+it('ignores mapping key order in by_provider chains but preserves runtime order', () => {
+  const text = `${PROVIDERS.replace('  specialists:', '    other: { name: Other, access: [{ kind: cli, runtime: opencode }] }\n  specialists:')}  chains:
+    fallback:
+      name: Fallback
+      mode: by_provider
+      runtimes:
+        - { runtime: opencode, model: zai/A, provider: zai, default: true, variant: low }
+        - { runtime: opencode, model: zai/B, provider: other }
+`;
+  const reordered = text.replace('provider: zai, default: true', 'default: true, provider: zai');
+  const snapshot = config(text);
+  expect(refreshSpecialists(snapshot, specialistsOf(config(reordered)))).toEqual([]);
+  const fresh = config(reordered);
+  fresh.chains[0]!.runtimes.reverse();
+  expect(refreshSpecialists(snapshot, specialistsOf(fresh))).toEqual(['chains']);
+});

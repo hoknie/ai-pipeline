@@ -17,7 +17,10 @@ import {
 import { type ConfigSource, isMapping } from '../types/merge.ts';
 
 /** Reads settings.yaml, specialists/*.yaml, pipelines/*.yaml and actions/*.yaml of a level directory. */
-export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {}): LevelFiles {
+export function readLevel(
+  paths: LevelPaths,
+  options: { tolerant?: boolean; registryOnly?: boolean } = {},
+): LevelFiles {
   const problems: FieldError[] = [];
   const legacy: string[] = [];
   const pick = (
@@ -26,6 +29,7 @@ export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {
     only?: string,
     canonical?: (value: unknown) => unknown,
   ): ConfigSource[] => {
+    if (options.registryOnly && section !== '' && section !== 'providers') return [];
     const byStem = new Map<string, string[]>();
     for (const directory of directories) {
       for (const name of listYaml(directory, only)) {
@@ -151,6 +155,10 @@ export function parseYaml(text: string, path: string): unknown {
   if (first) {
     throw new ConfigLoadError({ kind: 'syntax', path, message: first.message });
   }
-  const value: unknown = document.toJS({ maxAliasCount: 100 });
-  return value === null ? undefined : value;
+  try {
+    const value: unknown = document.toJS({ maxAliasCount: 100 });
+    return value === null ? undefined : value;
+  } catch (error) {
+    throw new ConfigLoadError({ kind: 'syntax', path, message: (error as Error).message });
+  }
 }

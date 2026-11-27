@@ -67,13 +67,13 @@ export class ConfigService {
   }
 
   /** The merged configuration with the files it was read from; throws `ConfigLoadError`. */
-  loadSources(repository: string): LoadedConfig {
-    return loadConfigSources(this.pathsOf(repository));
+  loadSources(repository: string, registryOnly = false): LoadedConfig {
+    return loadConfigSources(this.pathsOf(repository), registryOnly);
   }
 
   /** The shared level alone, without the files of the repository; throws `ConfigLoadError`. */
-  loadGlobalSources(repository: string): LoadedConfig {
-    return loadGlobalConfigSources(this.pathsOf(repository));
+  loadGlobalSources(repository: string, registryOnly = false): LoadedConfig {
+    return loadGlobalConfigSources(this.pathsOf(repository), registryOnly);
   }
 
   /** `delivery.auto`, `delivery.mode` and pipeline names of the repository now. */

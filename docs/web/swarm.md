@@ -11,7 +11,22 @@ The "Swarm" section holds everything a run is made of, in one window with five t
 
 ## Chains
 
-Choosing a provider in an item of a chain adds its roles to the model choice: a group "Roles of the provider" with each role's model through the CLI of the item. Choosing one writes the model id; the chain does not follow later changes of the role.
+Choosing a provider in an item of a chain adds a group "Roles of the provider" to the model choice. Each choice shows the role and its current model through the first enabled CLI for the item's runtime. Choosing **Think** saves a reference to that provider's role, not the displayed model ID:
+
+```yaml
+name: Thinking
+mode: on_error
+enabled: true
+runtimes:
+  - runtime: opencode
+    enabled: true
+    provider: proxy
+    model_role: think
+```
+
+New configuration loads follow changes to that role's model. Existing runs keep their configuration snapshot until an explicit configuration refresh. Selecting a model from the catalog or typing its ID instead writes `model: proxy/A` (without `model_role`) and remains fixed, even if a role uses the same ID. Saving, reopening, and moving between YAML and the form preserve this distinction.
+
+Changing the provider clears the selected role and asks you to choose again. An incompatible runtime or a removed role leaves the reference visible with a warning; choose another role or a fixed model to repair it. Shared chains use the shared registry in the editor; project chains use the project's effective registry.
 
 ## Where each part is described
 

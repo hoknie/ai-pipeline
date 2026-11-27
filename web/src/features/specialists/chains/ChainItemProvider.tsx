@@ -43,7 +43,15 @@ export function ItemProvider({
         id={`chain-item-${index}-provider`}
         label={t('chains.item.provider')}
         value={item.provider === '' ? null : item.provider}
-        onChange={(provider) => onChange({ provider: provider ?? '' })}
+        onChange={(provider) => {
+          const changed = (provider ?? '') !== item.provider;
+          onChange({
+            provider: provider ?? '',
+            ...(changed && (item.model_role || item.invalidModelRole)
+              ? { model_role: '', model: '', invalidModelRole: undefined, chooseRole: true }
+              : {}),
+          });
+        }}
         providers={view?.providers ?? []}
         {...(tier ? {} : { emptyLabel: t('chains.item.noProvider') })}
         placeholder={t('chains.item.chooseProvider')}
@@ -52,6 +60,11 @@ export function ItemProvider({
         invalid={errors.provider !== undefined}
         disabled={disabled || view === null}
       />
+      {item.chooseRole && !item.model_role && !item.model ? (
+        <p role="alert" className="text-xs text-destructive">
+          {t('chains.item.chooseRole')}
+        </p>
+      ) : null}
       {errors.provider ? (
         <p role="alert" className="text-xs text-destructive">
           {errors.provider}

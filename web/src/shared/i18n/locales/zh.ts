@@ -1662,6 +1662,8 @@ export const zh: Dictionary = {
       runtime: '运行器',
       model: '模型',
       modelPlaceholder: '默认模型或指定模型',
+      unresolvedRole: '此角色无法用于当前提供商和运行时。请选择其他角色或固定模型。',
+      chooseRole: '提供商已更改。请重新选择角色或固定模型。',
       variant: '变体',
       variantPlaceholder: 'OpenCode 变体',
       reasoningEffort: '推理强度',
