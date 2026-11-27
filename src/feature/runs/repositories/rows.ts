@@ -118,7 +118,11 @@ function hydrateGroup(group: Row, attemptRows: Row[]): Group {
     question: text(group.question ?? null),
     questions: nullable(group.questions_json ?? null),
     humanOnly:
-      group.human_only === 'review' || group.human_only === 'request' ? group.human_only : null,
+      group.human_only === 'review' ||
+      group.human_only === 'request' ||
+      group.human_only === 'review_cycle'
+        ? group.human_only
+        : null,
     reason: text(group.reason ?? null),
     warnings: parse(group.warnings_json ?? null),
     decisions: parse<(Omit<HumanDecision, 'by'> & { by?: unknown })[]>(

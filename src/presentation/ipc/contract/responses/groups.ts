@@ -6,6 +6,7 @@ import type {
   HumanQuestion,
 } from '../../../../feature/runs/types/index.ts';
 import type { DiffStat, RowStatus, ViewDecision } from './runs.ts';
+import type { Report } from '../../../../feature/runs/types/index.ts';
 
 export interface AttemptDecision {
   question: string;
@@ -14,6 +15,9 @@ export interface AttemptDecision {
 }
 
 export interface AttemptView {
+  review?: Report['review'];
+  implementation?: Report['implementation'];
+  strategy?: Report['strategy'];
   seq: number;
   stepId: string;
   /** The human name of the step. */

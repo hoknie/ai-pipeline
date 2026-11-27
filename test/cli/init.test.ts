@@ -69,6 +69,7 @@ describe('aip init', () => {
     for (const file of [
       'settings.yaml',
       'specialists/coder.yaml',
+      'specialists/planner.yaml',
       'specialists/reviewer.yaml',
       'pipelines/feature.yaml',
     ]) {

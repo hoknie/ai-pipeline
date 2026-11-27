@@ -26,6 +26,7 @@ import {
 import { finishDelivery, finishMessageGroup } from './delivery-flow.ts';
 import type { ActionOutcome, Ctx, Effect } from './events.ts';
 import { failRepair } from './repair.ts';
+import { managedRejection } from './review/cycle.ts';
 
 export function groupOf(m: Ctx, slug: string): Group {
   const group = findGroup(m.state, slug);
@@ -100,6 +101,7 @@ export function advanceStep(m: Ctx, group: Group, current: number): void {
 }
 
 export function rejectedStep(m: Ctx, group: Group, attempt: Attempt, feedback: string): void {
+  if (managedRejection(m, group, attempt, feedback)) return;
   const steps = stepsOf(m.state.run, group);
   const onReject = steps[attempt.stepIndex]?.onReject ?? null;
   if (onReject === null) {

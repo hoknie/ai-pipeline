@@ -10,6 +10,11 @@ import {
 } from '../../../feature/runs/types/index.ts';
 import { proposedGroupSchema, target } from './runs.ts';
 import { z } from 'zod';
+import {
+  reviewReportSchema,
+  implementationReportSchema,
+  strategyReportSchema,
+} from './review/schemas.ts';
 
 export const humanQuestionSchema = z.object({
   text: z.string().trim().min(1).max(QUESTION_TEXT_LIMIT),
@@ -18,6 +23,9 @@ export const humanQuestionSchema = z.object({
 });
 
 export const reportParamsSchema = z.object({
+  review: reviewReportSchema.optional(),
+  implementation: implementationReportSchema.optional(),
+  strategy: strategyReportSchema.optional(),
   token: z.string().min(1),
   verdict: z.enum(VERDICTS),
   summary: z.string().min(1).max(SUMMARY_LIMIT),

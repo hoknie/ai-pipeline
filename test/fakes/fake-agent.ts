@@ -13,6 +13,9 @@ import {
 import { dirname, join } from 'node:path';
 
 interface Action {
+  review?: unknown;
+  implementation?: unknown;
+  strategy?: unknown;
   verdict?: 'done' | 'rejected' | 'needs_human';
   summary?: string;
   feedback?: string;
@@ -204,6 +207,9 @@ function connectDirect(workerArgs: string[]) {
             feedback: input.feedback ?? null,
             questions: input.questions ?? null,
             ...(input.human_only === true ? { human_only: true } : {}),
+            ...(input.review !== undefined ? { review: input.review } : {}),
+            ...(input.implementation !== undefined ? { implementation: input.implementation } : {}),
+            ...(input.strategy !== undefined ? { strategy: input.strategy } : {}),
           });
           return toolText(`Recorded verdict ${String(input.verdict)}. You can stop now.`);
         }
@@ -784,6 +790,9 @@ if (!action.noReport) {
         : {}),
       ...(action.questions ? { questions: action.questions } : {}),
       ...(action.humanOnly ? { human_only: true } : {}),
+      ...(action.review !== undefined ? { review: action.review } : {}),
+      ...(action.implementation !== undefined ? { implementation: action.implementation } : {}),
+      ...(action.strategy !== undefined ? { strategy: action.strategy } : {}),
     },
   });
   appendFileSync(join(state, 'reports.jsonl'), `${JSON.stringify({ step, group, result })}\n`);

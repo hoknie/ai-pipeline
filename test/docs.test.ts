@@ -105,12 +105,13 @@ describe('documentation examples', () => {
     const config = configFromFiles({
       settings: settings ?? '',
       specialists: {
+        planner: 'name: Planner\npermissions: read\n',
         coder: 'name: Coder\n',
         reviewer: 'name: Reviewer\npermissions: read\n',
       },
       pipelines: { feature: pipeline ?? '' },
     });
-    expect(findPipeline(config, 'feature')?.steps).toHaveLength(2);
+    expect(findPipeline(config, 'feature')?.steps).toHaveLength(3);
     expect(config.max).toBe(2);
   });
 

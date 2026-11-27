@@ -88,6 +88,11 @@ export function attemptView(
     verdict: attemptVerdict(attempt),
     summary: attempt.report?.summary ?? null,
     feedback: attempt.report?.feedback ?? null,
+    ...(attempt.report?.review ? { review: structuredClone(attempt.report.review) } : {}),
+    ...(attempt.report?.implementation
+      ? { implementation: structuredClone(attempt.report.implementation) }
+      : {}),
+    ...(attempt.report?.strategy ? { strategy: structuredClone(attempt.report.strategy) } : {}),
     ...(attempt.report?.source === 'reply' ? { reportSource: 'reply' as const } : {}),
     decision: attemptDecision(group, attempt),
     reason: attempt.reason ? describeFailReason(attempt.reason) : null,

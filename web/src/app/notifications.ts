@@ -28,7 +28,7 @@ export interface NotificationItem {
   /** The first line of the question or of the reason; empty when there is none. */
   detail: string;
   /** The question is for a person only; null otherwise. */
-  humanOnly: 'review' | 'request' | null;
+  humanOnly: 'review' | 'request' | 'review_cycle' | null;
   createdAt: number;
 }
 

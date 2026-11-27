@@ -22,6 +22,9 @@ export interface StepDraft {
   maxRounds: string;
   additionalPrompt: string;
   humanReview: boolean;
+  /** Preserve the protocol verbatim, including invalid values, for boundary diagnostics. */
+  review?: unknown;
+  recoveryKey?: number;
 }
 
 export interface SplitDraft {
@@ -86,6 +89,7 @@ export function draftOf(raw: Record<string, unknown>): Draft {
       maxRounds: text(onReject.max_rounds),
       additionalPrompt: text(step.additional_prompt),
       humanReview: step.human_review === true,
+      ...('review' in onReject ? { review: structuredClone(onReject.review) } : {}),
     };
   });
   const derived = stepIds(steps.map((step) => ({ ...step, autoId: true })));
@@ -110,6 +114,9 @@ export function draftOf(raw: Record<string, unknown>): Draft {
   }
   const ids = stepIds(steps);
   for (const step of steps) {
+    const recovery = record(step.review).recovery_step;
+    const recoveryTarget = steps.find((_, index) => ids[index] === recovery);
+    if (recoveryTarget) step.recoveryKey = recoveryTarget.key;
     const target = steps.find((_, index) => ids[index] === step.gotoRaw);
     if (target && step.gotoRaw !== '') {
       step.gotoKey = target.key;
@@ -174,6 +181,19 @@ export function valueOf(draft: Draft): Record<string, unknown> {
     if (target !== '') {
       const onReject: Record<string, unknown> = { goto: target };
       if (step.maxRounds.trim() !== '') onReject.max_rounds = asNumber(step.maxRounds);
+      if ('review' in step) {
+        const review = structuredClone(step.review);
+        if (
+          step.recoveryKey !== undefined &&
+          typeof review === 'object' &&
+          review !== null &&
+          !Array.isArray(review)
+        ) {
+          const recovery = draft.steps.findIndex((item) => item.key === step.recoveryKey);
+          if (recovery >= 0) (review as Record<string, unknown>).recovery_step = ids[recovery];
+        }
+        onReject.review = review;
+      }
       out.on_reject = onReject;
     }
     if (step.additionalPrompt !== '') out.additional_prompt = step.additionalPrompt;

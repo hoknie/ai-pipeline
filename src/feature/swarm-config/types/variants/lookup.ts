@@ -34,6 +34,9 @@ export function skipProblem(steps: readonly Step[], skip: readonly string[]): st
   const left = steps.filter((step) => !wanted.includes(step.id));
   if (left.length === 0) return 'skip leaves no steps';
   for (const step of left) {
+    const recovery = step.onReject?.review?.recoveryStep;
+    if (recovery && wanted.includes(recovery))
+      return `step \`${step.id}\` requires skipped recovery step \`${recovery}\``;
     const goto = step.onReject?.goto;
     if (goto !== undefined && wanted.includes(goto)) {
       return `step \`${step.id}\` returns to skipped step \`${goto}\``;

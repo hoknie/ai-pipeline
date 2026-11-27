@@ -30,6 +30,8 @@ import {
 import { type Run, runPipeline } from './run.ts';
 
 export interface Pending {
+  /** The reviewer that requested this one bounded strategy recovery. */
+  recoveryFor?: string;
   stepIndex: number;
   feedback: string | null;
   humanAnswer: string | null;
@@ -73,7 +75,7 @@ export function pendingDelivery(): GroupDelivery {
   };
 }
 
-export type HumanOnly = 'review' | 'request';
+export type HumanOnly = 'review' | 'request' | 'review_cycle';
 
 export interface Group {
   slug: string;

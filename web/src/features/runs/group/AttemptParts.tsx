@@ -198,6 +198,7 @@ export function AttemptBody({
         <Skeleton role="status" aria-label={t('runs.attempt.loadingLog')} className="h-16" />
       )}
       <SummaryAndFeedback attempt={attempt} />
+      <ReviewResult attempt={attempt} />
     </div>
   );
 }
@@ -258,3 +259,4 @@ function SummaryAndFeedback({ attempt }: { attempt: AttemptView }) {
     </>
   );
 }
+import { ReviewResult } from './ReviewResult.tsx';

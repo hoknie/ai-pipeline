@@ -615,6 +615,22 @@ export const zh: Dictionary = {
     running: '已运行 {{duration}}',
   },
   runs: {
+    reviewCycle: {
+      title: '审查循环',
+      blocker: '阻断',
+      major: '重要',
+      minor: '建议',
+      expected: '预期',
+      evidence: '证据',
+      initial: '首次审查',
+      missed: '先前遗漏',
+      regression: '回归',
+      resolved: '已解决',
+      files: '文件',
+      tests: '测试',
+      passed: '通过',
+      failed: '失败',
+    },
     list: {
       stageLabel: '{{status}} · {{stage}}{{more}}',
       stageMore: ' +{{n}}',
@@ -889,6 +905,7 @@ export const zh: Dictionary = {
       observer: '观察者',
     },
     humanOnly: {
+      review_cycle: '审查循环需要您的决定',
       review: '人工审查',
       request: '需要人工',
       hint: '队列自动驾驶和观察者都不会回答此问题。',

@@ -40,6 +40,7 @@ export interface RegistryProjectRef {
 }
 
 export interface StepInput {
+  review?: ReviewAssignment;
   prompt: string;
   groupTitle: string;
   stepId: string;
@@ -63,3 +64,4 @@ export interface StepInput {
   /** Files attached to the task; absent when there are none. */
   attachments?: InputAttachment[];
 }
+import type { ReviewAssignment } from './review/protocol.ts';

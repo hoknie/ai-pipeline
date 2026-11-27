@@ -2,13 +2,21 @@ import type { PreviousStep, StepInput } from '../../agents/types/index.ts';
 import { buildPrompt } from '../../swarm-config/types/index.ts';
 import { type Group, type Pending, isSplitGroup, stepsOf } from './group.ts';
 import { type Run, runPipeline, specialistOfStep } from './run.ts';
+import { findingsText, reviewAssignment } from './review/history.ts';
 
 export function buildInput(run: Run, group: Group, pending: Pending): StepInput {
   const step = stepsOf(run, group)[pending.stepIndex];
   if (!step) throw new Error(`step ${pending.stepIndex} does not exist`);
   const specialist = specialistOfStep(run, group, step);
   if (!specialist) throw new Error(`specialist ${step.specialist} does not exist`);
-  const previous: PreviousStep[] = group.attempts.flatMap((attempt) =>
+  const review = reviewAssignment(run, group, pending);
+  const reports = group.attempts.filter(
+    (attempt) => attempt.status === 'finished' && attempt.report,
+  );
+  const attempts = review
+    ? [...new Map(reports.map((attempt) => [attempt.stepId, attempt])).values()]
+    : reports;
+  const previous: PreviousStep[] = attempts.flatMap((attempt) =>
     attempt.status === 'finished' && attempt.report
       ? [
           {
@@ -21,6 +29,7 @@ export function buildInput(run: Run, group: Group, pending: Pending): StepInput 
       : [],
   );
   return {
+    ...(review ? { review: structuredClone(review) } : {}),
     prompt:
       buildPrompt(specialist.prompt, group.task, step.additionalPrompt ?? null) +
       splitInstruction(run, group),
@@ -29,7 +38,8 @@ export function buildInput(run: Run, group: Group, pending: Pending): StepInput 
     specialistName: specialist.name,
     skills: [...specialist.skills],
     previous,
-    feedback: pending.feedback,
+    feedback:
+      review && pending.feedback === findingsText(review.findings) ? null : pending.feedback,
     humanAnswer: pending.humanAnswer,
     ...(pending.message ? { message: { ...pending.message } } : {}),
     decisions: group.decisions.map((decision) => ({ ...decision })),

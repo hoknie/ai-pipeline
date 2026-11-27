@@ -36,7 +36,7 @@ This installs the `aip` command and connects it to Claude Code and OpenCode. Det
    aip init
    ```
 
-   It writes `aip/settings.yaml`, two specialists and a pipeline. Settings first:
+   It writes `aip/settings.yaml`, a planner, coder and reviewer, and a pipeline. Settings first:
 
    ```yaml
    max: 2
@@ -44,13 +44,26 @@ This installs the `aip` command and connects it to Claude Code and OpenCode. Det
      allow_commands: ["npm test*"]
    ```
 
-   The pipeline `aip/pipelines/feature.yaml`: write the code, then review it.
+   The pipeline `aip/pipelines/feature.yaml`: plan testable slices, implement them, then review with a bounded recovery loop.
 
    ```yaml
    steps:
+     - { id: plan, specialist: planner }
      - { id: code, specialist: coder }
-     - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }
+     - id: review
+       specialist: reviewer
+       on_reject:
+         goto: code
+         max_rounds: 5
+         review:
+           stagnant_rounds: 2
+           recovery_step: plan
+           required_checks: [] # set your project's mandatory gate commands
    ```
+
+   Two revisions without verified progress request one revised strategy. Exhausted
+   budgets stay with a person. See [bounded review cycles](docs/configuration/review-cycles.md)
+   for finding IDs, repair evidence and an optional stronger implementation specialist.
 
 2. Check the setup, start a task and watch it:
 

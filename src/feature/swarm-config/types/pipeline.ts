@@ -40,6 +40,14 @@ export interface PipelineVariant {
 export interface OnReject {
   goto: string;
   maxRounds: number;
+  review?: ReviewPolicy;
+}
+
+export interface ReviewPolicy {
+  stagnantRounds: number;
+  recoveryStep?: string;
+  escalationSpecialist?: string;
+  requiredChecks: string[];
 }
 
 export interface Step {

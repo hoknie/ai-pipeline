@@ -95,7 +95,10 @@ export function firstLine(text: string): string {
 }
 
 /** The note after `question` for a question only a person answers. */
-export function humanMark(humanOnly: 'review' | 'request' | null | undefined): string {
+export function humanMark(
+  humanOnly: 'review' | 'request' | 'review_cycle' | null | undefined,
+): string {
+  if (humanOnly === 'review_cycle') return ' (review cycle needs a person)';
   if (humanOnly === 'review') return ' (human review)';
   if (humanOnly === 'request') return ' (human only)';
   return '';

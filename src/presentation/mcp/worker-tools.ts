@@ -20,6 +20,11 @@ import { VERDICTS, WORKER_TOOLS } from '../../feature/agents/types/index.ts';
 import { packageVersion } from '../../platform/build/index.ts';
 import { invalid } from '../../platform/errors/index.ts';
 import { attempt, type Send } from './tools.ts';
+import {
+  reviewReportSchema,
+  implementationReportSchema,
+  strategyReportSchema,
+} from '../ipc/contract/review/schemas.ts';
 
 export interface WorkerOptions {
   token: string;
@@ -50,6 +55,21 @@ export function registerReport(kit: WorkerKit): void {
       description:
         'Call this exactly once as your last action. verdict: "done" when the step is complete; "rejected" when the received work must be redone (put concrete remarks into feedback); "needs_human" when a person must decide (put the question into feedback, or pass several independent questions as questions, each with a recommendation and, for a clear choice, options; set human_only when only a person may answer, for example when you ask for a personal look at the result).',
       inputSchema: {
+        review: reviewReportSchema
+          .optional()
+          .describe(
+            'Managed reviewer: full open findings with stable IDs, and verified resolved IDs; classify new findings as missed or regression after the first review',
+          ),
+        implementation: implementationReportSchema
+          .optional()
+          .describe(
+            'Managed implementer: changed files, each blocking finding ID mapped to change/tests, required checks run after the last edit',
+          ),
+        strategy: strategyReportSchema
+          .optional()
+          .describe(
+            'Recovery planner: revised approach and sequential slices with acceptance criteria',
+          ),
         verdict: z.enum(VERDICTS),
         summary: z.string().min(1).max(SUMMARY_LIMIT).describe('What you did, in a few sentences'),
         feedback: z
@@ -88,7 +108,7 @@ export function registerReport(kit: WorkerKit): void {
           ),
       },
     },
-    ({ verdict, summary, feedback, questions, human_only }) =>
+    ({ verdict, summary, feedback, questions, human_only, review, implementation, strategy }) =>
       attempt(async () => {
         await options.send('report', {
           token: options.token,
@@ -97,6 +117,9 @@ export function registerReport(kit: WorkerKit): void {
           feedback: feedback ?? null,
           questions: questions ?? null,
           human_only: human_only ?? null,
+          ...(review ? { review } : {}),
+          ...(implementation ? { implementation } : {}),
+          ...(strategy ? { strategy } : {}),
         });
         return `Recorded verdict ${verdict}. You can stop now.`;
       }),

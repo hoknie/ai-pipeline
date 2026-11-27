@@ -633,6 +633,22 @@ export const en = {
     running: 'running {{duration}}',
   },
   runs: {
+    reviewCycle: {
+      title: 'Review cycle',
+      blocker: 'Blocker',
+      major: 'Major',
+      minor: 'Minor',
+      expected: 'Expected',
+      evidence: 'Evidence',
+      initial: 'Initial review',
+      missed: 'Missed in earlier review',
+      regression: 'Regression',
+      resolved: 'Resolved',
+      files: 'Files',
+      tests: 'Tests',
+      passed: 'Passed',
+      failed: 'Failed',
+    },
     list: {
       stageLabel: '{{status}} · {{stage}}{{more}}',
       stageMore: ' +{{n}}',
@@ -913,6 +929,7 @@ export const en = {
       observer: 'observer',
     },
     humanOnly: {
+      review_cycle: 'Review cycle needs your decision',
       review: 'Human review',
       request: 'Human needed',
       hint: 'Neither the queue autopilot nor observers answer this question.',

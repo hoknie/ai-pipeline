@@ -77,6 +77,9 @@ export const runHandlers = {
         feedback: params.feedback ?? null,
         questions: params.questions ?? null,
         ...(params.human_only === true ? { humanOnly: true } : {}),
+        ...(params.review ? { review: params.review } : {}),
+        ...(params.implementation ? { implementation: params.implementation } : {}),
+        ...(params.strategy ? { strategy: params.strategy } : {}),
       },
     })),
   split: (params, { services }) =>

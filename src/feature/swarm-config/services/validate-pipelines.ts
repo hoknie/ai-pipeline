@@ -11,6 +11,7 @@ import {
   readString,
 } from './validate-context.ts';
 import { checkVariants } from './sections/variants.ts';
+import { checkReviewPolicy, checkReviewTargets } from './sections/review/validate.ts';
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
 import {
   DEFAULT_MAX_GROUPS,
@@ -28,7 +29,7 @@ const PIPELINE_KEYS = ['name', 'split', 'steps', 'tags', 'stages', 'variants'];
 
 const STEP_KEYS = ['id', 'specialist', 'on_reject', 'additional_prompt', 'human_review'];
 
-const ON_REJECT_KEYS = ['goto', 'max_rounds'];
+const ON_REJECT_KEYS = ['goto', 'max_rounds', 'review'];
 
 export function checkSplitTargets(ctx: ValidateContext, pipelines: Pipeline[]): void {
   for (const pipeline of pipelines) {
@@ -137,6 +138,7 @@ export function checkPipeline(
     if (target === -1) addError(ctx, gotoPath, `unknown step \`${step.onReject.goto}\``);
     else if (target >= index) addError(ctx, gotoPath, 'must point to an earlier step');
   });
+  checkReviewTargets(ctx, steps, stepsPath, known);
   return withStages({ id, name: name?.trim() ?? null, split, steps });
 }
 
@@ -225,5 +227,9 @@ export function checkOnReject(ctx: ValidateContext, value: unknown, path: string
       : null;
   if (!('goto' in mapping)) addError(ctx, join(path, 'goto'), 'is required');
   if (!('max_rounds' in mapping)) addError(ctx, join(path, 'max_rounds'), 'is required');
-  return goto !== null && maxRounds !== null ? { goto, maxRounds } : null;
+  const review =
+    'review' in mapping ? checkReviewPolicy(ctx, mapping.review, join(path, 'review')) : undefined;
+  return goto !== null && maxRounds !== null
+    ? { goto, maxRounds, ...(review ? { review } : {}) }
+    : null;
 }

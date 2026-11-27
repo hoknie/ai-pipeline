@@ -16,6 +16,7 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | [configuration/README.md](configuration/README.md) | the `aip/` directory, shared and project levels, `settings.yaml`, `defaults`, the `web` section |
 | [configuration/specialists.md](configuration/specialists.md) | the fields of a specialist: prompt, model, limits, skills, tools, MCP servers, queueing tasks, tags |
 | [configuration/pipelines.md](configuration/pipelines.md) | steps, verdicts, returns, human review, questions, splitting a task into groups |
+| [configuration/review-cycles.md](configuration/review-cycles.md) | stable findings, verified repairs, compact context, strategy recovery and protected review budgets |
 | [configuration/actions.md](configuration/actions.md) | pipeline actions: commands and specialist steps around the split and the delivery, points, environment |
 | [configuration/permissions.md](configuration/permissions.md) | permission levels, `claude.edit_mode`, denied commands and how to allow them |
 | [configuration/delivery.md](configuration/delivery.md) | how a result reaches you: modes, safety, conflicts and the resolver, commit messages |

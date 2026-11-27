@@ -645,6 +645,22 @@ export const ru: Dictionary = {
     running: 'идёт {{duration}}',
   },
   runs: {
+    reviewCycle: {
+      title: 'Цикл ревью',
+      blocker: 'Блокирующее',
+      major: 'Существенное',
+      minor: 'Рекомендация',
+      expected: 'Ожидается',
+      evidence: 'Доказательство',
+      initial: 'Первое ревью',
+      missed: 'Пропуск прежнего ревью',
+      regression: 'Регрессия',
+      resolved: 'Закрыто',
+      files: 'Файлы',
+      tests: 'Тесты',
+      passed: 'Успешно',
+      failed: 'Ошибка',
+    },
     list: {
       stageLabel: '{{status}} · {{stage}}{{more}}',
       stageMore: ' +{{n}}',
@@ -924,6 +940,7 @@ export const ru: Dictionary = {
       observer: 'наблюдатель',
     },
     humanOnly: {
+      review_cycle: 'Цикл ревью требует вашего решения',
       review: 'Проверка человеком',
       request: 'Нужен человек',
       hint: 'Ни автопилот очереди, ни наблюдатели на этот вопрос не отвечают.',

@@ -1,3 +1,4 @@
+import { reviewPolicyValue } from './review/policy.ts';
 import type { CliIo } from '../io.ts';
 import { stringify } from 'yaml';
 
@@ -139,7 +140,17 @@ function presentSteps(pipeline: Config['pipelines'][number]): unknown {
     id: step.id,
     specialist: step.specialist,
     ...(step.onReject
-      ? { on_reject: { goto: step.onReject.goto, max_rounds: step.onReject.maxRounds } }
+      ? {
+          on_reject: {
+            goto: step.onReject.goto,
+            max_rounds: step.onReject.maxRounds,
+            ...(step.onReject.review
+              ? {
+                  review: reviewPolicyValue(step.onReject.review),
+                }
+              : {}),
+          },
+        }
       : {}),
     ...(step.additionalPrompt ? { additional_prompt: step.additionalPrompt } : {}),
     ...(step.humanReview ? { human_review: true } : {}),

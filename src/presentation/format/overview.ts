@@ -41,7 +41,7 @@ export interface AttentionItem {
   group: string | null;
   /** First line of the question or the reason. */
   text: string;
-  humanOnly: 'review' | 'request' | null;
+  humanOnly: 'review' | 'request' | 'review_cycle' | null;
 }
 
 function firstText(text: string | null | undefined, fallback = ''): string {

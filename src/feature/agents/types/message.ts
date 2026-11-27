@@ -6,6 +6,7 @@ import {
 
 import { describePermissions } from './runtime.ts';
 import type { StepInput } from './step-input.ts';
+import { reviewMessage } from './review/message.ts';
 
 /** A skill of a registry is named by its name alone, as the agent sees it. */
 function skillLabel(skill: string): string {
@@ -65,6 +66,7 @@ export function userMessage(
   attachmentsDirectory: string | null | undefined = null,
 ): string {
   const sections = [input.prompt];
+  if (input.review) sections.push(reviewMessage(input.review));
   if (input.attachments && input.attachments.length > 0 && attachmentsDirectory) {
     const folder = attachmentsDirectory.replace(/[\\/]+$/, '');
     sections.push(

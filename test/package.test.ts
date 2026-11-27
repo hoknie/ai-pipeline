@@ -54,18 +54,22 @@ describe('npm package', () => {
     expect(mod.version).toBe(manifest.version);
   });
 
-  it('the starter template is a valid configuration with a two step feature pipeline', () => {
+  it('the starter template is a valid configuration with planning and bounded review recovery', () => {
     const config = configFromFiles({
       settings: template('settings.yaml'),
       specialists: {
+        planner: template('specialists/planner.yaml'),
         coder: template('specialists/coder.yaml'),
         reviewer: template('specialists/reviewer.yaml'),
       },
       pipelines: { feature: template('pipelines/feature.yaml') },
     });
     expect(findPipeline(config, 'feature')?.steps.map((step) => step.id)).toEqual([
+      'plan',
       'code',
       'review',
     ]);
+    expect(findPipeline(config, 'feature')?.steps[2]?.onReject?.review?.recoveryStep).toBe('plan');
+    expect(config.specialists.find((item) => item.slug === 'planner')?.permissions).toBe('read');
   });
 });

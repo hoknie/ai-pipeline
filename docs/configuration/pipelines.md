@@ -65,6 +65,10 @@ A step that ends without `swarm_report`, or on `timeout`, gets the `failed` stat
 
 ## Asking a person
 
+For stable finding IDs, verified repairs, compact handoffs and a bounded strategy
+recovery, enable [bounded review cycles](review-cycles.md). Their budget stops are
+reserved for a person and cannot be extended by the queue autopilot or observers.
+
 ### Questions
 
 `questions` in `swarm_report` (only with `needs_human`) holds 1 to 10 independent questions in one report.

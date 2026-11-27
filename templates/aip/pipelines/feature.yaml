@@ -1,4 +1,15 @@
-# Write the code, then review it. A rejected review sends the work back to `code` up to 2 times.
+# Plan testable slices, implement the agreed scope, then review. Two stagnant revisions
+# request one revised strategy; the total rejection limit always requires a person.
 steps:
+  - { id: plan, specialist: planner }
   - { id: code, specialist: coder }
-  - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }
+  - id: review
+    specialist: reviewer
+    on_reject:
+      goto: code
+      max_rounds: 5
+      review:
+        stagnant_rounds: 2
+        recovery_step: plan
+        # Set the project's mandatory gate commands here.
+        required_checks: []

@@ -646,6 +646,22 @@ export const es: Dictionary = {
     running: 'en curso {{duration}}',
   },
   runs: {
+    reviewCycle: {
+      title: 'Ciclo de revisión',
+      blocker: 'Bloqueante',
+      major: 'Importante',
+      minor: 'Sugerencia',
+      expected: 'Esperado',
+      evidence: 'Evidencia',
+      initial: 'Revisión inicial',
+      missed: 'Omisión anterior',
+      regression: 'Regresión',
+      resolved: 'Resuelto',
+      files: 'Archivos',
+      tests: 'Pruebas',
+      passed: 'Correcto',
+      failed: 'Fallido',
+    },
     list: {
       stageLabel: '{{status}} · {{stage}}{{more}}',
       stageMore: ' +{{n}}',
@@ -928,6 +944,7 @@ export const es: Dictionary = {
       observer: 'observador',
     },
     humanOnly: {
+      review_cycle: 'El ciclo de revisión requiere tu decisión',
       review: 'Revisión humana',
       request: 'Se necesita una persona',
       hint: 'Ni el piloto automático de la cola ni los observadores responden a esta pregunta.',

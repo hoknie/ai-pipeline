@@ -1,5 +1,11 @@
 import type { Denial, StepInput, Usage, Verdict } from '../../agents/types/index.ts';
 import type { ReasoningEffort } from '../../swarm-config/types/index.ts';
+import type {
+  ReviewReport,
+  ImplementationReport,
+  StrategyReport,
+} from '../../agents/types/index.ts';
+import { validateReviewData } from '../../agents/types/index.ts';
 import {
   type AttemptRuntime,
   type AttemptStatus,
@@ -20,6 +26,9 @@ export interface HumanQuestion {
 }
 
 export interface Report {
+  review?: ReviewReport;
+  implementation?: ImplementationReport;
+  strategy?: StrategyReport;
   verdict: Verdict;
   summary: string;
   feedback: string | null;
@@ -125,6 +134,8 @@ export function describeFailReason(reason: FailReason): string {
 }
 
 export function validateReport(report: Report): string | null {
+  const reviewProblem = validateReviewData(report);
+  if (reviewProblem) return reviewProblem;
   if (report.summary.trim() === '') return 'summary must not be empty';
   if ([...report.summary].length > SUMMARY_LIMIT) {
     return `summary must be at most ${SUMMARY_LIMIT} characters`;
@@ -141,7 +152,7 @@ export function validateReport(report: Report): string | null {
     const problem = validateQuestions(questions);
     if (problem !== null) return problem;
   }
-  if (feedback === null && questions === null && report.verdict !== 'done') {
+  if (feedback === null && questions === null && report.verdict !== 'done' && !report.review) {
     return `feedback is required when verdict is ${report.verdict}`;
   }
   if (feedback !== null && [...feedback].length > FEEDBACK_LIMIT) {

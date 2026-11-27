@@ -315,10 +315,10 @@ export function finishedApartFromRepair(state: RunState): boolean {
 export function specialistOfStep(
   run: Run,
   group: Group,
-  step: { specialist: string; agent?: StepAgent },
+  step: { id?: string; specialist: string; agent?: StepAgent },
 ): Specialist | undefined {
   if (isRepairGroup(group)) return run.repair.specialist ?? undefined;
-  return stepSpecialist(run.config, step);
+  return escalatedSpecialist(run, group, step.id) ?? stepSpecialist(run.config, step);
 }
 
 /** Work groups and the split step of a run that a retry can continue. */
@@ -400,3 +400,4 @@ export interface StepProgress {
   /** Step of the only group; number is the ordinal of its pass, from one; null with several groups or when all steps are passed. */
   current: { step: string; name: string; number: number } | null;
 }
+import { escalatedSpecialist } from './review/history.ts';

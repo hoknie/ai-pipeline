@@ -12,6 +12,8 @@ import {
   findGroup,
   runPipeline,
   validateReport,
+  validateCycleReport,
+  findingsText,
 } from '../types/index.ts';
 import type { Ctx } from './events.ts';
 import { groupOf, runningAttempt } from './steps.ts';
@@ -42,6 +44,8 @@ export function answerQuestion(
   if (answer.trim() === '') throw rejected('answer must not be empty');
   const group = groupOf(m, slug);
   if (group.status !== 'needs_human') throw wrongStatus(group, 'answer', 'needs_human');
+  if (group.humanOnly !== null && by !== 'human')
+    throw rejected(`group \`${slug}\` question is only for a person`);
   refreshPermissionsOf(m, group, permissions);
   const last = group.attempts.at(-1);
   const askedBy = group.pending?.askedBy;
@@ -100,13 +104,16 @@ export function registryProjectResolved(
 }
 
 export function reportAttempt(m: Ctx, slug: string, seq: number, report: Report): void {
-  const attempt = runningAttempt(groupOf(m, slug), seq);
+  const group = groupOf(m, slug);
+  const attempt = runningAttempt(group, seq);
   if (!attempt) throw rejected(`attempt ${seq} is not running`);
   if (attempt.reason?.kind === 'message') {
     throw rejected(`attempt ${seq} was interrupted by a message`);
   }
   const problem = validateReport(report);
   if (problem !== null) throw rejected(`invalid report: ${problem}`);
+  const cycleProblem = validateCycleReport(group, attempt, report);
+  if (cycleProblem !== null) throw rejected(`invalid report: ${cycleProblem}`);
   attempt.report = {
     verdict: report.verdict,
     summary: report.summary,
@@ -114,9 +121,14 @@ export function reportAttempt(m: Ctx, slug: string, seq: number, report: Report)
       ? report.feedback
       : report.questions
         ? questionsText(report.questions)
-        : null,
+        : report.review
+          ? findingsText(report.review.findings) || null
+          : null,
     ...(report.questions ? { questions: report.questions } : {}),
     ...(report.humanOnly ? { humanOnly: true } : {}),
+    ...(report.review ? { review: structuredClone(report.review) } : {}),
+    ...(report.implementation ? { implementation: structuredClone(report.implementation) } : {}),
+    ...(report.strategy ? { strategy: structuredClone(report.strategy) } : {}),
   };
 }
 

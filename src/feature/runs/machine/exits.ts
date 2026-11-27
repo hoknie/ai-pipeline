@@ -44,6 +44,7 @@ import {
   waitForLimit,
 } from './steps.ts';
 import { reviewQuestion } from './texts.ts';
+import { finishRecovery } from './review/cycle.ts';
 
 /** The attempt was cancelled or timed out before its process ended: only the usage is unknown. */
 function lateUsage(group: Group, seq: number, exit: AttemptExit): void {
@@ -233,6 +234,7 @@ function finishStep(m: Ctx, group: Group, attempt: Attempt, report: Report): voi
     );
     return;
   }
+  if (finishRecovery(group, attempt, stepsOf(m.state.run, group))) return;
   advanceStep(m, group, attempt.stepIndex);
 }
 

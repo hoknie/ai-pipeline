@@ -20,3 +20,5 @@ export * from './stages.ts';
 export * from './topology.ts';
 export { RUN_TITLE_LIMIT, RUN_NAME_LIMIT, RUN_NAME_PATTERN } from '../../agents/types/index.ts';
 export * from './answers/answers-text.ts';
+export * from './review/history.ts';
+export * from './review/reports.ts';
