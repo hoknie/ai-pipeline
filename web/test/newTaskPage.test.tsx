@@ -5,7 +5,18 @@ import { App } from '../src/app/App.tsx';
 import type { Api } from '../src/shared/api/api.ts';
 import type { QueueView, RunView } from '../src/shared/api/types.ts';
 
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import {
+  markdownSource,
+  markdownValue,
+  setMarkdown,
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from './render.tsx';
 import {
   FakeSocket,
   fakeApi,
@@ -84,7 +95,7 @@ function mount(
   return { api };
 }
 
-const textField = () => screen.findByLabelText<HTMLTextAreaElement>('Task text');
+const textField = () => screen.findByLabelText('Task text');
 
 async function ready() {
   const field = await textField();
@@ -102,10 +113,12 @@ describe('page of a new task', () => {
     expect(screen.getByRole('link', { name: '← Queue' }).getAttribute('href')).toBe('#queue');
     expect(screen.getByRole('combobox', { name: 'Repository' })).toBeTruthy();
     expect(screen.getByLabelText('Name')).toBeTruthy();
-    expect(field.rows).toBe(9);
-    expect(field.className).toContain('flex-1');
+    expect(field.getAttribute('contenteditable')).toBe('true');
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(field));
+    const source = markdownSource(field);
+    expect(source.rows).toBe(9);
+    expect(source.className).toContain('flex-1');
   });
 
   it('shows a skeleton instead of the form until the queue is loaded', async () => {
@@ -124,7 +137,7 @@ describe('page of a new task', () => {
   it('Add clears the draft, leads to the queue and announces the task', async () => {
     const { api } = mount();
     const field = await ready();
-    fireEvent.change(field, { target: { value: 'Do it' } });
+    setMarkdown(field, 'Do it');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(window.location.hash).toBe('#queue'));
     await waitFor(() => expect(screen.getAllByText('Task #7 created').length).toBeGreaterThan(0));
@@ -133,16 +146,16 @@ describe('page of a new task', () => {
     expect(screen.getAllByText(/#7/).length).toBeGreaterThan(0);
     fireEvent.click(strip().getByRole('button', { name: 'New task' }));
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+    expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe('');
   });
 
   it('Add and continue stays on the page', async () => {
     const { api } = mount();
     const field = await ready();
-    fireEvent.change(field, { target: { value: 'One' } });
+    setMarkdown(field, 'One');
     fireEvent.click(screen.getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
-    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(''));
+    await waitFor(() => expect(markdownValue(field)).toBe(''));
     expect(window.location.hash).toBe('#queue/new');
   });
 
@@ -150,11 +163,11 @@ describe('page of a new task', () => {
     const { api } = mount();
     (api.queueAdd as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('nope'));
     const field = await ready();
-    fireEvent.change(field, { target: { value: 'Keep' } });
+    setMarkdown(field, 'Keep');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText('nope');
     expect(window.location.hash).toBe('#queue/new');
-    expect((field as HTMLTextAreaElement).value).toBe('Keep');
+    expect(markdownValue(field)).toBe('Keep');
   });
 
   it('puts Cancel, Add and continue and Add in this order', async () => {
@@ -173,12 +186,12 @@ describe('page of a new task', () => {
   it('Cancel and the link lead to the queue without a request and keep the draft', async () => {
     const { api } = mount();
     const field = await ready();
-    fireEvent.change(field, { target: { value: 'Draft' } });
+    setMarkdown(field, 'Draft');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(window.location.hash).toBe('#queue'));
     expect(api.queueAdd).not.toHaveBeenCalled();
     window.location.hash = '#queue/new';
-    expect(((await textField()) as HTMLTextAreaElement).value).toBe('Draft');
+    expect(markdownValue(await textField())).toBe('Draft');
     fireEvent.click(screen.getByRole('link', { name: '← Queue' }));
     await waitFor(() => expect(window.location.hash).toBe('#queue'));
     expect(api.queueAdd).not.toHaveBeenCalled();
@@ -186,24 +199,25 @@ describe('page of a new task', () => {
 
   it('shares the draft with the dialog in both directions', async () => {
     mount();
-    fireEvent.change(await ready(), { target: { value: 'from page' } });
+    setMarkdown(await ready(), 'from page');
     window.location.hash = '#queue';
     await screen.findByRole('list', { name: 'tasks in the queue' });
     fireEvent.click(strip().getByRole('button', { name: 'New task' }));
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    const inDialog = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    expect(inDialog.value).toBe('from page');
-    expect(inDialog.className).not.toContain('flex-1');
-    expect(inDialog.rows).toBe(9);
-    fireEvent.change(inDialog, { target: { value: 'from dialog' } });
+    const inDialog = within(dialog).getByLabelText('Task text');
+    expect(markdownValue(inDialog)).toBe('from page');
+    const source = markdownSource(inDialog);
+    expect(source.className).not.toContain('flex-1');
+    expect(source.rows).toBe(9);
+    setMarkdown(inDialog, 'from dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Expand to page' }));
-    expect(((await textField()) as HTMLTextAreaElement).value).toBe('from dialog');
+    expect(markdownValue(await textField())).toBe('from dialog');
   });
 
   it('keeps the text over queue and run events', async () => {
     mount();
     const field = await ready();
-    fireEvent.change(field, { target: { value: 'stay' } });
+    setMarkdown(field, 'stay');
     act(() => {
       FakeSocket.last?.send({
         event: 'queue',
@@ -216,7 +230,7 @@ describe('page of a new task', () => {
         run: runView({ id: 'a1', repository: APP, title: 'changed' }),
       });
     });
-    expect((field as HTMLTextAreaElement).value).toBe('stay');
+    expect(markdownValue(field)).toBe('stay');
   });
 
   it('targets the chosen repository without moving the panel', async () => {
@@ -227,7 +241,7 @@ describe('page of a new task', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('docs'),
     );
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'doc' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'doc');
     fireEvent.click(screen.getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
     expect(window.location.hash).toBe('#queue/new');
@@ -244,7 +258,7 @@ describe('repository of the page', () => {
   it('follows the header, keeps the text and drops "Waits for"', async () => {
     mount();
     const field = await ready();
-    fireEvent.change(field, { target: { value: 'keep me' } });
+    setMarkdown(field, 'keep me');
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
     const waits = screen.getByRole('combobox', { name: 'Linked task' });
     fireEvent.click(waits);
@@ -260,7 +274,7 @@ describe('repository of the page', () => {
       expect(screen.getByRole('combobox', { name: 'Repository' }).textContent).toContain('lib'),
     );
     expect(window.location.hash).toBe('#queue/new');
-    expect(screen.getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('keep me');
+    expect(markdownValue(screen.getByLabelText('Task text'))).toBe('keep me');
     expect(screen.queryAllByText(/app task/)).toHaveLength(0);
   });
 });
@@ -282,18 +296,18 @@ describe('ways to the page', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'ui' }));
     fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
     await waitFor(() => expect(tags.getAttribute('aria-expanded')).toBe('false'));
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'carry' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'carry');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Expand to page' }));
     await waitFor(() => expect(window.location.hash).toBe('#queue/new'));
     expect(screen.queryByRole('dialog')).toBeNull();
     const field = await textField();
-    expect(field.value).toBe('carry');
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    expect(markdownValue(field)).toBe('carry');
     expect(screen.getByRole('combobox', { name: 'Repository' }).textContent).toContain('lib');
     expect(screen.getAllByText('ui').length).toBeGreaterThan(0);
     expect(document.querySelector('[data-repository-trigger]')?.getAttribute('aria-label')).toBe(
       'Repository: app',
     );
-    await waitFor(() => expect(document.activeElement).toBe(field));
   });
 
   it('keeps the parent of an expanded subtask', async () => {
@@ -377,7 +391,7 @@ describe('page of a new task in several projects', () => {
     fireEvent.click(screen.getByRole('button', { name: 'In several projects' }));
     await addLib();
     fireEvent.click(screen.getByRole('button', { name: 'Move lib up' }));
-    fireEvent.change(await textField(), { target: { value: 'Email' } });
+    setMarkdown(await textField(), 'Email');
     expect(screen.queryByRole('radio', { name: 'Groups' })).toBeNull();
     const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
     await waitFor(() => expect(add.disabled).toBe(false));
@@ -396,14 +410,12 @@ describe('page of a new task in several projects', () => {
     await ready();
     fireEvent.click(screen.getByRole('button', { name: 'In several projects' }));
     await addLib();
-    fireEvent.change(await textField(), { target: { value: 'One' } });
+    setMarkdown(await textField(), 'One');
     const next = screen.getByRole<HTMLButtonElement>('button', { name: 'Add and continue' });
     await waitFor(() => expect(next.disabled).toBe(false));
     fireEvent.click(next);
     await waitFor(() => expect(api.queueAddProjects).toHaveBeenCalled());
-    await waitFor(() =>
-      expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(''),
-    );
+    await waitFor(() => expect(markdownValue(screen.getByLabelText('Task text'))).toBe(''));
     expect(window.location.hash).toBe('#queue/new');
     expect(
       screen.getByRole('button', { name: 'In several projects' }).getAttribute('aria-pressed'),

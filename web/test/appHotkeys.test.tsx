@@ -6,7 +6,16 @@ import { SECTION_SHORTCUTS } from '../src/app/sections.ts';
 import { SHORTCUTS } from '../src/app/shortcuts.ts';
 
 import { FakeSocket, configView, fakeApi, groupView, openFake, queueOf } from './fixtures.ts';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import {
+  markdownValue,
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from './render.tsx';
 
 beforeEach(() => {
   window.location.hash = '#runs';
@@ -95,9 +104,9 @@ describe('panel hotkeys', () => {
     );
     press('n', 'KeyN', { ctrlKey: true });
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    const text = within(dialog).getByLabelText('Task text') as HTMLTextAreaElement;
+    const text = within(dialog).getByLabelText('Task text');
     await waitFor(() => expect(document.activeElement).toBe(text));
-    expect(text.value).toBe('');
+    expect(markdownValue(text)).toBe('');
   });
 
   it('takes ctrl+r for itself and leaves cmd+r to the browser', async () => {

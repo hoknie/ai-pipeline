@@ -5,7 +5,7 @@ import { App } from '../src/app/App.tsx';
 import type { Api } from '../src/shared/api/api.ts';
 import type { ProvidersView } from '../src/shared/api/types.ts';
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
+import { setMarkdown, act, cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
 import {
   FakeSocket,
   fakeApi,
@@ -73,7 +73,7 @@ function mount(registries: Record<string, ProvidersView>) {
   return api;
 }
 
-const text = () => screen.findByLabelText<HTMLTextAreaElement>('Task text');
+const text = () => screen.findByLabelText('Task text');
 const providerField = () => screen.findByRole<HTMLButtonElement>('combobox', { name: 'Provider' });
 
 async function openProviders() {
@@ -95,7 +95,7 @@ async function addLib() {
 describe('the default provider in the task form', () => {
   it('is chosen in a new task and sent without touching the field', async () => {
     const api = mount({ [APP]: registry(APP, 'anthropic') });
-    fireEvent.change(await text(), { target: { value: 'T' } });
+    setMarkdown(await text(), 'T');
     await waitFor(async () => expect((await providerField()).textContent).toContain('Anthropic'));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
@@ -121,7 +121,7 @@ describe('the default provider in the task form', () => {
 
   it('can be refused with «Not chosen», which is sent as null', async () => {
     const api = mount({ [APP]: registry(APP, 'anthropic') });
-    fireEvent.change(await text(), { target: { value: 'T' } });
+    setMarkdown(await text(), 'T');
     await waitFor(async () => expect((await providerField()).textContent).toContain('Anthropic'));
     await openProviders();
     fireEvent.click(await screen.findByRole('option', { name: /Not chosen/ }));
@@ -136,7 +136,7 @@ describe('the default provider in the task form', () => {
 
   it('sends null when the project has no default provider', async () => {
     const api = mount({ [APP]: registry(APP, null) });
-    fireEvent.change(await text(), { target: { value: 'T' } });
+    setMarkdown(await text(), 'T');
     await waitFor(async () => expect((await providerField()).disabled).toBe(false));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>

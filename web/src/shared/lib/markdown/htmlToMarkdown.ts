@@ -1,5 +1,7 @@
+import { isSafeLink } from './linkEditing.ts';
+
 /**
- * Turns pasted HTML into Markdown. The HTML is parsed into an inert document (no script runs, no
+ * Turns pasted HTML into Markdown. The HTML is parsed into inert template contents (no script runs, no
  * handler fires, no image loads) and walked by hand. Returns `null` when the HTML has no
  * meaningful markup (headings, lists, emphasis, links, code, tables…): then the caller keeps the
  * plain text, which is what a source such as a code editor wants.
@@ -9,7 +11,7 @@
 const BOUNDARY = '\u0001';
 
 const SEMANTIC =
-  'h1,h2,h3,h4,h5,h6,ul,ol,li,em,i,s,del,strike,a[href],code,pre,blockquote,table,hr,img';
+  'h1,h2,h3,h4,h5,h6,ul,ol,li,em,i,s,del,strike,a[href],code,pre,blockquote,table,hr,img,span[data-raw-inline="true"]';
 const HEADING = /^H([1-6])$/;
 const BLOCKS = new Set([
   'P',
@@ -69,9 +71,9 @@ function isStruck(el: Element): boolean {
   );
 }
 
-function hasMeaning(doc: Document): boolean {
-  if (doc.body.querySelector(SEMANTIC) !== null) return true;
-  for (const el of Array.from(doc.body.querySelectorAll('*'))) {
+function hasMeaning(root: DocumentFragment): boolean {
+  if (root.querySelector(SEMANTIC) !== null) return true;
+  for (const el of Array.from(root.querySelectorAll('*'))) {
     if (['B', 'STRONG', 'SPAN'].includes(el.nodeName) && isBold(el)) return true;
     if (el.nodeName === 'SPAN' && (isItalic(el) || isStruck(el))) return true;
   }
@@ -83,15 +85,20 @@ function block(content: string): string {
 }
 
 /** Folds the boundaries into blank lines (`tight`: single line breaks) and trims the edges. */
-function finish(text: string, tight: boolean): string {
-  return text
+function finish(text: string, tight: boolean, trimEdges = true): string {
+  const result = text
     .replace(/[ \t\n]*\u0001[\u0001 \t\n]*/g, tight ? '\n' : '\n\n')
-    .replace(/^\n+|\n+$/g, '')
-    .replace(/^[ \t]+|[ \t]+$/g, '');
+    .replace(/^\n+|\n+$/g, '');
+  return trimEdges ? result.replace(/^[ \t]+|[ \t]+$/g, '') : result;
 }
 
 function escapeText(text: string): string {
-  return text.replace(/([\\`*_[\]])/g, '\\$1');
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\u0001/g, '')
+    .replace(/([\\`*_[\]!~])/g, '\\$1');
 }
 
 export function fence(code: string, min: number): string {
@@ -109,16 +116,17 @@ function language(pre: Element): string {
 }
 
 function safeLink(href: string): string | null {
-  // eslint-disable-next-line no-control-regex
-  const cleaned = href.replace(/[\u0000- ]/g, '');
-  if (cleaned === '' || /^(javascript|vbscript|data|file):/i.test(cleaned)) return null;
-  return href.trim().replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
-}
-
-function safeImage(src: string): string | null {
-  const trimmed = src.trim();
-  if (!/^(https?:\/\/|data:image\/)/i.test(trimmed)) return null;
-  return trimmed.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
+  const trimmed = href.trim();
+  if (!isSafeLink(href)) return null;
+  // Escape Markdown entities without changing the URL after Markdown decoding.
+  // The DOM has already decoded HTML entities, and isSafeLink checks that value.
+  return trimmed.replace(/[\s()<>\\"'&]/g, (char) =>
+    char === '&'
+      ? '&amp;'
+      : char === ' '
+        ? '%20'
+        : `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`,
+  );
 }
 
 function wrap(marker: string, text: string): string {
@@ -135,14 +143,17 @@ function renderChildren(parent: Node): string {
 }
 
 function renderText(node: Text): string {
-  let text = (node.nodeValue ?? '').replace(/[ \t\r\n\f\u00a0]+/g, ' ');
+  // NBSP is content, not collapsible HTML whitespace (including at fragment edges).
+  let text = (node.nodeValue ?? '').replace(/[ \t\r\n\f]+/g, ' ');
   const next = node.nextSibling;
   const lineStart = startsLine(node);
-  if (lineStart) text = text.replace(/^ /, '');
   if (next?.nodeName === 'BR') text = text.replace(/ $/, '');
   let escaped = escapeText(text);
   if (lineStart) {
-    escaped = escaped.replace(/^([#>+-])(?= |$)/, '\\$1').replace(/^(\d+)([.)])(?= |$)/, '$1\\$2');
+    escaped = escaped
+      .replace(/^( {0,3})(#{1,6})(?= |$)/, '$1\\$2')
+      .replace(/^([>+-])(?= |$)/, '\\$1')
+      .replace(/^(\d+)([.)])(?= |$)/, '$1\\$2');
   }
   return escaped;
 }
@@ -226,6 +237,9 @@ function renderTable(table: Element): string {
 function renderElement(el: Element): string {
   const name = el.nodeName;
   if (DROPPED.has(name)) return '';
+  // Clipboard atoms carry untrusted Markdown as text, never live HTML. The
+  // visual Markdown parser will preserve unknown syntax as inert atoms again.
+  if (name === 'SPAN' && el.getAttribute('data-raw-inline') === 'true') return el.textContent ?? '';
   const heading = HEADING.exec(name);
   if (heading) {
     const text = finish(renderChildren(el), true).replace(/\s*\n\s*/g, ' ');
@@ -252,6 +266,9 @@ function renderElement(el: Element): string {
       );
     }
     case 'PRE': {
+      // Our clipboard serializer emits raw Markdown atoms. Treat this as untrusted
+      // source, just like text/plain; callers still parse and validate the result.
+      if (el.getAttribute('data-raw-markdown') === 'true') return block(el.textContent ?? '');
       const code = (el.textContent ?? '').replace(/^\n/, '').replace(/\n$/, '');
       const ticks = fence(code, 3);
       return block(`${ticks}${language(el)}\n${code}\n${ticks}`);
@@ -264,17 +281,18 @@ function renderElement(el: Element): string {
       return `${ticks}${pad}${code}${pad}${ticks}`;
     }
     case 'IMG': {
-      const alt = (el.getAttribute('alt') ?? '').replace(/[[\]]/g, '');
-      const src = safeImage(el.getAttribute('src') ?? '');
-      return src === null ? escapeText(alt) : `![${alt}](${src})`;
+      // Never turn pasted resources into Markdown images that a renderer could fetch.
+      return escapeText(el.getAttribute('alt') ?? '');
     }
     case 'A': {
       const text = renderChildren(el);
       const href = safeLink(el.getAttribute('href') ?? '');
       if (href === null) return text;
-      if (text.trim() === '') return `<${href}>`;
-      if (text.trim() === href) return `<${href}>`;
-      return `[${text.trim()}](${href})`;
+      if (text === '') return `[${escapeText(href)}](${href})`;
+      if (text.trim() === '') return `[${text}](${href})`;
+      const lead = /^\s*/.exec(text)![0];
+      const trail = /\s*$/.exec(text)![0];
+      return `${lead}[${text.trim()}](${href})${trail}`;
     }
     default:
   }
@@ -293,8 +311,11 @@ function renderNode(node: Node): string {
 
 export function htmlToMarkdown(html: string): string | null {
   if (html.trim() === '') return null;
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  if (!hasMeaning(doc)) return null;
-  const md = finish(renderChildren(doc.body), false);
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  if (!hasMeaning(template.content)) return null;
+  // Block boundaries consume layout whitespace; inline fragment edges are text
+  // that must survive insertion between existing words.
+  const md = finish(renderChildren(template.content), false, false);
   return md === '' ? null : md;
 }

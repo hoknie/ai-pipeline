@@ -1,5 +1,23 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
+@source './';
+
+.markdown-code {
+  @apply my-2 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-2 font-mono text-xs;
+  & .hljs-attr {
+    @apply text-blue-600;
+  }
+  & .hljs-keyword,
+  & .hljs-literal {
+    @apply text-purple-600;
+  }
+  & .hljs-number {
+    @apply text-orange-600;
+  }
+  & .hljs-string {
+    @apply text-green-700;
+  }
+}
 
 @custom-variant dark (&:where(.dark, .dark *));
 

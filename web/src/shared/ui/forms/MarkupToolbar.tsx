@@ -2,7 +2,6 @@ import {
   Bold,
   Code,
   Code2,
-  Eye,
   Heading2,
   Italic,
   Link,
@@ -17,15 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { cn } from '../../lib/browser/cn.ts';
 import type { MarkupAction } from '../../lib/markdown/markdownMarkup.ts';
-import {
-  Toolbar,
-  ToolbarButton,
-  ToolbarSeparator,
-  ToolbarToggleGroup,
-  ToolbarToggleItem,
-} from '../layout/toolbar.tsx';
-
-export type Mode = 'plain' | 'markdown';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '../layout/toolbar.tsx';
 
 const ACTIONS: { action: MarkupAction; icon: LucideIcon; separated?: boolean }[] = [
   { action: 'heading', icon: Heading2 },
@@ -41,46 +32,30 @@ const ACTIONS: { action: MarkupAction; icon: LucideIcon; separated?: boolean }[]
   { action: 'link', icon: Link },
 ];
 
-/** The switch of the display, the markup buttons and the preview toggle of a Markdown field. */
+/** Formatting actions and the source toggle of a Markdown field. */
 export function MarkupToolbar({
-  mode,
-  onMode,
   editing,
-  preview,
-  onPreview,
+  source,
+  onSource,
   onMark,
 }: {
-  mode: Mode;
-  onMode: (mode: string) => void;
   editing: boolean;
-  preview: boolean;
-  onPreview: () => void;
+  source: boolean;
+  onSource: () => void;
   onMark: (action: MarkupAction) => void;
 }) {
   const { t } = useTranslation();
-  const markdown = mode === 'markdown';
   const caption = (action: MarkupAction) => t(`queue.form.markup.${action}`);
   return (
     <Toolbar aria-label={t('queue.form.markupToolbar')}>
-      <ToolbarToggleGroup
-        type="single"
-        aria-label={t('queue.form.markupMode')}
-        value={mode}
-        onValueChange={onMode}
-      >
-        <ToolbarToggleItem value="plain">{t('queue.form.modePlain')}</ToolbarToggleItem>
-        <ToolbarToggleItem value="markdown">{t('queue.form.modeMarkdown')}</ToolbarToggleItem>
-      </ToolbarToggleGroup>
-      <ToolbarSeparator />
       {ACTIONS.map(({ action, icon: Icon, separated }) => (
         <span key={action} className="contents">
           {separated ? <ToolbarSeparator /> : null}
           <ToolbarButton
             aria-label={caption(action)}
-            title={
-              markdown ? caption(action) : t('queue.form.markupNeedsMd', { label: caption(action) })
-            }
-            disabled={!editing}
+            title={caption(action)}
+            disabled={!editing || source}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => onMark(action)}
           >
             <Icon aria-hidden />
@@ -88,18 +63,13 @@ export function MarkupToolbar({
         </span>
       ))}
       <ToolbarButton
-        className={cn('ml-auto w-auto px-2', preview && 'bg-accent text-foreground')}
-        aria-pressed={preview}
-        title={
-          markdown
-            ? t('queue.form.preview')
-            : t('queue.form.markupNeedsMd', { label: t('queue.form.preview') })
-        }
-        disabled={!markdown}
-        onClick={onPreview}
+        className={cn('ml-auto w-auto px-2', source && 'bg-accent text-foreground')}
+        aria-pressed={source}
+        title={t('queue.form.markdownSource')}
+        onClick={onSource}
       >
-        <Eye aria-hidden />
-        {t('queue.form.preview')}
+        <Code2 aria-hidden />
+        {t('queue.form.markdownSource')}
       </ToolbarButton>
     </Toolbar>
   );

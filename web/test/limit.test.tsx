@@ -136,8 +136,8 @@ describe('return to the queue', () => {
     const list = await screen.findByRole('list', { name: 'tasks in the queue' });
     fireEvent.click(within(list).getByRole('button', { name: 'Edit' }));
     const item = within(within(list).getAllByRole('listitem')[0]!);
-    const text = await item.findByRole<HTMLTextAreaElement>('textbox', { name: 'Task text' });
-    expect(text.matches(':disabled')).toBe(true);
+    const text = await item.findByRole('textbox', { name: 'Task text' });
+    expect(text.getAttribute('contenteditable')).toBe('false');
     expect(item.getByRole('textbox', { name: 'Name' }).matches(':disabled')).toBe(true);
     fireEvent.click(item.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalledWith('q9', {}));

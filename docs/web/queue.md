@@ -85,12 +85,16 @@ The left half holds what is shared: name, pipeline and variant, text and the sha
 
 ### The text editor
 
-The text of a task and of each group has a toolbar. Its first element is the display switch `Plain` / `MD`; `MD` is the default at every opening.
+The text of a task and of each group opens in a visual Markdown editor with its own toolbar. Paragraphs, headings, ordinary and task lists, quotes and GFM table cells can be edited visually, including strikethrough. Unknown fragments remain literal, with their source available for direct editing. The document has one selection and undo/redo history across blocks.
 
-- `MD` enables the markup buttons: heading, bold, italic, strikethrough, bulleted, numbered and task lists, quote, code, code block and link. A button wraps the selection (or the lines it touches) in the markup, and pressing it again takes the markup off.
-- "Preview" shows the text as Markdown.
-- The display does not change the text, and pasted formatted text becomes Markdown in both modes.
-- In a form of a task that already runs, the switch and "Preview" work while the text and the markup buttons are unavailable.
+- "Markdown source" switches to direct editing of the same draft and back without submitting or changing it. Formatting buttons are unavailable in source mode.
+- Ctrl/⌘+B and Ctrl/⌘+I toggle bold and italic; Ctrl/⌘+K opens the link editor for both text and destination. Ctrl/⌘+Z undoes an edit, Ctrl/⌘+Shift+Z redoes it. These shortcuts apply only while the visual editor has focus. Use the arrow keys to move between toolbar buttons.
+- Supported formatted HTML is pasted as Markdown. In the visual editor, ordinary Markdown paste is formatted; paste as plain text keeps it literal. In source mode, pasted Markdown stays as source text.
+- Code blocks retain their lines and use syntax highlighting for supported languages; unrecognised languages show plain code.
+- Mermaid flowcharts, sequence, class, state and ER diagrams and PlantUML diagrams render locally in a disposable worker. Diagram text is never sent to an external rendering service. Edit diagrams in the Markdown source; the original code also remains available below the drawing.
+- Diagram rendering loads on demand (a roughly 6 MB worker bundle) and requires a browser with Worker, WebAssembly and OffscreenCanvas support. Inputs are limited to 32,000 characters and rendering to 15 seconds.
+- Includes, themes, external resources and Mermaid configuration/click directives are disabled. Invalid or unsupported diagrams show an error with the unchanged source; no external-server fallback is used. The development server must serve the worker isolation policy, otherwise rendering is refused.
+- In a form of a task that already runs, both views remain readable and the source switch works, but editing and formatting are unavailable.
 
 ## Global queue
 

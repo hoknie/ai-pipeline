@@ -10,7 +10,16 @@ import { es } from '../src/shared/i18n/locales/es.ts';
 import { ru } from '../src/shared/i18n/locales/ru.ts';
 import { zh } from '../src/shared/i18n/locales/zh.ts';
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import {
+  markdownValue,
+  setMarkdown,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from './render.tsx';
 import { fakeApi, openFake, queueOf } from './fixtures.ts';
 
 beforeEach(() => {
@@ -36,8 +45,8 @@ async function dialogWith(queueAdd: (fields: QueueFields) => Promise<never | unk
   await waitFor(() =>
     expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
   );
-  const text = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-  fireEvent.change(text, { target: { value: 'fix the login' } });
+  const text = within(dialog).getByLabelText('Task text');
+  setMarkdown(text, 'fix the login');
   return { api, dialog, text };
 }
 
@@ -53,7 +62,7 @@ describe('a copy of a waiting task in the new task form', () => {
     const notice = await within(dialog).findByText('This task already waits in the queue as #12.');
     expect(notice.getAttribute('title')).toBe(REFUSAL);
     expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
-    expect(text.value).toBe('fix the login');
+    expect(markdownValue(text)).toBe('fix the login');
     expect(api.queueAdd).toHaveBeenCalledTimes(1);
     expect(api.queueAdd).toHaveBeenLastCalledWith({
       provider: null,
@@ -76,7 +85,7 @@ describe('a copy of a waiting task in the new task form', () => {
     const { api, dialog, text } = await dialogWith(refuseCopies);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await within(dialog).findByRole('button', { name: 'Add anyway' });
-    fireEvent.change(text, { target: { value: 'fix the logout' } });
+    setMarkdown(text, 'fix the logout');
     await waitFor(() =>
       expect(within(dialog).queryByRole('button', { name: 'Add anyway' })).toBeNull(),
     );

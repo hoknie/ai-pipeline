@@ -15,7 +15,17 @@ import {
   queueOf,
   runView,
 } from './fixtures.ts';
-import { act, cleanup, fireEvent, openTab, render, screen, waitFor, within } from './render.tsx';
+import {
+  setMarkdown,
+  act,
+  cleanup,
+  fireEvent,
+  openTab,
+  render,
+  screen,
+  waitFor,
+  within,
+} from './render.tsx';
 
 beforeEach(() => {
   window.location.hash = '#queue';
@@ -48,7 +58,7 @@ async function openDialog(api = fakeApi({ queue: vi.fn(async () => queueOf()) })
   await waitFor(() =>
     expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
   );
-  fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Work' } });
+  setMarkdown(within(dialog).getByLabelText('Task text'), 'Work');
   return { api, dialog: within(dialog) };
 }
 

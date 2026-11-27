@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import {
+  setMarkdown,
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from './render.tsx';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
@@ -489,9 +498,7 @@ describe('controls of the global queue', () => {
     const edit = vi.fn(async () => asAnswer(globalOf()));
     const api = mount(globalOf(), { queueEdit: edit });
     fireEvent.click((await row('ql')).getByRole('button', { name: 'Edit' }));
-    fireEvent.change(await screen.findByLabelText('Task text'), {
-      target: { value: 'changed text' },
-    });
+    setMarkdown(await screen.findByLabelText('Task text'), 'changed text');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(edit).toHaveBeenCalledWith('ql', expect.anything()));
     expect(api.calls).toContainEqual(['queueEdit', LIB]);

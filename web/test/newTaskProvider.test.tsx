@@ -5,7 +5,17 @@ import { App } from '../src/app/App.tsx';
 import type { Api } from '../src/shared/api/api.ts';
 import type { ProvidersView } from '../src/shared/api/types.ts';
 
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import {
+  markdownValue,
+  setMarkdown,
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from './render.tsx';
 import {
   FakeSocket,
   fakeApi,
@@ -70,7 +80,7 @@ function mount(
   return api;
 }
 
-const text = () => screen.findByLabelText<HTMLTextAreaElement>('Task text');
+const text = () => screen.findByLabelText('Task text');
 const providerField = () => screen.findByRole<HTMLButtonElement>('combobox', { name: 'Provider' });
 
 async function openProviders() {
@@ -145,7 +155,7 @@ describe('creating a provider from the task form', () => {
         return { ok: true as const, revision: 'r1' } as never;
       }),
     });
-    fireEvent.change(await text(), { target: { value: 'Keep this text' } });
+    setMarkdown(await text(), 'Keep this text');
     await openProviders();
     fireEvent.change(await screen.findByPlaceholderText('Name or slug'), {
       target: { value: 'Corp' },
@@ -159,6 +169,6 @@ describe('creating a provider from the task form', () => {
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Save' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /provider/i })).toBeNull());
     await waitFor(async () => expect((await providerField()).textContent).toContain('Corp'));
-    expect((await text()).value).toBe('Keep this text');
+    expect(markdownValue(await text())).toBe('Keep this text');
   });
 });

@@ -65,7 +65,38 @@ describe('htmlToMarkdown', () => {
       htmlToMarkdown(
         '<p><a href="https://e.com/a b">site</a> <a href="https://e.com">https://e.com</a> <img src="https://e.com/i.png" alt="pic"> <img src="javascript:x" alt="bad"></p>',
       ),
-    ).toBe('[site](https://e.com/a%20b) <https://e.com> ![pic](https://e.com/i.png) bad');
+    ).toBe('[site](https://e.com/a%20b) [https://e.com](https://e.com) pic bad');
+  });
+
+  it('rejects disguised and unknown link schemes and escapes Markdown destinations', () => {
+    expect(
+      htmlToMarkdown(
+        '<a href="java&#x09;script:alert(1)">a</a> <a href="data:text/html,x">b</a> <a href="custom:run">c</a> <a href="https://e.com/a)\u0022 onmouseover=alert(1)">d</a> <a href="/local?q=1">local</a>',
+      ),
+    ).toBe('a b c [d](https://e.com/a%29) [local](/local?q=1)');
+    expect(htmlToMarkdown('<a href="javascript&amp;colon;alert(1)">x</a>')).toBe(
+      '[x](javascript&amp;colon;alert%281%29)',
+    );
+  });
+
+  it('keeps pasted resources inert and escapes HTML and image syntax in text and alt', () => {
+    expect(
+      htmlToMarkdown(
+        '<p>&lt;img src=x onerror=alert(1)&gt; !<a href="https://e.com">link</a> <img src="https://e.com/i" alt="![x](https://e.com/i)"></p><iframe src="https://e.com/frame"></iframe><b>ok</b>',
+      ),
+    ).toBe(
+      '&lt;img src=x onerror=alert(1)&gt; \\![link](https://e.com) \\!\\[x\\](https://e.com/i)\n\n**ok**',
+    );
+  });
+
+  it('preserves code fences and table cells containing Markdown syntax', () => {
+    expect(
+      htmlToMarkdown(
+        '<table><tr><th>Title</th><th>Link</th></tr><tr><td>a | b</td><td><a href="https://e.com/a(b)">spec</a></td></tr></table><pre><code class="language-ts">const x = `a`;\n```\nend</code></pre>',
+      ),
+    ).toBe(
+      '| Title | Link |\n| --- | --- |\n| a \\| b | [spec](https://e.com/a%28b%29) |\n\n````ts\nconst x = `a`;\n```\nend\n````',
+    );
   });
 
   it('turns a dangerous link into text and runs nothing', () => {

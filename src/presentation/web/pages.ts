@@ -16,7 +16,12 @@ const TYPES: Record<string, string> = {
 };
 
 const PAGE_POLICY =
-  "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+  "default-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+// Worker bundles are self-contained. Their own response policy denies all I/O,
+// further scripts, nested workers and JS evaluation, but permits embedded Graphviz Wasm.
+const WORKER_POLICY =
+  "default-src 'none'; script-src 'wasm-unsafe-eval'; connect-src 'none'; worker-src 'none'";
 
 const MISSING_BUILD = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>aip</title></head><body><h1>aip web</h1><p>The panel is not built. Run <code>npm run build</code> in the aip repository and reload this page.</p></body></html>`;
 
@@ -52,6 +57,7 @@ export function serveAsset(response: ServerResponse, assets: string, pathname: s
     // Vite names assets by their content hash, so they never change.
     'cache-control': 'public, max-age=31536000, immutable',
     'x-content-type-options': 'nosniff',
+    ...(extname(file) === '.js' ? { 'content-security-policy': WORKER_POLICY } : {}),
   });
   response.end(readFileSync(file));
 }

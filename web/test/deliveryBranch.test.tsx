@@ -8,7 +8,17 @@ import { DeliveryFields } from '../src/features/queue/form/DeliveryFields.tsx';
 import { useBranchValidation } from '../src/features/queue/form/branch/useBranchValidation.ts';
 import { draftOf, emptyDraft, fieldsOf } from '../src/features/queue/draft.ts';
 import { projectsFields } from '../src/features/queue/form/sharedTag.ts';
-import { act, choose, cleanup, fireEvent, render, renderHook, screen, waitFor } from './render.tsx';
+import {
+  act,
+  choose,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  setMarkdown,
+  waitFor,
+} from './render.tsx';
 import { fakeApi, openFake, queueOf, runView } from './fixtures.ts';
 
 afterEach(cleanup);
@@ -77,7 +87,7 @@ describe('delivery branch of a task', () => {
     const open = await screen.findByRole('button', { name: 'New task' });
     await waitFor(() => expect(open.hasAttribute('disabled')).toBe(false));
     fireEvent.click(open);
-    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'hello' } });
+    setMarkdown(await screen.findByLabelText('Task text'), 'hello');
     fireEvent.change(await screen.findByLabelText('Target branch'), { target: { value: '@' } });
     expect(
       screen
@@ -170,7 +180,7 @@ describe('delivery branch of a task', () => {
     const open = await screen.findByRole('button', { name: 'New task' });
     await waitFor(() => expect(open.hasAttribute('disabled')).toBe(false));
     fireEvent.click(open);
-    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'hello' } });
+    setMarkdown(await screen.findByLabelText('Task text'), 'hello');
     fireEvent.change(await screen.findByLabelText('Target branch'), {
       target: { value: 'feature' },
     });
@@ -202,7 +212,7 @@ describe('delivery branch of a task', () => {
     const open = await screen.findByRole('button', { name: 'New task' });
     await waitFor(() => expect(open.hasAttribute('disabled')).toBe(false));
     fireEvent.click(open);
-    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'hello' } });
+    setMarkdown(await screen.findByLabelText('Task text'), 'hello');
     fireEvent.change(await screen.findByLabelText('Target branch'), {
       target: { value: 'feature/new' },
     });

@@ -4,7 +4,9 @@ import {
   act,
   cleanup,
   fireEvent,
-  previewMarkdown,
+  markdownSource,
+  markdownValue,
+  setMarkdown,
   render,
   screen,
   waitFor,
@@ -564,7 +566,7 @@ describe('new task form', () => {
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     expect(add.disabled).toBe(true);
-    fireEvent.change(text, { target: { value: 'Build sign-in' } });
+    setMarkdown(text, 'Build sign-in');
     expect(add.disabled).toBe(false);
     fireEvent.click(add);
     await waitFor(() =>
@@ -576,7 +578,7 @@ describe('new task form', () => {
     );
     await screen.findByLabelText('tasks in the queue');
     await openNewTask();
-    expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+    expect(markdownValue(screen.getByLabelText('Task text'))).toBe('');
     expect(api.queueStart).not.toHaveBeenCalled();
   });
 
@@ -591,9 +593,7 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(await screen.findByLabelText('Task text'), {
-      target: { value: 'Build sign-in' },
-    });
+    setMarkdown(await screen.findByLabelText('Task text'), 'Build sign-in');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.getAllByText('Task #7 created').length).toBeGreaterThan(0));
   });
@@ -606,7 +606,7 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'X' } });
+    setMarkdown(await screen.findByLabelText('Task text'), 'X');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.getAllByText('Task created').length).toBeGreaterThan(0));
   });
@@ -621,7 +621,7 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'X' } });
+    setMarkdown(await screen.findByLabelText('Task text'), 'X');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(/unknown pipeline/);
     expect(screen.queryAllByText(/^Task (#\d+ )?created$/)).toHaveLength(0);
@@ -635,11 +635,11 @@ describe('new task form', () => {
     const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
     fireEvent.change(screen.getByLabelText('Title of group 1'), { target: { value: 'Sign-in' } });
     expect(add.disabled).toBe(false);
-    fireEvent.change(screen.getByLabelText('Text of group 1'), { target: { value: 'form' } });
+    setMarkdown(screen.getByLabelText('Text of group 1'), 'form');
     fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
     expect(add.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('Title of group 2'), { target: { value: 'Sign-out' } });
-    fireEvent.change(screen.getByLabelText('Text of group 2'), { target: { value: 'button' } });
+    setMarkdown(screen.getByLabelText('Text of group 2'), 'button');
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pair' } });
     expect(add.disabled).toBe(false);
     fireEvent.click(add);
@@ -680,11 +680,11 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Build sign-in' } });
+    setMarkdown(text, 'Build sign-in');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(/unknown pipeline/);
     expect(api.queueAdd).toHaveBeenCalled();
-    expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('Build sign-in');
+    expect(markdownValue(screen.getByLabelText('Task text'))).toBe('Build sign-in');
   });
 
   it('accepts a title without task text and sends the title as task text', async () => {
@@ -712,9 +712,7 @@ describe('new task form', () => {
     await openNewTask();
     await screen.findByLabelText('Task text');
     fireEvent.click(screen.getByRole('radio', { name: 'Groups' }));
-    fireEvent.change(screen.getByLabelText('Text of group 1'), {
-      target: { value: '\n  First line\n- Markdown body  ' },
-    });
+    setMarkdown(screen.getByLabelText('Text of group 1'), '\n  First line\n- Markdown body  ');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(/unknown pipeline/);
     expect(api.queueAdd).toHaveBeenCalledWith({
@@ -732,34 +730,32 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'draft text' } });
+    setMarkdown(text, 'draft text');
     act(() => {
       stream().open();
       stream().send({ event: 'queue', seq: 5, queue: queueOf({ items: items('A', 'Z') }) });
       stream().send({ event: 'run', seq: 6, run: runView() });
     });
     expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
-    expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('draft text');
+    expect(markdownValue(screen.getByLabelText('Task text'))).toBe('draft text');
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     await waitFor(() => expect(labels()).toEqual(['1. A', '2. Z']));
     fireEvent.click(screen.getByRole('link', { name: /Runs/ }));
     fireEvent.click(await screen.findByRole('link', { name: /Queue/ }));
     await openNewTask();
-    expect(((await screen.findByLabelText('Task text')) as HTMLTextAreaElement).value).toBe(
-      'draft text',
-    );
+    expect(markdownValue(await screen.findByLabelText('Task text'))).toBe('draft text');
   });
 
   it('keeps the typed text when the language changes and shows the labels in the new one', async () => {
     show(queueOf({ items: items('A') }));
     await openNewTask();
     const text = await screen.findByLabelText('Task text');
-    fireEvent.change(text, { target: { value: 'draft text' } });
+    setMarkdown(text, 'draft text');
     act(() => {
       void i18next.changeLanguage('ru');
     });
     const field = await screen.findByLabelText<HTMLTextAreaElement>('Текст задачи');
-    expect(field.value).toBe('draft text');
+    expect(markdownValue(field)).toBe('draft text');
     expect(screen.getByRole('button', { name: 'Добавить' })).toBeTruthy();
     expect(screen.queryByLabelText('Task text')).toBeNull();
   });
@@ -781,7 +777,7 @@ describe('automatic delivery switch', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Build sign-in' } });
+    setMarkdown(text, 'Build sign-in');
     fireEvent.click(toggle);
     expect(screen.getByText('for this task')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -803,10 +799,9 @@ describe('automatic delivery switch', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('previews the text of an item as Markdown in the edit form', async () => {
+  it('renders the text of an item as Markdown in the edit form', async () => {
     show(queueOf({ items: [queueItem('q1', '**important**', 1)] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-    previewMarkdown();
     expect((await screen.findByText('important')).tagName).toBe('STRONG');
   });
 
@@ -815,12 +810,11 @@ describe('automatic delivery switch', () => {
       queueOf({ items: [queueItem('q1', '**important**', 1, { run: 'run7', hold: 'paused' })] }),
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-    const field = await screen.findByLabelText<HTMLTextAreaElement>('Task text');
-    expect(field.disabled).toBe(true);
-    previewMarkdown();
+    const field = await screen.findByLabelText('Task text');
+    expect(field.getAttribute('contenteditable')).toBe('false');
     expect((await screen.findByText('important')).tagName).toBe('STRONG');
-    previewMarkdown(null, false);
-    expect(field.disabled).toBe(true);
+    const source = markdownSource(field);
+    expect(source.readOnly).toBe(true);
     for (const name of ['Bold', 'Heading', 'Link', 'Code block']) {
       expect(screen.getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(true);
     }
@@ -840,14 +834,16 @@ describe('automatic delivery switch', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     expect(screen.getByLabelText<HTMLInputElement>('Title of group 1').disabled).toBe(true);
-    expect(screen.getByLabelText<HTMLTextAreaElement>('Text of group 1').disabled).toBe(true);
+    expect(screen.getByLabelText('Text of group 1').getAttribute('contenteditable')).toBe('false');
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Remove group 1' }).disabled).toBe(
       true,
     );
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Add group' }).disabled).toBe(
       true,
     );
-    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'MD' }).disabled).toBe(false);
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Markdown source' }).disabled,
+    ).toBe(false);
   });
 
   it('returns an item to the setting with null when it is edited', async () => {
@@ -940,7 +936,7 @@ describe('items', () => {
     const title = await screen.findByLabelText<HTMLInputElement>('Title of group 1');
     const task = screen.getByLabelText<HTMLTextAreaElement>('Text of group 1');
     fireEvent.change(title, { target: { value: edited.title } });
-    fireEvent.change(task, { target: { value: edited.task } });
+    setMarkdown(task, edited.task);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith(
@@ -991,8 +987,8 @@ describe('items', () => {
       within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
     );
     const fields = await screen.findAllByLabelText('Task text');
-    const editor = fields.find((node) => (node as HTMLTextAreaElement).value === 'Body')!;
-    fireEvent.change(editor, { target: { value: '' } });
+    const editor = fields.find((node) => node.textContent === 'Body')!;
+    setMarkdown(editor, '');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
@@ -1026,9 +1022,7 @@ describe('items', () => {
       );
     edit();
     fireEvent.change(await screen.findByLabelText('Title of group 1'), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText('Text of group 1'), {
-      target: { value: 'Saved first line\nmore' },
-    });
+    setMarkdown(screen.getByLabelText('Text of group 1'), 'Saved first line\nmore');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByLabelText('Title of group 1')).toBeNull());
@@ -1056,9 +1050,7 @@ describe('items', () => {
     expect((await screen.findByLabelText<HTMLInputElement>('Title of group 1')).value).toBe(
       'Saved first line',
     );
-    expect(screen.getByLabelText<HTMLTextAreaElement>('Text of group 1').value).toBe(
-      'Saved first line\nmore',
-    );
+    expect(markdownValue(screen.getByLabelText('Text of group 1'))).toBe('Saved first line\nmore');
   });
 
   it('saves a group with only a description: its title comes from the first line', async () => {
@@ -1113,13 +1105,13 @@ describe('items', () => {
       within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
     );
     const field = await screen.findAllByLabelText('Task text');
-    const editor = field.find((node) => (node as HTMLTextAreaElement).value === 'A')!;
-    fireEvent.change(editor, { target: { value: 'A2' } });
+    const editor = field.find((node) => node.textContent === 'A')!;
+    setMarkdown(editor, 'A2');
     act(() => {
       stream().open();
       stream().send({ event: 'queue', seq: 5, queue: queueOf({ items: items('A', 'B', 'C') }) });
     });
-    expect((editor as HTMLTextAreaElement).value).toBe('A2');
+    expect(markdownValue(editor)).toBe('A2');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
@@ -1621,7 +1613,7 @@ describe('tags in the queue', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Build sign-in' } });
+    setMarkdown(text, 'Build sign-in');
     await pick('auth', 'v2');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
@@ -1905,7 +1897,7 @@ describe('dependencies in the form', () => {
   it('adds a task after another', async () => {
     const api = show(queueOf({ items: [model()] }));
     await openNewTask();
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'API' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'API');
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
     await pick(screen.getByRole('combobox', { name: 'Linked task' }), 'Schema');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -1955,9 +1947,9 @@ describe('dependencies in the form', () => {
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
     const editor = (await screen.findAllByLabelText('Task text')).find(
-      (node) => (node as HTMLTextAreaElement).value === 'api',
+      (node) => node.textContent === 'api',
     )!;
-    fireEvent.change(editor, { target: { value: 'api 2' } });
+    setMarkdown(editor, 'api 2');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
     const body = (api.queueEdit as ReturnType<typeof vi.fn>).mock.calls[0]![1];
@@ -1968,7 +1960,7 @@ describe('dependencies in the form', () => {
   it('does not send after when nothing is chosen', async () => {
     const api = show(queueOf({ items: [model()] }));
     await openNewTask();
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'API' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'API');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
     expect('after' in (api.queueAdd as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe(false);
@@ -2571,7 +2563,7 @@ describe('delivery mode of a task', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Build sign-in' } });
+    setMarkdown(text, 'Build sign-in');
     fireEvent.keyDown(select, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: 'Branch' }));
     expect(screen.getByText('mode for this task')).toBeTruthy();
@@ -2607,7 +2599,7 @@ describe('delivery mode of a task', () => {
     fireEvent.click(screen.getByRole('button', { name: 'mode as in the settings' }));
     expect(screen.queryByRole('button', { name: 'mode as in the settings' })).toBeNull();
     expect(screen.getByText('mode as in the settings')).toBeTruthy();
-    fireEvent.change(text, { target: { value: 'Build' } });
+    setMarkdown(text, 'Build');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
@@ -2760,7 +2752,7 @@ describe('postponed items', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: text } });
+    setMarkdown(await screen.findByLabelText('Task text'), text);
   }
 
   it('adds a task without postponed while the new-task switch is off', async () => {
@@ -2980,7 +2972,7 @@ describe('new task dialog', () => {
     expect(dialog.className).toContain('md:w-[75vw]');
     expect(dialog.className).toContain('content-start');
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Task text')));
-    expect(screen.getByLabelText<HTMLTextAreaElement>('Task text').rows).toBe(9);
+    expect(screen.getByLabelText('Task text').getAttribute('contenteditable')).toBe('true');
     expect(screen.getByLabelText('Task text').id).toBe('new-task');
   });
 
@@ -3001,7 +2993,7 @@ describe('new task dialog', () => {
       .mockResolvedValueOnce({ ...queueOf({ items: items('X') }), item: 'q1' });
     show(queueOf(), { queueAdd });
     await openNewTask();
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'X' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'X');
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
@@ -3015,7 +3007,7 @@ describe('new task dialog', () => {
   it('keeps the draft after Esc and does not close on events', async () => {
     show(queueOf());
     await openNewTask();
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'draft text' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'draft text');
     act(() => {
       stream().open();
       stream().send({ event: 'queue', seq: 5, queue: queueOf() });
@@ -3025,7 +3017,7 @@ describe('new task dialog', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await openNewTask();
-    expect(screen.getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('draft text');
+    expect(markdownValue(screen.getByLabelText('Task text'))).toBe('draft text');
   });
 });
 
@@ -3092,7 +3084,7 @@ describe('main and properties columns of the task form', () => {
     await openNewTask();
     fireEvent.click(await skipStepAsync('review'));
     fireEvent.click(skipStep('qa'));
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'T');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
@@ -3111,7 +3103,7 @@ describe('main and properties columns of the task form', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'Pipeline' }));
     fireEvent.click(await screen.findByRole('option', { name: 'small' }));
     await waitFor(() => expect(skipOptions()).toHaveLength(2));
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'T');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({ provider: null, pipeline: 'small', task: 'T' }),
@@ -3155,7 +3147,7 @@ describe('main and properties columns of the task form', () => {
     fireEvent.click(skipStep('review'));
     expect(skipChips()).toEqual([]);
     expect(isChecked(skipStep('review'))).toBe(false);
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'T');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({ provider: null, pipeline: 'feature', task: 'T' }),
@@ -3200,7 +3192,7 @@ describe('main and properties columns of the task form', () => {
       expect(isChecked(skipStep('qa'))).toBe(true);
       expect(isChecked(skipStep('plan'))).toBe(false);
       fireEvent.click(skipStep('plan'));
-      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      setMarkdown(screen.getByLabelText('Task text'), 'T');
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       // the task keeps only its own skip: the steps of the variant are not in it
       await waitFor(() =>
@@ -3298,7 +3290,7 @@ describe('main and properties columns of the task form', () => {
         target: { value: 'z.a' },
       });
       fireEvent.click(await screen.findByRole('option', { name: /Z\.ai/ }));
-      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      setMarkdown(screen.getByLabelText('Task text'), 'T');
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() =>
         expect(api.queueAdd).toHaveBeenCalledWith({
@@ -3317,7 +3309,7 @@ describe('main and properties columns of the task form', () => {
           false,
         ),
       );
-      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      setMarkdown(screen.getByLabelText('Task text'), 'T');
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() =>
         expect(api.queueAdd).toHaveBeenCalledWith({
@@ -3378,7 +3370,7 @@ describe('main and properties columns of the task form', () => {
           false,
         ),
       );
-      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      setMarkdown(screen.getByLabelText('Task text'), 'T');
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
       const alert = await screen.findByText(/unknown provider `old`/);
@@ -3498,7 +3490,7 @@ describe('parent task in the form', () => {
     const api = show(parentQueue([]));
     await parent();
     await openNewTask();
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'Next' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'Next');
     await choose('Parent');
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
     await waitFor(() =>
@@ -3569,7 +3561,7 @@ describe('parent task in the form', () => {
       { id: 'other', title: 'Elsewhere', number: 9, repository: '/b' },
     );
     await openNewTask();
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'Next' } });
+    setMarkdown(screen.getByLabelText('Task text'), 'Next');
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
     await chooseKind(screen.getByRole('combobox', { name: 'Link kind' }), 'Parent');
     fireEvent.click(screen.getByRole('combobox', { name: 'Linked task' }));

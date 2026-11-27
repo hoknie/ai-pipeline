@@ -17,7 +17,9 @@ import {
   choose,
   cleanup,
   fireEvent,
-  previewMarkdown,
+  markdownSource,
+  markdownValue,
+  setMarkdown,
   render,
   screen,
   waitFor,
@@ -85,9 +87,7 @@ describe('new task from the top strip', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: '  Do work\nAnd verify  ' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Task text'), '  Do work\nAnd verify  ');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
@@ -114,7 +114,7 @@ describe('new task from the top strip', () => {
     fireEvent.submit(dialog.querySelector('form')!);
     expect(api.queueAdd).not.toHaveBeenCalled();
     expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('');
-    expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+    expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe('');
   });
 
   it('preserves the original title-only draft when the server rejects it', async () => {
@@ -147,7 +147,7 @@ describe('new task from the top strip', () => {
     await waitFor(() => expect(within(dialog).getByText('rejected')).toBeTruthy());
     expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
     expect(name.value).toBe('  title only  ');
-    expect(text.value).toBe('');
+    expect(markdownValue(text)).toBe('');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(2));
     expect(api.queueAdd).toHaveBeenLastCalledWith({
@@ -157,7 +157,7 @@ describe('new task from the top strip', () => {
       task: 'title only',
     });
     expect(name.value).toBe('  title only  ');
-    expect(text.value).toBe('');
+    expect(markdownValue(text)).toBe('');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
     fireEvent.click(strip().getByRole('button', { name: 'New task' }));
@@ -165,7 +165,7 @@ describe('new task from the top strip', () => {
     expect((within(reopened).getByLabelText('Name') as HTMLInputElement).value).toBe(
       '  title only  ',
     );
-    expect((within(reopened).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+    expect(markdownValue(within(reopened).getByLabelText('Task text'))).toBe('');
   });
 
   it('clears the draft after a successful create and opens an empty form again', async () => {
@@ -191,7 +191,7 @@ describe('new task from the top strip', () => {
     fireEvent.click(strip().getByRole('button', { name: 'New task' }));
     const reopened = await screen.findByRole('dialog', { name: 'New task' });
     expect((within(reopened).getByLabelText('Name') as HTMLInputElement).value).toBe('');
-    expect((within(reopened).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+    expect(markdownValue(within(reopened).getByLabelText('Task text'))).toBe('');
   });
 
   it.each([
@@ -236,9 +236,7 @@ describe('new task from the top strip', () => {
       target: { value: 'Only title' },
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add group' }));
-    fireEvent.change(within(dialog).getByLabelText('Text of group 2'), {
-      target: { value: 'Only description\nMore detail' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Text of group 2'), 'Only description\nMore detail');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
@@ -269,9 +267,7 @@ describe('new task from the top strip', () => {
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
-    fireEvent.change(within(dialog).getByLabelText('Text of group 1'), {
-      target: { value: '\n  ## Original\n- detail  ' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Text of group 1'), '\n  ## Original\n- detail  ');
     const payload = {
       pipeline: 'feature',
       provider: null,
@@ -281,7 +277,7 @@ describe('new task from the top strip', () => {
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledWith(payload));
     await within(dialog).findByText('rejected');
     expect((within(dialog).getByLabelText('Title of group 1') as HTMLInputElement).value).toBe('');
-    expect((within(dialog).getByLabelText('Text of group 1') as HTMLTextAreaElement).value).toBe(
+    expect(markdownValue(within(dialog).getByLabelText('Text of group 1'))).toBe(
       '\n  ## Original\n- detail  ',
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
@@ -298,9 +294,7 @@ describe('new task from the top strip', () => {
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
     await screen.findByLabelText('Task text');
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
-    fireEvent.change(within(dialog).getByLabelText('Text of group 1'), {
-      target: { value: 'Only text\nmore' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Text of group 1'), 'Only text\nmore');
     act(() => {
       FakeSocket.last!.open();
       FakeSocket.last!.send({ event: 'queue', seq: 1, queue: queueOf() });
@@ -313,9 +307,7 @@ describe('new task from the top strip', () => {
     expect((await within(again).findByLabelText<HTMLInputElement>('Title of group 1')).value).toBe(
       '',
     );
-    expect(within(again).getByLabelText<HTMLTextAreaElement>('Text of group 1').value).toBe(
-      'Only text\nmore',
-    );
+    expect(markdownValue(within(again).getByLabelText('Text of group 1'))).toBe('Only text\nmore');
     expect(api.queueAdd).not.toHaveBeenCalled();
   });
 
@@ -343,9 +335,7 @@ describe('new task from the top strip', () => {
       'valid title',
     );
     expect((within(dialog).getByLabelText('Title of group 2') as HTMLInputElement).value).toBe('');
-    expect((within(dialog).getByLabelText('Text of group 2') as HTMLTextAreaElement).value).toBe(
-      '',
-    );
+    expect(markdownValue(within(dialog).getByLabelText('Text of group 2'))).toBe('');
   });
 
   it('opens the dialog over the section and announces the created task', async () => {
@@ -367,9 +357,7 @@ describe('new task from the top strip', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'Build sign-in' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Build sign-in');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
@@ -401,18 +389,14 @@ describe('new task from the top strip', () => {
     await waitFor(() => expect(button.disabled).toBe(false));
     fireEvent.click(button);
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'rough draft' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'rough draft');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
     window.location.hash = '#queue';
     const controls = await screen.findByRole('region', { name: 'queue controls' });
     fireEvent.click(within(controls).getByRole('button', { name: 'New task' }));
     const again = await screen.findByRole('dialog', { name: 'New task' });
-    expect((within(again).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(
-      'rough draft',
-    );
+    expect(markdownValue(within(again).getByLabelText('Task text'))).toBe('rough draft');
   });
   it('gives every field of the new task dialog the same height', async () => {
     const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
@@ -576,7 +560,7 @@ describe('repository of the new task', () => {
     await waitFor(() =>
       expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('docs'),
     );
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'doc it' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'doc it');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.getAllByText('Task #7 created').length).toBeGreaterThan(0));
     expect(api.calls.filter(([name]) => name === 'queueAdd')).toEqual([['queueAdd', LIB]]);
@@ -598,7 +582,7 @@ describe('repository of the new task', () => {
     expect(
       within(dialog).getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked'),
     ).toBe('true');
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'later' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'later');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.getAllByText('Task #7 created').length).toBeGreaterThan(0));
     expect(api.calls.filter(([name]) => name === 'queueAdd')).toEqual([['queueAdd', LIB]]);
@@ -608,7 +592,7 @@ describe('repository of the new task', () => {
   it('keeps the pipeline the chosen repository has', async () => {
     twoRepositories({ libPipelines: ['docs', 'feature'] });
     const dialog = await openDialog();
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'text' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'text');
     await waitFor(() =>
       expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe(
         'feature',
@@ -623,7 +607,7 @@ describe('repository of the new task', () => {
   it('replaces a pipeline the chosen repository lacks with its first one', async () => {
     twoRepositories({ libPipelines: ['docs'] });
     const other = await openDialog();
-    fireEvent.change(within(other).getByLabelText('Task text'), { target: { value: 'text' } });
+    setMarkdown(within(other).getByLabelText('Task text'), 'text');
     await waitFor(() =>
       expect(within(other).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
@@ -636,7 +620,7 @@ describe('repository of the new task', () => {
   it('clears the links and keeps the text, the name and the tags', async () => {
     twoRepositories();
     const dialog = await openDialog();
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'keep me' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'keep me');
     fireEvent.change(within(dialog).getByPlaceholderText('Name (optional)'), {
       target: { value: 'my name' },
     });
@@ -659,9 +643,7 @@ describe('repository of the new task', () => {
     await pickLib(dialog);
     await waitFor(() => expect(within(dialog).queryByText(/app task/)).toBeNull());
     expect(within(dialog).getByRole('button', { name: 'Remove tag app-tag' })).toBeTruthy();
-    expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(
-      'keep me',
-    );
+    expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe('keep me');
     expect((within(dialog).getByPlaceholderText('Name (optional)') as HTMLInputElement).value).toBe(
       'my name',
     );
@@ -683,7 +665,7 @@ describe('repository of the new task', () => {
   it('keeps Add disabled until the pipelines of the chosen repository are loaded', async () => {
     const { release } = twoRepositories({ libPipelinesLate: true });
     const dialog = await openDialog();
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'text' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'text');
     const add = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
     await waitFor(() => expect(add.disabled).toBe(false));
     await pickLib(dialog);
@@ -695,9 +677,7 @@ describe('repository of the new task', () => {
   it('blocks submission during retargeting and clears prior links once the new repository loads', async () => {
     const { api, release } = twoRepositories({ libPipelinesLate: true });
     const dialog = await openDialog();
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'keep text' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'keep text');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
     const task = within(dialog).getByRole('combobox', { name: 'Linked task' });
     fireEvent.click(task);
@@ -723,7 +703,7 @@ describe('repository of the new task', () => {
     twoRepositories();
     const dialog = await openDialog();
     await pickLib(dialog);
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'draft' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'draft');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
     const again = await openDialog();
@@ -732,7 +712,7 @@ describe('repository of the new task', () => {
         'app',
       ),
     );
-    expect((within(again).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('draft');
+    expect(markdownValue(within(again).getByLabelText('Task text'))).toBe('draft');
   });
 });
 
@@ -765,7 +745,7 @@ describe('subtask from the run header', () => {
     const { api } = twoRepositories({ runs: [finished] });
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'child' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'child');
     await waitFor(() =>
       expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
         false,
@@ -782,20 +762,18 @@ describe('subtask from the run header', () => {
   it('keeps the text typed in the dialog before', async () => {
     twoRepositories({ runs: [finished] });
     const first = await openDialog();
-    fireEvent.change(within(first).getByLabelText('Task text'), { target: { value: 'kept' } });
+    setMarkdown(within(first).getByLabelText('Task text'), 'kept');
     await close();
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
-    expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('kept');
+    expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe('kept');
   });
 
   it('keeps the preset parent after add and continue', async () => {
     const { api } = twoRepositories({ runs: [finished] });
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'first child' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'first child');
     await waitFor(() =>
       expect(
         within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add and continue' })
@@ -808,9 +786,7 @@ describe('subtask from the run header', () => {
         expect.objectContaining({ links: [{ kind: 'parent', target: 'a1' }] }),
       ),
     );
-    await waitFor(() =>
-      expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe(''),
-    );
+    await waitFor(() => expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe(''));
     expect(parentField(dialog).textContent).toBe('#115 Sign-in by link');
   });
 
@@ -818,7 +794,7 @@ describe('subtask from the run header', () => {
     twoRepositories({ runs: [finished] });
     const first = await openDialog();
     await pickLib(first);
-    fireEvent.change(within(first).getByLabelText('Task text'), { target: { value: 'for lib' } });
+    setMarkdown(within(first).getByLabelText('Task text'), 'for lib');
     const tags = within(first).getByRole('combobox', { name: 'Tags' });
     fireEvent.click(tags);
     fireEvent.click(await screen.findByRole('option', { name: 'lib-tag' }));
@@ -834,9 +810,7 @@ describe('subtask from the run header', () => {
     expect(within(dialog).getByRole('combobox', { name: 'Repository' }).textContent).toContain(
       'app',
     );
-    expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(
-      'for lib',
-    );
+    expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe('for lib');
     expect(within(dialog).queryByText(/lib old/)).toBeNull();
     expect(within(dialog).queryByRole('button', { name: 'Remove tag lib-tag' })).toBeNull();
   });
@@ -881,7 +855,7 @@ describe('subtask from the run header', () => {
       'lib',
     );
     expect(parentField(dialog).textContent).toBe('#42 Library');
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'child' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'child');
     await waitFor(() =>
       expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
         false,
@@ -910,7 +884,7 @@ describe('subtask from the run header', () => {
     await close();
     const again = await openDialog();
     expect(within(again).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
-    fireEvent.change(within(again).getByLabelText('Task text'), { target: { value: 'plain' } });
+    setMarkdown(within(again).getByLabelText('Task text'), 'plain');
     await waitFor(() =>
       expect(within(again).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
         false,
@@ -923,12 +897,10 @@ describe('subtask from the run header', () => {
 });
 
 describe('markdown field of the new task', () => {
-  async function openDialog(api = fakeApi({ queue: vi.fn(async () => queueOf()) })) {
+  async function openEditor() {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
     render(<App api={api} openStream={openFake} />);
-    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
-    await waitFor(() => expect(button.disabled).toBe(false));
-    fireEvent.click(button);
-    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    const dialog = await openDialog();
     return { api, dialog };
   }
 
@@ -941,229 +913,210 @@ describe('markdown field of the new task', () => {
     return event;
   }
 
-  it('shows the text as Markdown in the preview and keeps the draft', async () => {
-    const { api, dialog } = await openDialog();
-    const text = '# Overview\n\n- [x] done\n\n**bold text**';
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: text } });
-    previewMarkdown(dialog);
+  it('renders Markdown visually, preserves source, and submits it unchanged', async () => {
+    const { api, dialog } = await openEditor();
+    const value = '# Overview\n\n- [x] done\n\n**bold text**';
+    setMarkdown(within(dialog).getByLabelText('Task text'), value);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Markdown source' }));
+    const editor = within(dialog).getAllByLabelText('Task text')[0]!;
+    expect(editor.getAttribute('contenteditable')).toBe('true');
     expect(within(dialog).getByRole('heading', { name: 'Overview' })).toBeTruthy();
     expect(within(dialog).getByText('bold text').tagName).toBe('STRONG');
-    expect(within(dialog).getByRole<HTMLInputElement>('checkbox').checked).toBe(true);
-    previewMarkdown(dialog, false);
-    expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(text);
+    expect(markdownValue(editor)).toBe(value);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
-    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: text });
-  });
-
-  const MARKS = [
-    'Heading',
-    'Bold',
-    'Italic',
-    'Strikethrough',
-    'Bulleted list',
-    'Numbered list',
-    'Task list',
-    'Quote',
-    'Code',
-    'Code block',
-    'Link',
-  ];
-
-  it('starts on MD with the markup buttons and the preview available', async () => {
-    const { dialog } = await openDialog();
-    const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
-    const first = bar.querySelector('button, [role="radio"]');
-    expect(first?.textContent).toBe('Plain');
-    expect(within(bar).getByRole('radio', { name: 'MD' }).getAttribute('aria-checked')).toBe(
-      'true',
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith(expect.objectContaining({ task: value })),
     );
-    for (const name of [...MARKS, 'Preview']) {
-      const button = within(bar).getByRole<HTMLButtonElement>('button', { name });
-      expect(button.disabled).toBe(false);
-    }
-    expect(bar.lastElementChild?.textContent).toBe('Preview');
   });
 
-  it('puts the attachments right under the text of the task', async () => {
-    const { dialog } = await openDialog();
+  it('offers formatting in visual mode and disables it in source mode', async () => {
+    const { dialog } = await openEditor();
+    const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
+    const marks = [
+      'Heading',
+      'Bold',
+      'Italic',
+      'Strikethrough',
+      'Bulleted list',
+      'Numbered list',
+      'Task list',
+      'Quote',
+      'Code',
+      'Code block',
+      'Link',
+    ];
+    for (const name of marks)
+      expect(within(bar).getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(false);
+    expect(within(bar).queryByRole('radio', { name: 'Plain' })).toBeNull();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Markdown source' }));
+    for (const name of marks)
+      expect(within(bar).getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(true);
+    expect(
+      within(bar).getByRole('button', { name: 'Markdown source' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+    fireEvent.click(within(bar).getByRole('button', { name: 'Markdown source' }));
+    expect(within(bar).getByRole<HTMLButtonElement>('button', { name: 'Bold' }).disabled).toBe(
+      false,
+    );
+  });
+
+  it('applies bold to a visual selection and submits the Markdown', async () => {
+    const { api, dialog } = await openEditor();
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'one two');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Markdown source' }));
+    const editor = within(dialog).getByLabelText('Task text');
+    editor.focus();
+    const range = document.createRange();
+    const text = editor.querySelector('p')!.firstChild!;
+    range.setStart(text, 0);
+    range.setEnd(text, 3);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent(document, new Event('selectionchange'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Bold' }));
+    expect(within(editor).getByText('one').tagName).toBe('STRONG');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith(expect.objectContaining({ task: '**one** two' })),
+    );
+  });
+
+  it.each([
+    ['Heading', 'h2', '## one two'],
+    ['Bulleted list', 'ul li', '* one two'],
+    ['Numbered list', 'ol li', '1. one two'],
+    ['Task list', 'ul li', '* [ ] one two'],
+    ['Quote', 'blockquote', '> one two'],
+    ['Code', 'p code', '`one` two'],
+    ['Code block', 'pre code', '```\none two\n```'],
+  ])(
+    'applies semantic %s in the dialog and restores exact source with one undo',
+    async (name, selector, expected) => {
+      const { api, dialog } = await openEditor();
+      const original = 'one two\n\n\n';
+      setMarkdown(within(dialog).getByLabelText('Task text'), original);
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Markdown source' }));
+      const editor = within(dialog).getByLabelText('Task text');
+      editor.focus();
+      const range = document.createRange();
+      const text = editor.querySelector('p')!.firstChild!;
+      range.setStart(text, 0);
+      range.setEnd(text, 3);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      fireEvent(document, new Event('selectionchange'));
+      fireEvent.click(within(dialog).getByRole('button', { name }));
+      expect(editor.querySelector(selector)?.textContent).toBe(name === 'Code' ? 'one' : 'one two');
+      const visual = editor;
+      fireEvent.keyDown(visual, { key: 'z', ctrlKey: true });
+      expect(visual.querySelector(selector)).toBeNull();
+      expect(visual.querySelector('p')?.textContent).toBe('one two');
+      fireEvent.keyDown(visual, { key: 'Z', ctrlKey: true, shiftKey: true });
+      expect(visual.querySelector(selector)).not.toBeNull();
+      fireEvent.keyDown(visual, { key: 'z', ctrlKey: true });
+      expect(markdownValue(visual)).toBe(original);
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Markdown source' }));
+      const restored = within(dialog).getByLabelText('Task text');
+      restored.focus();
+      const restoredText = restored.querySelector('p')!.firstChild!;
+      range.setStart(restoredText, 0);
+      range.setEnd(restoredText, 3);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      fireEvent(document, new Event('selectionchange'));
+      fireEvent.click(within(dialog).getByRole('button', { name }));
+      expect(markdownValue(within(dialog).getByLabelText('Task text')).trim()).toBe(expected);
+      expect(api.queueAdd).not.toHaveBeenCalled();
+    },
+  );
+
+  it('puts attachments after the editor and before delivery', async () => {
+    const { dialog } = await openEditor();
     const area = within(dialog).getByLabelText('Task text');
     const files = within(dialog).getByTestId('new-attachments-input');
     expect(area.compareDocumentPosition(files) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const delivery = within(dialog).getByText('Delivery');
-    expect(files.compareDocumentPosition(delivery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('takes the markup buttons away on Plain', async () => {
-    const { dialog } = await openDialog();
-    const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
-    fireEvent.click(within(bar).getByRole('radio', { name: 'Plain' }));
-    for (const name of [...MARKS, 'Preview']) {
-      expect(within(bar).getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(true);
-    }
-    expect(within(bar).getByRole('button', { name: 'Bold' }).getAttribute('title')).toBe(
-      'Bold (switch to MD)',
-    );
-  });
-
-  it('enables the buttons on MD and takes them away again on Plain from the preview', async () => {
-    const { dialog } = await openDialog();
-    fireEvent.click(within(dialog).getByRole('radio', { name: 'MD' }));
-    for (const name of [...MARKS, 'Preview']) {
-      expect(within(dialog).getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(false);
-    }
-    const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    fireEvent.change(area, { target: { value: '# Total' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Preview' }));
-    expect(area.hidden).toBe(true);
     expect(
-      within(dialog).getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed'),
-    ).toBe('true');
-    expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Bold' }).disabled).toBe(
-      true,
-    );
-    fireEvent.click(within(dialog).getByRole('radio', { name: 'Plain' }));
-    expect(area.hidden).toBe(false);
-    expect(within(dialog).queryByRole('heading', { name: 'Total' })).toBeNull();
-    expect(
-      within(dialog).getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed'),
-    ).toBe('false');
-    expect(area.value).toBe('# Total');
+      files.compareDocumentPosition(within(dialog).getByText('Delivery')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
-  it('puts the markup of a button into the draft and keeps the selection in the field', async () => {
-    const { api, dialog } = await openDialog();
-    fireEvent.click(within(dialog).getByRole('radio', { name: 'MD' }));
-    const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    fireEvent.change(area, { target: { value: 'one two' } });
-    area.setSelectionRange(0, 3);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Bold' }));
-    expect(area.value).toBe('**one** two');
-    expect([area.selectionStart, area.selectionEnd]).toEqual([2, 5]);
-    expect(document.activeElement).toBe(area);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Bulleted list' }));
-    expect(area.value).toBe('- **one** two');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Bulleted list' }));
-    expect(area.value).toBe('**one** two');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Quote' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
-    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: '> **one** two' });
+  it('treats raw HTML as text instead of executing it', async () => {
+    const { dialog } = await openEditor();
+    setMarkdown(within(dialog).getByLabelText('Task text'), '<img src=x alt="pic"> here');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Markdown source' }));
+    expect(dialog.querySelector('img:not(.ProseMirror-separator)')).toBeNull();
+    expect(dialog.textContent).toContain('<img src=x');
   });
 
-  it('pastes formatted text on Plain as Markdown', async () => {
-    const { dialog } = await openDialog();
-    const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    const event = paste(area, {
-      'text/html': '<strong>important</strong>',
-      'text/plain': 'important',
-    });
-    expect(event.defaultPrevented).toBe(true);
-    expect(area.value).toBe('**important**');
-  });
-
-  it('shows HTML in the text as text', async () => {
-    const { dialog } = await openDialog();
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: '<img src=x alt="pic"> here' },
-    });
-    previewMarkdown(dialog);
-    expect(dialog.querySelector('img')).toBeNull();
-    expect(
-      within(dialog)
-        .getAllByText(/<img src=x/)
-        .some((el) => el.tagName === 'P'),
-    ).toBe(true);
-  });
-
-  it('says there is nothing to preview for an empty text', async () => {
-    const { dialog } = await openDialog();
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: '  ' } });
-    previewMarkdown(dialog);
-    expect(within(dialog).getByText('Nothing to preview')).toBeTruthy();
-  });
-
-  it('opens on MD with the focus in the field after a preview', async () => {
-    const { dialog } = await openDialog();
-    previewMarkdown(dialog);
+  it('reopens in visual mode with focus in the field', async () => {
+    const { dialog } = await openEditor();
+    markdownSource(within(dialog).getByLabelText('Task text'));
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
-    fireEvent.click(strip().getByRole('button', { name: 'New task' }));
-    const again = await screen.findByRole('dialog', { name: 'New task' });
-    expect(within(again).getByRole('radio', { name: 'MD' }).getAttribute('aria-checked')).toBe(
-      'true',
-    );
+    const again = await openDialog();
+    expect(within(again).getByLabelText('Task text').getAttribute('contenteditable')).toBe('true');
     await waitFor(() => expect(document.activeElement?.id).toBe('new-task'));
   });
 
   it('keeps one stop of the Tab key on the toolbar', async () => {
-    const { dialog } = await openDialog();
+    const { dialog } = await openEditor();
     const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
-    // the roving focus makes the bar itself the only stop until focus enters it
-    const items = [...bar.querySelectorAll('button, [role="radio"]')];
+    const items = [...bar.querySelectorAll('button')];
     expect(items.length).toBeGreaterThan(1);
     expect(items.every((item) => item.getAttribute('tabindex') !== '0')).toBe(true);
     expect(bar.getAttribute('tabindex')).toBe('0');
   });
 
-  it('has an independent toolbar for the text of every group', async () => {
-    const { dialog } = await openDialog();
+  it('keeps the editors of different groups independent', async () => {
+    const { dialog } = await openEditor();
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add group' }));
-    const second = within(dialog).getByLabelText('Text of group 2').closest('fieldset')!;
     const first = within(dialog).getByLabelText('Text of group 1').closest('fieldset')!;
-    fireEvent.change(within(first).getByLabelText('Text of group 1'), {
-      target: { value: '## Section' },
-    });
-    fireEvent.change(within(second).getByLabelText('Text of group 2'), {
-      target: { value: '## Second' },
-    });
-    previewMarkdown(second);
+    const second = within(dialog).getByLabelText('Text of group 2').closest('fieldset')!;
+    setMarkdown(within(first).getByLabelText('Text of group 1'), '## Section');
+    setMarkdown(within(second).getByLabelText('Text of group 2'), '## Second');
+    fireEvent.click(within(second).getByRole('button', { name: 'Markdown source' }));
     expect(within(second).getByRole('heading', { name: 'Second' })).toBeTruthy();
-    expect(within(first).queryByRole('heading')).toBeNull();
-    expect(within(first).getByRole('radio', { name: 'MD' }).getAttribute('aria-checked')).toBe(
-      'true',
-    );
-    expect(within(first).getByLabelText<HTMLTextAreaElement>('Text of group 1').hidden).toBe(false);
-    previewMarkdown(first);
+    expect(
+      within(first).getByRole('button', { name: 'Markdown source' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+    fireEvent.click(within(first).getByRole('button', { name: 'Markdown source' }));
     expect(within(first).getByRole('heading', { name: 'Section' })).toBeTruthy();
   });
 
-  it('pastes formatted text into the middle of the text as Markdown', async () => {
-    const { api, dialog } = await openDialog();
-    const area = within(dialog).getByLabelText('Task text') as HTMLTextAreaElement;
+  it('converts formatted clipboard content at the source selection', async () => {
+    const { api, dialog } = await openEditor();
+    const area = markdownSource(within(dialog).getByLabelText('Task text'));
     fireEvent.change(area, { target: { value: 'in out' } });
     area.setSelectionRange(3, 3);
     const event = paste(area, {
-      'text/html': '<h2>Total</h2><ul><li>one</li><li>two</li></ul>',
-      'text/plain': 'Total one two',
+      'text/html': '<strong>important</strong>',
+      'text/plain': 'important',
     });
     expect(event.defaultPrevented).toBe(true);
-    const md = '## Total\n\n- one\n- two';
-    expect(area.value).toBe(`in ${md}out`);
-    expect(area.selectionStart).toBe(3 + md.length);
+    expect(area.value).toBe('in **important**out');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
-    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: `in ${md}out` });
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ task: 'in **important**out' }),
+      ),
+    );
   });
 
-  it('leaves Markdown source and plain text to the browser', async () => {
-    const { dialog } = await openDialog();
-    const area = within(dialog).getByLabelText('Task text') as HTMLTextAreaElement;
-    const plain = paste(area, { 'text/plain': '# Overview\n- item' });
-    expect(plain.defaultPrevented).toBe(false);
-    const code = paste(area, {
-      'text/html': '<div><span># Overview</span></div><div><span>- item</span></div>',
-      'text/plain': '# Overview\n- item',
-    });
-    expect(code.defaultPrevented).toBe(false);
+  it('leaves plain clipboard text to the browser in source mode', async () => {
+    const { dialog } = await openEditor();
+    const area = markdownSource(within(dialog).getByLabelText('Task text'));
+    expect(paste(area, { 'text/plain': '# Overview\n- item' }).defaultPrevented).toBe(false);
     expect(area.value).toBe('');
   });
 
-  it('pastes formatted text into the text of a group', async () => {
-    const { dialog } = await openDialog();
+  it('converts formatted clipboard content in a group source', async () => {
+    const { dialog } = await openEditor();
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
-    const area = within(dialog).getByLabelText('Text of group 1') as HTMLTextAreaElement;
+    const area = markdownSource(within(dialog).getByLabelText('Text of group 1'));
     paste(area, { 'text/html': '<p>see <a href="https://e.com">site</a></p>' });
     expect(area.value).toBe('see [site](https://e.com)');
   });
@@ -1205,7 +1158,7 @@ describe('add and continue', () => {
     const api = fakeApi({ queue: vi.fn(async () => queueOf()), queueAdd: added() });
     const dialog = await openDialog(api);
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'First' } });
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Do it');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
@@ -1217,11 +1170,13 @@ describe('add and continue', () => {
     );
     await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
     const text = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    await waitFor(() => expect(text.value).toBe(''));
+    await waitFor(() => expect(markdownValue(text)).toBe(''));
     expect(within(dialog).getByLabelText<HTMLInputElement>('Name').value).toBe('');
     expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature');
-    await waitFor(() => expect(document.activeElement).toBe(text));
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute('aria-label')).toBe('Task text'),
+    );
   });
 
   it('leaves one empty group and focuses its title in the groups mode', async () => {
@@ -1232,9 +1187,7 @@ describe('add and continue', () => {
       target: { value: 'One' },
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add group' }));
-    fireEvent.change(within(dialog).getByLabelText('Text of group 2'), {
-      target: { value: 'Two' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Text of group 2'), 'Two');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
@@ -1265,10 +1218,10 @@ describe('add and continue', () => {
     const dialog = await openDialog(api);
     const shown = screen.queryAllByText('Task #12 created').length;
     const created = screen.queryAllByText('Task created').length;
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Keep' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Keep');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(within(dialog).getByText('rejected')).toBeTruthy());
-    expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('Keep');
+    expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe('Keep');
     expect(api.queueAdd).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
     expect(screen.queryAllByText('Task #12 created')).toHaveLength(shown);
@@ -1289,7 +1242,7 @@ describe('add and continue', () => {
       });
     });
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'First' } });
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Do it');
     fireEvent.click(within(dialog).getByRole('switch', { name: 'Postpone' }));
     const tags = within(dialog).getByRole('combobox', { name: 'Tags' });
     fireEvent.click(tags);
@@ -1346,9 +1299,7 @@ describe('add and continue', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(1));
     expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toEqual(settingsPayload);
-    await waitFor(() =>
-      expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe(''),
-    );
+    await waitFor(() => expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe(''));
     expect(within(dialog).getAllByText('auth').length).toBeGreaterThan(0);
     expect(within(dialog).getByRole('combobox', { name: 'Linked task' }).textContent).toMatch(
       /add sign-in/,
@@ -1376,7 +1327,7 @@ describe('add and continue', () => {
   it('offers the added task among the tasks to wait for', async () => {
     const api = fakeApi({ queue: vi.fn(async () => queueOf()), queueAdd: added() });
     const dialog = await openDialog(api);
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Do it');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
@@ -1396,7 +1347,7 @@ describe('add and continue', () => {
       ),
     });
     const dialog = await openDialog(api);
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Do it');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(1));
     expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
@@ -1527,7 +1478,7 @@ describe('new task in several projects', () => {
     // the project of the field is chosen first
     expect(projectNames(dialog)).toEqual(['app']);
     const addButton = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Email');
     expect(addButton.disabled).toBe(true);
     expect(within(dialog).getAllByText('Choose at least two projects').length).toBeGreaterThan(0);
     await pickProject(dialog, 'lib');
@@ -1549,9 +1500,7 @@ describe('new task in several projects', () => {
     const api = multiMount({ add, branches, commit: true });
     const dialog = await openMulti();
     await pickProject(dialog, 'lib');
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'Shared task' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Shared task');
     fireEvent.change(await within(dialog).findByLabelText('Target branch'), {
       target: { value: 'shared' },
     });
@@ -1583,7 +1532,7 @@ describe('new task in several projects', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual([expect.stringContaining('lib'), expect.stringContaining('app')]);
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Email');
     await clickAdd(dialog);
     await waitFor(() => expect(add).toHaveBeenCalled());
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ repositories: [LIB, APP] }));
@@ -1637,7 +1586,7 @@ describe('new task in several projects', () => {
     expect(
       await within(dialog).findByText('The selected projects have no pipeline in common'),
     ).toBeTruthy();
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'x' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'x');
     expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
       true,
     );
@@ -1654,9 +1603,7 @@ describe('new task in several projects', () => {
     expect(within(dialog).getByLabelText<HTMLInputElement>('Shared tag').value).toBe(
       'Email in profile',
     );
-    fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'Email field' },
-    });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Email field');
     fireEvent.change(within(dialog).getByLabelText('Addition for lib'), {
       target: { value: 'Form' },
     });
@@ -1685,7 +1632,7 @@ describe('new task in several projects', () => {
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Other title' } });
     expect(tag.value).toBe('mine');
     fireEvent.change(tag, { target: { value: '' } });
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'x' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'x');
     await clickAdd(dialog);
     await waitFor(() => expect(add).toHaveBeenCalled());
     const [sent] = add.mock.calls[0] as unknown as [Record<string, unknown>];
@@ -1770,12 +1717,12 @@ describe('new task in several projects', () => {
     multiMount({ add });
     const dialog = await openMulti();
     await pickProject(dialog, 'lib');
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
+    setMarkdown(within(dialog).getByLabelText('Task text'), 'Email');
     await clickAdd(dialog);
     expect(
       await within(dialog).findByText('unknown pipeline `feature` in project `lib`'),
     ).toBeTruthy();
-    expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('Email');
+    expect(markdownValue(within(dialog).getByLabelText('Task text'))).toBe('Email');
     expect(projectNames(dialog)).toEqual(['app', 'lib']);
   });
 });
@@ -1827,8 +1774,8 @@ describe('layout and keyboard of the task form', () => {
     for (const key of ['ctrlKey', 'metaKey'] as const) {
       const { api, dialog } = await mount();
       const text = within(dialog).getByLabelText('Task text');
-      fireEvent.change(text, { target: { value: 'Do it' } });
-      fireEvent.keyDown(text, { key: 'Enter', [key]: true });
+      setMarkdown(text, 'Do it');
+      fireEvent.keyDown(markdownSource(text), { key: 'Enter', [key]: true });
       await waitFor(() =>
         expect(api.queueAdd).toHaveBeenCalledWith({
           provider: null,
@@ -1845,8 +1792,8 @@ describe('layout and keyboard of the task form', () => {
     const { api, dialog } = await mount();
     const text = within(dialog).getByLabelText('Task text');
     fireEvent.keyDown(text, { key: 'Enter', ctrlKey: true });
-    fireEvent.change(text, { target: { value: 'Do it' } });
-    fireEvent.keyDown(text, { key: 'Enter' });
+    setMarkdown(text, 'Do it');
+    fireEvent.keyDown(markdownSource(text), { key: 'Enter' });
     expect(api.queueAdd).not.toHaveBeenCalled();
   });
 });
