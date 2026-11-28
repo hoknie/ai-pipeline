@@ -39,6 +39,8 @@ export interface LaunchOptions {
   drainMs?: number;
   /** Called when the usage of the parser changed after a line of output. */
   onUsage?: (usage: Usage) => void;
+  /** Called as soon as the CLI reveals its session, before exit or timeout. */
+  onSession?: (sessionId: string) => void;
   /** When set, the moment each log line was written is appended there as `<line>\t<ms>`. */
   timesPath?: string;
   /** Called once new lines of the log are on disk. */
@@ -96,11 +98,19 @@ function readOutput(
 ): Interface {
   const stdout = createInterface({ input: child.stdout! });
   let reported: Usage | null = null;
+  let sessionReported = false;
   const grew = () => options.onLog?.();
   stdout.on('line', (line) => {
     log.write(`${line}\n`, grew);
     stamp(1);
     options.parser.push(line);
+    if (!sessionReported && options.onSession) {
+      const session = options.parser.outcome().sessionId;
+      if (session) {
+        sessionReported = true;
+        options.onSession(session);
+      }
+    }
     if (!options.onUsage) return;
     const usage = options.parser.usage();
     if (

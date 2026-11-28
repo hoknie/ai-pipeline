@@ -103,6 +103,7 @@ describe('message to the specialist', () => {
       '- verdict "done" when the step is complete;',
       '- verdict "rejected" when the work you received must be redone; put concrete remarks into feedback;',
       '- verdict "needs_human" when you cannot continue without a decision from a person; put the question into feedback. When you have several independent questions, ask them all in one report through `questions` (each with a `recommendation`, and `options` when the answer is a clear choice) instead of feedback. Add `human_only: true` when only a person may answer, for example when you ask them to look personally at what you wrote.',
+      'Save intermediate findings and remaining work early with `swarm_artifact` as `checkpoint.md` (content, at most 12000 characters); update after each completed investigation area or confirmed finding. This saves progress without ending the step. Keep it concise: files and evidence, decisions, checked areas, open questions and next actions. Do not wait until the final report.',
       'Always pass a short summary of what you did. Without swarm_report the step counts as failed.',
     ].join('\n');
     expect(systemPrompt(plain, minimal)).toBe(baseline);

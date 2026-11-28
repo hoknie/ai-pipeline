@@ -91,6 +91,7 @@ export type Event =
   | { kind: 'report'; group: string; seq: number; report: Report }
   | { kind: 'split_proposed'; seq: number; groups: ProposedGroup[] }
   | { kind: 'attempt_exited'; group: string; seq: number; exit: AttemptExit }
+  | { kind: 'attempt_session'; group: string; seq: number; sessionId: string }
   | { kind: 'attempt_usage'; updates: { group: string; seq: number; usage: Usage }[] }
   /** The project of the service registry the run's project is linked to, found while the attempt prepares. */
   | {

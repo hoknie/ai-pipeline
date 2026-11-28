@@ -18,6 +18,7 @@ import type {
   ObservePort,
   QueueAdvancePort,
   RunAttachmentsPort,
+  RunCheckpointsPort,
   RunCommitsPort,
   RunPushPort,
   RunStatsPort,
@@ -82,6 +83,7 @@ export function declarePorts() {
     runs: wiring.port<RunsPublishPort>('runs.publish'),
     diff: wiring.port<DiffPort>('runs.diff'),
     attachments: wiring.port<RunAttachmentsPort>('runs.attachments'),
+    checkpoints: wiring.port<RunCheckpointsPort>('runs.checkpoints'),
     remoteMcp: wiring.port<RemoteMcpPort>('runs.remote-mcp'),
     registrySkills: wiring.port<RegistrySkillsPort>('runs.registry-skills'),
     registryProject: wiring.port<RegistryProjectPort>('runs.registry-project'),
@@ -104,3 +106,8 @@ export function declarePorts() {
 }
 
 export type Ports = ReturnType<typeof declarePorts>['ports'];
+
+/** Files a run receives from features above it in the dependency graph. */
+export function runFiles(ports: Ports) {
+  return { attachments: ports.attachments.port, checkpoints: ports.checkpoints.port };
+}

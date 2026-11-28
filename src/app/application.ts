@@ -38,7 +38,7 @@ import { createAgents } from './agents.ts';
 import { createNotifications, builtInAdapters } from './notifications/index.ts';
 import { createLifecycle } from './lifecycle.ts';
 import { DEFAULT_TIMINGS, type DaemonTimings } from './timings.ts';
-import { declarePorts, type Ports } from './wiring.ts';
+import { declarePorts, runFiles, type Ports } from './wiring.ts';
 
 export interface ApplicationOptions {
   stateDirectory: string;
@@ -187,7 +187,7 @@ function createRuns(context: Context, lower: Lower) {
     notify: ports.notify.port,
     publish: ports.runs.port,
     diff: ports.diff.port,
-    attachments: ports.attachments.port,
+    ...runFiles(ports),
     remoteMcp: ports.remoteMcp.port,
     registrySkills: ports.registrySkills.port,
     registryProject: ports.registryProject.port,

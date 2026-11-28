@@ -31,13 +31,13 @@ import {
   conversationFolder,
   effectiveSpecialist,
   purgeConversations,
-  connectedSpecialist,
   startWithRegistryProject,
   withBridges,
   workerCommand,
 } from './conversations.ts';
 import { logSkillWarnings, startWithSkills, type AttemptSkills } from './skills/index.ts';
 import { networkFailure, runtimeProblem, withProxy } from './runtime-check.ts';
+import { withServers, loadCheckpoint, saveSession } from './prepare/index.ts';
 import type { OutsideChanges } from './outside.ts';
 import type { RunningAgents } from './running.ts';
 import type { UsageBuffers } from './usage.ts';
@@ -72,6 +72,7 @@ export class AttemptStarter {
     const prepared = await this.prepare(state, slug, seq);
     if (prepared === null) return;
     const { key, specialist, runtime } = prepared;
+    await loadCheckpoint(this.dependencies, prepared);
     const directory = attemptDirectory(workspaceOf(state), state.run.id, slug, seq);
     mkdirSync(directory, { recursive: true });
     const lessons = this.dependencies.lessons.blockFor(state.run, specialist.slug);
@@ -194,29 +195,16 @@ export class AttemptStarter {
         return null;
       }
     }
-    const resolved = await this.withServers(state, key, attempt.runtime, specialist, settings);
+    const resolved = await withServers(
+      this.dependencies,
+      state,
+      key,
+      attempt.runtime,
+      specialist,
+      settings,
+    );
     if (resolved === null) return null;
     return { state, group, attempt, key, runtime, worktree, specialist: resolved, attachments };
-  }
-
-  /** The specialist ready to start (servers expanded, connections checked); null when refused. */
-  private async withServers(
-    state: RunState,
-    key: AttemptKey,
-    runtimeName: string,
-    specialist: Specialist,
-    settings: Readonly<Record<string, { env: Readonly<Record<string, string>> }>>,
-  ): Promise<Specialist | null> {
-    const variables = { ...this.dependencies.environment, ...settings[runtimeName]?.env };
-    const result = connectedSpecialist(
-      this.dependencies.remoteMcp,
-      state.run.repository,
-      specialist,
-      variables,
-    );
-    if ('specialist' in result) return result.specialist;
-    await this.fail(state, key, { kind: 'spawn', message: result.error });
-    return null;
   }
 
   /** The token of an attempt stops being valid; so does whatever was kept open for it. */
@@ -236,7 +224,10 @@ export class AttemptStarter {
     const { context, entry, socket, environment, graceMs, timings } = this.dependencies;
     const launch = runtime.buildLaunch({
       specialist: effectiveSpecialist(withBridges(specialist, entry, token, socket), attempt),
-      input: attempt.input,
+      input: {
+        ...attempt.input,
+        ...(prepared.checkpoint ? { checkpoint: prepared.checkpoint } : {}),
+      },
       worktree,
       environment,
       attemptDirectory: directory,
@@ -270,6 +261,7 @@ export class AttemptStarter {
       graceMs,
       drainMs: timings.drainMs,
       timesPath: timesPath(log),
+      onSession: (sessionId) => saveSession(this.dependencies, state, key, sessionId),
       onUsage: (usage) => this.parts.usage.report(state, key, usage),
       onLog: () => this.dependencies.publish.logGrew(key),
     });

@@ -66,6 +66,7 @@ export function wire(ports: Ports, services: DaemonServices, publisher: Publishe
       return user ? { name: user.name, email: user.email } : null;
     },
   });
+  ports.checkpoints.set(services.artifacts);
   ports.attachments.set({ materialize: (run) => services.attachments.materialize(run) });
   // The MCP servers of a specialist that go through a connection of a service registry.
   ports.remoteMcp.set({

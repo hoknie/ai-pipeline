@@ -247,6 +247,30 @@ The daemon applies the rules a person has: a retry of a group a person cancelled
 Switching observers off, or off for a project, does not interrupt repairs in progress; new incidents wait for a person. In the panel a person can forbid observers in one task, which stops its repair, and give the task back, which clears the ban and resets the repair count. The ban survives a daemon restart.
 The request for the ban is in the [HTTP API](../web/http-api.md#runs); the settings are in [Observers](../web/http-api.md#observers).
 
+Ordinary review cycles also pass the newest structured finding list to the next specialist,
+even when the review's short feedback only names IDs. Older lists are not repeated; managed
+review cycles continue to use their existing structured assignment.
+
+## Saving intermediate progress
+
+Specialists can publish `checkpoint.md` through `swarm_artifact`, passing `content`
+(at most 12,000 characters). Save confirmed findings with file references, checked areas,
+decisions, remaining questions and next actions early; replace the same artifact as work proceeds.
+Publishing a checkpoint does not finish the step or send a review verdict to the implementer.
+The final `swarm_report` still contains the complete result.
+
+Before a later attempt starts, AIP loads the newest checkpoint of the same run, group,
+step and specialist into a separate **Saved progress** section. This works after failure,
+timeout, a fresh retry or daemon restart, even when the CLI session cannot be resumed.
+The notes remain in artifact storage outside git and are visible in the panel's Artifacts tab.
+Missing or unavailable checkpoint bytes do not prevent the attempt from starting.
+
+Checkpoint notes are advisory: verify them against current files and feedback. Accepted human
+decisions take precedence, and old test results do not prove the current revision passes.
+AIP also records the CLI session as soon as it appears in stdout, rather than waiting for exit;
+normal session compatibility and explicit retry policies still apply. Saving an ID does not
+guarantee that a CLI can resume its history or that input token usage decreases.
+
 ## Run states
 
 `state` in JSON and the `STATE` column in `aip run list`:

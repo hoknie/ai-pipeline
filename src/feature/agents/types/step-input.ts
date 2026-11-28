@@ -40,6 +40,8 @@ export interface RegistryProjectRef {
 }
 
 export interface StepInput {
+  /** Loaded for launch from artifact storage; advisory, never a verdict or an accepted decision. */
+  checkpoint?: { seq: number; text: string };
   review?: ReviewAssignment;
   prompt: string;
   groupTitle: string;

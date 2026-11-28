@@ -13,6 +13,7 @@ import {
   messageAttempt,
   proposeSplit,
   recordUsage,
+  recordSession,
   registryProjectResolved,
   reportAttempt,
 } from './answers.ts';
@@ -112,6 +113,7 @@ const HANDLERS: Handlers = {
     replyAsMessage(m.state, e.group, e.seq, e.exit);
     attemptExited(m, e.group, e.seq, e.exit);
   },
+  attempt_session: (m, e) => recordSession(m, e.group, e.seq, e.sessionId),
   attempt_usage: (m, e) => recordUsage(m, e.updates),
   registry_project_resolved: (m, e) =>
     registryProjectResolved(m, e.group, e.seq, e.registryProject),

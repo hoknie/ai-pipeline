@@ -78,6 +78,14 @@ export function answerQuestion(
   group.humanOnly = null;
 }
 
+/** The first session of the active attempt wins; late output cannot revive a stopped attempt. */
+export function recordSession(m: Ctx, slug: string, seq: number, sessionId: string): void {
+  const group = findGroup(m.state, slug);
+  const attempt = group?.attempts.at(-1);
+  if (!attempt || attempt.seq !== seq || attempt.status !== 'running' || !sessionId) return;
+  attempt.sessionId ??= sessionId;
+}
+
 export function recordUsage(m: Ctx, updates: { group: string; seq: number; usage: Usage }[]): void {
   for (const update of updates) {
     const group = findGroup(m.state, update.group);

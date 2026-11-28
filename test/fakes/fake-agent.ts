@@ -546,6 +546,8 @@ if (action.stubbornChild) {
   const child = spawn('sh', ['-c', 'trap "" TERM; while :; do sleep 1; done'], { stdio: 'ignore' });
   appendFileSync(join(state, 'children'), `${child.pid}\n`);
 }
+if (mode === 'opencode')
+  console.log(JSON.stringify({ type: 'step_start', sessionID: option('-s') ?? 'ses_fake' }));
 const liveUsage = action.usage ?? [];
 for (const [index, call] of liveUsage.entries()) {
   if (index > 0 && action.usageGapMs) {
@@ -654,7 +656,7 @@ if (action.networkError && mode === 'claude') {
   process.exit(1);
 }
 
-if (!action.noReport) {
+if (!action.noReport || action.toolCalls?.length) {
   const client = action.realWorker
     ? await connectWorker(worker.command, worker.args)
     : connectDirect(worker.args);
@@ -779,23 +781,25 @@ if (!action.noReport) {
       );
     }
   }
-  const verdict = action.verdict ?? 'done';
-  const result = await client.callTool({
-    name: 'swarm_report',
-    arguments: {
-      verdict,
-      summary: action.summary ?? `${step} ${verdict}`,
-      ...(action.feedback || (verdict !== 'done' && !action.questions)
-        ? { feedback: action.feedback ?? 'remarks' }
-        : {}),
-      ...(action.questions ? { questions: action.questions } : {}),
-      ...(action.humanOnly ? { human_only: true } : {}),
-      ...(action.review !== undefined ? { review: action.review } : {}),
-      ...(action.implementation !== undefined ? { implementation: action.implementation } : {}),
-      ...(action.strategy !== undefined ? { strategy: action.strategy } : {}),
-    },
-  });
-  appendFileSync(join(state, 'reports.jsonl'), `${JSON.stringify({ step, group, result })}\n`);
+  if (!action.noReport) {
+    const verdict = action.verdict ?? 'done';
+    const result = await client.callTool({
+      name: 'swarm_report',
+      arguments: {
+        verdict,
+        summary: action.summary ?? `${step} ${verdict}`,
+        ...(action.feedback || (verdict !== 'done' && !action.questions)
+          ? { feedback: action.feedback ?? 'remarks' }
+          : {}),
+        ...(action.questions ? { questions: action.questions } : {}),
+        ...(action.humanOnly ? { human_only: true } : {}),
+        ...(action.review !== undefined ? { review: action.review } : {}),
+        ...(action.implementation !== undefined ? { implementation: action.implementation } : {}),
+        ...(action.strategy !== undefined ? { strategy: action.strategy } : {}),
+      },
+    });
+    appendFileSync(join(state, 'reports.jsonl'), `${JSON.stringify({ step, group, result })}\n`);
+  }
   await client.close();
 }
 

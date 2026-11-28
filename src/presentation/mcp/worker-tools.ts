@@ -133,7 +133,7 @@ export function registerArtifact(kit: WorkerKit): void {
     {
       title: 'Publish an artifact',
       description:
-        'Publish a file of this step (a report, a log, a template) as an artifact of the group. Artifacts are stored by the daemon outside of git, are shown in the panel on the Artifacts tab and never reach the delivered diff. Pass the text as content (best for reports and logs), or path to an existing file of your worktree that git ignores (build output, tmp/): a file that git tracks would be committed. Files named *.md and *.log can be previewed in the panel, others are downloaded. Publishing the same file_name again in this step replaces the artifact. Then call swarm_report as usual.',
+        'Publish a file of this step (a report, a log, a template) as an artifact of the group. Artifacts are stored by the daemon outside of git, are shown in the panel on the Artifacts tab and never reach the delivered diff. Pass the text as content (best for reports and logs), or path to an existing file of your worktree that git ignores (build output, tmp/): a file that git tracks would be committed. Files named *.md and *.log can be previewed in the panel, others are downloaded. Publishing the same file_name again in this step replaces the artifact. Use checkpoint.md (at most 12000 characters) for intermediate findings, checked areas and next actions: the newest checkpoint of the same step and specialist is restored on a later attempt, including after timeout or daemon restart. It does not complete the step or publish a review verdict. Then call swarm_report as usual.',
       inputSchema: {
         file_name: z
           .string()

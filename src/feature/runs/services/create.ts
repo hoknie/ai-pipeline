@@ -15,6 +15,7 @@ import type {
   RemoteMcpPort,
   RegistryProjectPort,
   RunAttachmentsPort,
+  RunCheckpointsPort,
   RunNotifyPort,
   RunCommitsPort,
   RunPushPort,
@@ -65,6 +66,7 @@ export interface RunsDependencies {
   diff: DiffPort;
   agentExit: AgentExitPort;
   attachments: RunAttachmentsPort;
+  checkpoints?: RunCheckpointsPort;
   remoteMcp: RemoteMcpPort;
   registrySkills: RegistrySkillsPort;
   registryProject: RegistryProjectPort;

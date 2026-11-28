@@ -14,6 +14,7 @@ import type {
   RemoteMcpPort,
   RegistryProjectPort,
   RunAttachmentsPort,
+  RunCheckpointsPort,
   RunsPublishPort,
 } from '../../ports/index.ts';
 import type { Attempt, Group, RunState } from '../../types/index.ts';
@@ -68,6 +69,7 @@ export interface EffectDependencies {
   agentExit: AgentExitPort;
   queue: QueueAdvancePort;
   attachments: RunAttachmentsPort;
+  checkpoints?: RunCheckpointsPort;
   /** The connections the MCP servers of a specialist go through. */
   remoteMcp: RemoteMcpPort;
   /** The skills of a service registry for the specialists. */
@@ -103,4 +105,5 @@ export interface Prepared {
   specialist: Specialist;
   /** The folder the attachments of the run are laid out in; null without attachments. */
   attachments: string | null;
+  checkpoint?: { seq: number; text: string };
 }

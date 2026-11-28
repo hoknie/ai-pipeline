@@ -11,6 +11,7 @@ import {
 } from '../repositories/index.ts';
 import {
   ARTIFACTS_PER_GROUP,
+  CHECKPOINT_LIMIT,
   artifactPreview,
   artifactTitle,
   type ArtifactContentView,
@@ -91,6 +92,33 @@ export class ArtifactService {
     return { fileName: record.fileName, size: bytes.length, base64: bytes.toString('base64') };
   }
 
+  /** Restore the newest checkpoint of this participant, including interrupted attempts. */
+  async checkpoint(params: {
+    runId: string;
+    group: string;
+    step: string;
+    specialist: string;
+    beforeSeq: number;
+  }) {
+    const records = this.dependencies.artifacts
+      .artifacts(params.runId, params.group)
+      .filter(
+        (record) =>
+          record.fileName === 'checkpoint.md' &&
+          record.step === params.step &&
+          record.specialist === params.specialist &&
+          record.seq < params.beforeSeq,
+      )
+      .sort((a, b) => b.seq - a.seq);
+    const record = records[0];
+    if (!record || record.size > CHECKPOINT_LIMIT * 4) return null;
+    const storage = artifactStorageFor(this.dependencies.storages, record.uri);
+    const bytes = await storage?.get(record.uri).catch(() => null);
+    if (!bytes) return null;
+    const text = bytes.toString('utf8');
+    return text.length <= CHECKPOINT_LIMIT ? { seq: record.seq, text } : null;
+  }
+
   /** `artifact_publish`: a running attempt stores a file; the same name replaces its earlier one. */
   async publish(params: ArtifactPublication): Promise<{ id: string }> {
     const { runs } = this.dependencies;
@@ -106,7 +134,13 @@ export class ArtifactService {
       params.content !== undefined
         ? Buffer.from(params.content, 'utf8')
         : await readArtifactFile(runs.effects.worktreePath(state, group), params.path ?? '');
+    if (params.fileName === 'checkpoint.md' && bytes.toString('utf8').length > CHECKPOINT_LIMIT) {
+      throw rejected(`checkpoint.md may have at most ${CHECKPOINT_LIMIT} characters`);
+    }
     return runs.engine.serial(async () => {
+      if (runs.effects.attemptFor(params.token)?.seq !== key.seq || attempt.status !== 'running') {
+        throw rejected('unknown or expired report token');
+      }
       const id = await this.store(state.run.id, group.slug, attempt, params, bytes);
       this.dependencies.publish.runChanged(state);
       return { id };

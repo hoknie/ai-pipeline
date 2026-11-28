@@ -1,3 +1,4 @@
+export type { RunCheckpointsPort } from './progress/index.ts';
 export type { AgentExitPort } from './agent-exit.ts';
 export type { RunAttachmentsPort } from './attachments.ts';
 export type { CommitStamp, RunCommitsPort } from './commits.ts';

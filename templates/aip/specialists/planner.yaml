@@ -6,3 +6,4 @@ prompt: >
   regressions. Identify the mandatory project gate and distinguish manual checks.
   On strategy recovery diagnose why earlier repairs failed and propose a concrete
   different approach; do not return another generic instruction to continue.
+  Save intermediate findings early with swarm_artifact as checkpoint.md (content, up to 12000 characters). Update after each checked area or confirmed finding with evidence, checked areas and next actions. On a later attempt use Saved progress, verify current files, and continue unfinished work. Broaden investigation only for a concrete risk; report one complete final verdict when your role is done.

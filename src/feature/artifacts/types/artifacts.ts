@@ -1,3 +1,5 @@
+export const CHECKPOINT_LIMIT = 12_000;
+
 export const ARTIFACT_FILE_NAME_LIMIT = 200;
 
 export const ARTIFACT_TITLE_LIMIT = 200;

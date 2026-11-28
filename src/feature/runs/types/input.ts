@@ -13,6 +13,7 @@ export function buildInput(run: Run, group: Group, pending: Pending): StepInput 
   const reports = group.attempts.filter(
     (attempt) => attempt.status === 'finished' && attempt.report,
   );
+  const latest = new Map(reports.map((attempt) => [attempt.stepId, attempt]));
   const attempts = review
     ? [...new Map(reports.map((attempt) => [attempt.stepId, attempt])).values()]
     : reports;
@@ -23,7 +24,14 @@ export function buildInput(run: Run, group: Group, pending: Pending): StepInput 
             stepId: attempt.stepId,
             specialist: attempt.specialist,
             verdict: attempt.report.verdict,
-            summary: attempt.report.summary,
+            summary: [
+              attempt.report.summary,
+              !review && latest.get(attempt.stepId) === attempt && attempt.report.review
+                ? findingsText(attempt.report.review.findings)
+                : '',
+            ]
+              .filter(Boolean)
+              .join('\n\n'),
           },
         ]
       : [],

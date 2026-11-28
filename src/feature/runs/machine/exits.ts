@@ -49,7 +49,9 @@ import { finishRecovery } from './review/cycle.ts';
 /** The attempt was cancelled or timed out before its process ended: only the usage is unknown. */
 function lateUsage(group: Group, seq: number, exit: AttemptExit): void {
   const stopped = group.attempts.find((item) => item.seq === seq);
-  if (stopped && exit.usage !== null && stopped.finishedAt !== null) stopped.usage = exit.usage;
+  if (!stopped || stopped.finishedAt === null) return;
+  if (exit.usage !== null) stopped.usage = exit.usage;
+  stopped.sessionId ??= exit.sessionId;
 }
 
 /** The failure of an exited attempt; a report sent before the limit ran out counts as usual. */

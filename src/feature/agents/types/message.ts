@@ -30,6 +30,7 @@ export function systemPrompt(
     '- verdict "done" when the step is complete;',
     '- verdict "rejected" when the work you received must be redone; put concrete remarks into feedback;',
     '- verdict "needs_human" when you cannot continue without a decision from a person; put the question into feedback. When you have several independent questions, ask them all in one report through `questions` (each with a `recommendation`, and `options` when the answer is a clear choice) instead of feedback. Add `human_only: true` when only a person may answer, for example when you ask them to look personally at what you wrote.',
+    'Save intermediate findings and remaining work early with `swarm_artifact` as `checkpoint.md` (content, at most 12000 characters); update after each completed investigation area or confirmed finding. This saves progress without ending the step. Keep it concise: files and evidence, decisions, checked areas, open questions and next actions. Do not wait until the final report.',
     'Always pass a short summary of what you did. Without swarm_report the step counts as failed.',
   ];
   if (specialist.skills.length > 0) {
@@ -67,6 +68,12 @@ export function userMessage(
 ): string {
   const sections = [input.prompt];
   if (input.review) sections.push(reviewMessage(input.review));
+  if (input.checkpoint)
+    sections.push(
+      `## Saved progress from attempt ${input.checkpoint.seq} (advisory)\n` +
+        'Continue from these notes. Verify them against the current files and task; current feedback and accepted human decisions take precedence. A checkpoint is not a verdict, an approved plan, or proof that checks still pass.\n' +
+        input.checkpoint.text,
+    );
   if (input.attachments && input.attachments.length > 0 && attachmentsDirectory) {
     const folder = attachmentsDirectory.replace(/[\\/]+$/, '');
     sections.push(
