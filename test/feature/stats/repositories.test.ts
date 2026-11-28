@@ -6,7 +6,7 @@ import {
   StatsReportRepository,
 } from '../../../src/feature/stats/repositories/index.ts';
 import { temporaryStorage } from '../storage.ts';
-import { attemptRecord, taskRecord } from './helpers.ts';
+import { attemptRecord, runWith, taskRecord } from './helpers.ts';
 
 function repositories() {
   const { database } = temporaryStorage();
@@ -101,6 +101,42 @@ describe('statistics repositories', () => {
     expect(records.deleteRepository('/work/app')).toBe(3);
     expect(reads.attempts({ exclude: [] }).map((record) => record.runId)).toEqual(['c']);
     expect(reads.tasks({ exclude: [] })).toEqual([]);
+  });
+
+  it('marks the records of probe runs and keeps them out of the report', () => {
+    const storage = temporaryStorage();
+    const records = new StatsRecordRepository(storage.database);
+    const reads = new StatsReportRepository(storage.database);
+    records.insertAttempts([
+      attemptRecord({ runId: 'plain', seq: 1 }),
+      attemptRecord({ runId: 'probe', seq: 1 }),
+    ]);
+    records.upsertTask(taskRecord({ runId: 'probe' }));
+    const saved = runWith('probe', []);
+    saved.run.probeOf = 'source';
+    storage.runs.saveRun(saved);
+    records.fillProbeRuns();
+    expect(reads.attempts({ exclude: [] }).map((record) => record.runId)).toEqual(['plain']);
+    expect(reads.tasks({ exclude: [] })).toEqual([]);
+    expect(records.read('probe')).toEqual({
+      attempts: [
+        {
+          runId: 'probe',
+          group: 'group-1',
+          seq: 1,
+          durationMs: 1000,
+          inputTokens: 100,
+          outputTokens: 50,
+        },
+      ],
+      wallMs: 4000,
+    });
+    records.markProbes(['plain']);
+    expect(reads.attempts({ exclude: [] })).toEqual([]);
+    expect(records.read('plain').attempts).toHaveLength(1);
+    records.fillProbeRuns();
+    records.markProbes(['plain']);
+    expect(records.read('plain').attempts).toHaveLength(1);
   });
 
   it('keeps the moment of the history move', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RunState } from '../../../src/feature/runs/types/index.ts';
+import { RunRepository } from '../../../src/feature/runs/repositories/index.ts';
 import {
   StatsMetaRepository,
   StatsRecordRepository,
@@ -17,6 +18,7 @@ function harness(history: RunState[] = [], start = 100_000) {
   const records = new StatsRecordRepository(database);
   const meta = new StatsMetaRepository(database);
   const reads = new StatsReportRepository(database);
+  const runs = new RunRepository(database);
   const clock = { now: start };
   const settings: { value: StatsSettings | string } = {
     value: { enabled: true, exclude: [] },
@@ -34,7 +36,7 @@ function harness(history: RunState[] = [], start = 100_000) {
       settingsCacheMs: 0,
     });
   const attempts = () => reads.attempts({ exclude: [] }).map((record) => record.runId);
-  return { build, clock, settings, records, meta, reads, attempts, warnings };
+  return { build, clock, settings, records, meta, reads, runs, attempts, warnings };
 }
 
 const finished = (id: string, at: number, repository = '/work/app') =>
@@ -174,6 +176,67 @@ describe('the statistics ledger', () => {
     };
     await expect(ledger.capture(finished('r1', 100_200))).resolves.toBeUndefined();
     expect(h.warnings.join()).toContain('disk full');
+  });
+
+  it('records a probe run in the journal and keeps it out of the report', async () => {
+    const h = harness();
+    const ledger = h.build();
+    await ledger.backfill();
+    const state = settle(finished('p1', 100_200), 'merged', 100_300);
+    state.run.probeOf = 'source';
+    h.clock.now = 100_400;
+    await ledger.capture(state);
+    expect(h.attempts()).toEqual([]);
+    expect(h.reads.tasks({ exclude: [] })).toEqual([]);
+    expect(ledger.read('p1')).toMatchObject({
+      attempts: [{ runId: 'p1', seq: 1 }],
+      wallMs: 99_300,
+    });
+  });
+
+  it('marks the runs of the experiments of older stores probes whatever the run says', async () => {
+    const h = harness();
+    const ledger = h.build();
+    await ledger.backfill();
+    ledger.markProbes(['old-member']);
+    h.clock.now = 100_400;
+    await ledger.capture(finished('old-member', 100_200));
+    expect(h.attempts()).toEqual([]);
+    expect(ledger.read('old-member').attempts).toHaveLength(1);
+    // a run marked again gains nothing new
+    ledger.markProbes(['old-member']);
+    expect(ledger.read('old-member').attempts).toHaveLength(1);
+  });
+
+  it('marks the remembered members as probes in the history move that waited for collection', async () => {
+    const h = harness([finished('old-member', 50_000)]);
+    h.settings.value = { enabled: false, exclude: [] };
+    const ledger = h.build();
+    await ledger.backfill();
+    expect(h.meta.backfilledAt()).toBeNull();
+    // The probes service names the member of an older experiment; the run itself does not say so.
+    ledger.markProbes(['old-member']);
+    h.settings.value = { enabled: true, exclude: [] };
+    h.clock.now = 200_000;
+    await ledger.capture(finished('new', 200_000));
+    expect(h.meta.backfilledAt()).toBe(200_000);
+    // The member is in the journal for the probes and out of the report of ordinary tasks.
+    expect(h.attempts()).toEqual(['new']);
+    expect(ledger.read('old-member').attempts).toHaveLength(1);
+  });
+
+  it('moves the history of a probe run as probe records', async () => {
+    const old = settle(finished('old-probe', 50_000), 'merged', 50_000);
+    old.run.probeOf = 'source';
+    const h = harness([old]);
+    const ledger = h.build();
+    await ledger.backfill();
+    expect(h.attempts()).toEqual([]);
+    expect(h.reads.tasks({ exclude: [] })).toEqual([]);
+    expect(ledger.read('old-probe')).toMatchObject({
+      attempts: [expect.anything()],
+      wallMs: 49_000,
+    });
   });
 
   it('clears a project without moving the history again', async () => {

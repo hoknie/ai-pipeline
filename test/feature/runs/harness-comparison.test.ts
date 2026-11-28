@@ -138,4 +138,30 @@ describe('harness probe comparison', () => {
     expect(text).toContain('check is hypothetical');
     expect(text).toContain('Nothing is automatically applied');
   });
+
+  it('stays a description of one pair: no change proposal and no delivery claim', () => {
+    // A strict advantage of the candidate in the single pair: the pair signal names it, the
+    // proposal of a change comes only from the repetitions of the experiment.
+    const winning = compareHarnessProbes(
+      probe('a', { check: { applied: false, conflicts: 1, error: null } }),
+      probe('b'),
+    );
+    expect(winning.recommendation).toBe('candidate');
+    const offered = formatHarnessProposal(winning);
+    expect(offered).toContain('Pair signal: **candidate**');
+    expect(offered).toContain('actualDelivery: not_attempted');
+    expect(offered).toContain('Nothing is automatically applied');
+    expect(offered).toContain('This is not a recommendation to apply a change');
+    expect(offered).not.toMatch(/use variant/i);
+    // Savings alone never overturn the check tie, and nothing is claimed as delivered.
+    const cheaper = compareHarnessProbes(
+      probe('a'),
+      probe('b', { cost: 0, wallMs: 1, inputTokens: 1, outputTokens: 1 }),
+    );
+    expect(cheaper.recommendation).toBe('baseline');
+    const saved = formatHarnessProposal(cheaper);
+    expect(saved).toContain('Pair signal: **baseline**');
+    expect(saved).toContain('actualDelivery: not_attempted');
+    expect(saved).not.toMatch(/use variant/i);
+  });
 });

@@ -17,6 +17,8 @@ import {
 } from '../../swarm-config/services/index.ts';
 import { findPipeline } from '../../swarm-config/types/index.ts';
 import type { Event } from '../machine/index.ts';
+import { reserveProbes } from './probes/admission.ts';
+import type { ProbeAdmissions } from './probes/admission.ts';
 import {
   checkSkip,
   checkDeliveryBranch,
@@ -48,6 +50,8 @@ export interface RunRequestsDependencies {
   registry: RegistryService;
   config: ConfigService;
   now: () => number;
+  /** The admissions of the probe budget: a single probe takes one place before any side effect. */
+  admissions: ProbeAdmissions;
 }
 
 /** The changes of runs the clients and the agents ask for. */
@@ -181,8 +185,9 @@ export class RunRequests {
       throw rejected(`run ${baseId} already runs the ${chosen} harness`);
     }
     const repository = await registry.rootOf(base.run.repository);
+    const id = runId(now(), randomInt(36 ** 4));
     const state = createRun({
-      id: runId(now(), randomInt(36 ** 4)),
+      id,
       repository,
       pipeline: base.run.pipeline,
       baseCommit: base.run.baseCommit,
@@ -207,6 +212,13 @@ export class RunRequests {
     if (!sameProbeInput(probeInputOf(base), probeInputOf(state))) {
       throw rejected(`a probe of run ${baseId} must repeat its input`);
     }
+    // The place of the task is taken before the first side effect: a refusal leaves no refs.
+    reserveProbes(this.dependencies.admissions, {
+      id,
+      run: baseId,
+      runs: 1,
+      now: now(),
+    });
     await prepareRunBranch(repository, state.run.branch, {
       workingTree: false,
       include: [],
@@ -224,7 +236,9 @@ export class RunRequests {
   async createProbe(request: ProbeRunRequest): Promise<RunCreated> {
     const { registry, config: configs, now } = this.dependencies;
     const repository = await registry.rootOf(request.repository);
-    const config = configs.load(repository);
+    // A pinned configuration is the resolved one of the first run of the variant; the first
+    // repetition reads `swarm.yaml` and resolves its variant as any run does.
+    const config = request.config ?? configs.load(repository);
     const id = runId(now(), randomInt(36 ** 4));
     const prepared = await prepareRunBranch(repository, `refs/aip/${id}/run`, {
       workingTree: false,
@@ -238,6 +252,7 @@ export class RunRequests {
       pipeline: request.pipeline,
       baseCommit: prepared.baseCommit,
       config,
+      configIsResolved: request.config !== undefined,
       dirtyWarning: false,
       groups: [{ title: request.groupTitle, task: request.task }],
       split: request.split,
@@ -249,6 +264,7 @@ export class RunRequests {
       variant: request.variant,
       provider: request.provider,
       attachments: request.attachments,
+      probeOf: request.probeOf,
       now: now(),
       title: request.title,
     });

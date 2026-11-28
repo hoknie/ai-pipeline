@@ -278,3 +278,97 @@ describe('the statistics report', () => {
     expect(autoLong.series.length).toBeGreaterThanOrEqual(21);
   });
 });
+
+describe('probes in the statistics report', () => {
+  it('keeps the probes of both kinds out of every view and readable by id', async () => {
+    const h = harness();
+    addTask(h, 't1', '/work/app', [
+      { tokens: 10_000, minutes: 10 },
+      { tokens: 20_000, minutes: 20 },
+    ]);
+    addTask(h, 't2', '/work/lib', [{ tokens: 60_000, minutes: 60 }], NOW - 2 * 60 * MINUTE);
+    const before = await h.service.report({});
+
+    // A single probe and a member of a batch: their own tokens, time, outcome and naming call.
+    h.records.insertAttempts([
+      attemptRecord({
+        runId: 'probe-single',
+        seq: 1,
+        repository: '/work/app',
+        inputTokens: 1111,
+        outputTokens: 0,
+        durationMs: 11 * MINUTE,
+        isProbe: true,
+      }),
+      attemptRecord({
+        runId: 'probe-single',
+        seq: 0,
+        kind: 'naming',
+        group: '_naming',
+        repository: '/work/app',
+        inputTokens: 222,
+        outputTokens: 22,
+        durationMs: 0,
+        isProbe: true,
+      }),
+      attemptRecord({
+        runId: 'probe-batch',
+        seq: 1,
+        repository: '/work/lib',
+        inputTokens: 3333,
+        outputTokens: 0,
+        durationMs: 33 * MINUTE,
+        isProbe: true,
+      }),
+      // The attempt of a probe that has no task record yet.
+      attemptRecord({
+        runId: 'probe-orphan',
+        seq: 1,
+        repository: '/work/app',
+        inputTokens: 4444,
+        outputTokens: 0,
+        durationMs: 44 * MINUTE,
+        isProbe: true,
+      }),
+    ]);
+    h.records.upsertTask(
+      taskRecord({
+        runId: 'probe-single',
+        repository: '/work/app',
+        outcome: 'failed',
+        wallMs: 12 * MINUTE,
+        finishedAt: NOW - 500,
+        isProbe: true,
+      }),
+    );
+    h.records.upsertTask(
+      taskRecord({
+        runId: 'probe-batch',
+        repository: '/work/lib',
+        outcome: 'cancelled',
+        wallMs: 34 * MINUTE,
+        isProbe: true,
+      }),
+    );
+
+    expect(await h.service.report({})).toEqual(before);
+    expect((await h.service.report({ repository: '/work/lib' })).totals.tokens).toBe(60_000);
+    const empty = await h.service.report({ since: NOW + MINUTE });
+    expect(empty.totals).toMatchObject({ tasks: 0, attempts: 0, tokens: 0 });
+    expect(empty.outcomes).toEqual({ finished: 0, failed: 0, cancelled: 0 });
+
+    // The direct read of the expense still answers for every probe, named or not.
+    expect(h.records.read('probe-single')).toMatchObject({
+      attempts: [
+        { runId: 'probe-single', seq: 0, inputTokens: 222 },
+        { runId: 'probe-single', seq: 1, inputTokens: 1111 },
+      ],
+      wallMs: 12 * MINUTE,
+    });
+    expect(h.records.read('probe-batch')).toMatchObject({ wallMs: 34 * MINUTE });
+    expect(h.records.read('probe-orphan')).toEqual({
+      attempts: [expect.anything()],
+      wallMs: null,
+    });
+  });
+});

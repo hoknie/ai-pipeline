@@ -41,6 +41,8 @@ export class StatsLedger {
   private readonly decided = new Set<string>();
   /** Finished runs: everything that ended by this moment is decided, so their keys are dropped. */
   private readonly settled = new Map<string, number>();
+  /** The runs the probes service named a probe: their records stay marked while they gain attempts. */
+  private readonly probeRuns = new Set<string>();
   /** Attempts that ended before this moment are left to the history move; null before it. */
   private capturedFrom: number | null;
   private tail: Promise<void> = Promise.resolve();
@@ -55,6 +57,7 @@ export class StatsLedger {
     let work: () => Promise<void>;
     try {
       const { attempts, task } = recordsOf(state);
+      this.markRemembered(attempts, task);
       work = () => this.decide(attempts, task);
     } catch (error) {
       this.dependencies.warn(`cannot read run ${state.run.id}: ${String(error)}`);
@@ -64,6 +67,12 @@ export class StatsLedger {
       this.dependencies.warn(`cannot record run ${state.run.id}: ${String(error)}`);
     });
     return this.tail;
+  }
+
+  /** Remembers the runs of the older experiments as probes and marks their records. */
+  markProbes(runIds: string[]): void {
+    for (const id of runIds) this.probeRuns.add(id);
+    this.dependencies.records.markProbes(runIds);
   }
 
   /** Reads the records currently in the journal, which can lag behind a saved run. */
@@ -77,6 +86,7 @@ export class StatsLedger {
    */
   async backfill(): Promise<void> {
     try {
+      this.dependencies.records.fillProbeRuns();
       const settings = await this.settings();
       this.backfillNow(settings);
       this.backfillAuthors(settings);
@@ -123,6 +133,19 @@ export class StatsLedger {
     return settings.enabled && !settings.excluded.has(repository);
   }
 
+  /**
+   * Names the records of the runs the probes service remembered: the table of runs cannot name a
+   * member of an experiment of an older store a probe, so the remembered ids decide, whatever the
+   * run itself says. The history move marks the same way before its records are written.
+   */
+  private markRemembered(attempts: AttemptRecord[], task: TaskRecord | null): void {
+    if (this.probeRuns.size === 0) return;
+    for (const record of attempts) {
+      if (this.probeRuns.has(record.runId)) record.isProbe = true;
+    }
+    if (task !== null && this.probeRuns.has(task.runId)) task.isProbe = true;
+  }
+
   private backfillNow(settings: LedgerSettings): void {
     const { records, meta, now } = this.dependencies;
     if (!settings.enabled || meta.backfilledAt() !== null) return;
@@ -134,6 +157,7 @@ export class StatsLedger {
       seen.add(state.run.id);
       if (settings.excluded.has(state.run.repository)) continue;
       const found = recordsOf(state);
+      this.markRemembered(found.attempts, found.task);
       attempts.push(...found.attempts);
       if (found.task !== null) tasks.push(found.task);
     }

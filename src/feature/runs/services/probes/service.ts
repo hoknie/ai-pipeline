@@ -3,6 +3,8 @@ import { randomInt } from 'node:crypto';
 import { rejected } from '../../../../platform/errors/index.ts';
 import type { ConfigService } from '../../../swarm-config/services/index.ts';
 import type { RunStatsPort } from '../../ports/stats/index.ts';
+import { createBatch } from './create-batch.ts';
+import { restoreActive, reserveProbes, type ProbeAdmissions } from './admission.ts';
 import { harnessProbe } from './harness-probe.ts';
 import { keepProposal } from './keep-proposal.ts';
 import { probeStats } from './probe-stats.ts';
@@ -44,6 +46,10 @@ export interface RunProbesDependencies {
   engine: ProbeQueue;
   now: () => number;
   stats: RunStatsPort;
+  /** The admissions of the budget: the reserve of a plan and the restore of an old one. */
+  admissions: ProbeAdmissions;
+  /** Every run the table of runs names a probe; the restore of the places they took. */
+  probeRuns: () => { id: string; probeOf: string; createdAt: number }[];
 }
 
 function groupOf(state: RunState, slug: string | null): Group {
@@ -100,31 +106,6 @@ function batchDone(states: ProbeStates, experiment: ProbeExperiment, repetition:
 
 function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-async function createBatch(
-  launcher: ProbeLauncher,
-  experiment: ProbeExperiment,
-  specs: ProbeRunSpec[],
-  source: RunState,
-): Promise<void> {
-  for (const spec of specs) {
-    const created = await launcher.createProbe({
-      repository: experiment.repository,
-      pipeline: experiment.pipeline,
-      groupTitle: experiment.groupTitle,
-      split: experiment.split,
-      task: experiment.task,
-      baseCommit: experiment.baseCommit,
-      variant: spec.candidate,
-      provider: experiment.provider,
-      skip: [...experiment.skip],
-      attachments: source.run.attachments.map((attachment) => ({ ...attachment })),
-      number: source.run.number,
-      title: `probe ${spec.candidate} ${spec.repetition}`,
-    });
-    experiment.runs.push({ ...spec, runId: created.runId });
-  }
 }
 
 function warningsOf(experiment: ProbeExperiment): string[] {
@@ -192,13 +173,26 @@ export class RunProbes {
       createdAt: this.dependencies.now(),
       proposalPath: null,
     };
-    this.loadActive();
+    // The reservations of the plans of an earlier life are restored before this one is checked.
+    this.restore();
+    reserveProbes(this.dependencies.admissions, {
+      id: experiment.id,
+      run: experiment.sourceRun,
+      runs: plan.runs.length,
+      now: this.dependencies.now(),
+    });
     this.active.set(experiment.id, experiment);
     // The plan is stored before the first run exists: a failure of the launcher leaves a visible
     // experiment with the runs it did create, not orphaned probes nobody can find.
     this.dependencies.store.save(experiment);
     try {
-      await createBatch(this.dependencies.launcher, experiment, specsOf(experiment, 1), source);
+      await createBatch(
+        this.dependencies.launcher,
+        this.dependencies.states,
+        experiment,
+        specsOf(experiment, 1),
+        source,
+      );
       this.dependencies.store.save(experiment);
     } catch (error) {
       experiment.stopped = 'creation_failed';
@@ -240,17 +234,28 @@ export class RunProbes {
   /** Creates the next repetition of every stored experiment whose last one has settled. */
   async advance(): Promise<void> {
     if (this.dependencies.engine.stopping) return;
-    this.loadActive();
+    this.restore();
     for (const experiment of [...this.active.values()]) await this.advanceOne(experiment);
   }
 
-  /** Reads the unfinished experiments once: after a restart the runner takes them over. */
-  private loadActive(): void {
+  /**
+   * The experiments and the reservations of an older daemon, once, before any new request: after
+   * a restart the runner takes them over, and the first admission must see the places they took.
+   */
+  restore(): void {
     if (this.loaded) return;
     this.loaded = true;
-    for (const experiment of this.dependencies.store.list()) {
+    const experiments = this.dependencies.store.list();
+    for (const experiment of experiments) {
       if (isActive(experiment)) this.active.set(experiment.id, experiment);
     }
+    // The plans admitted before count as admitted: the reservations are written again by their
+    // ids, so a restart neither widens the budget nor re-checks an old experiment.
+    restoreActive(
+      this.dependencies.admissions,
+      { experiments, probeRuns: this.dependencies.probeRuns() },
+      (ids) => this.dependencies.stats.markProbes(ids),
+    );
   }
 
   /** One experiment: wait for the last repetition, check the budget, create the next one. */
@@ -284,6 +289,7 @@ export class RunProbes {
     try {
       await createBatch(
         this.dependencies.launcher,
+        this.dependencies.states,
         experiment,
         specsOf(experiment, last + 1),
         source,

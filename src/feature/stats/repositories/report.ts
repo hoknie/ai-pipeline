@@ -22,7 +22,8 @@ export interface Scope {
 const CHUNK = 400;
 
 function where(scope: Scope): { sql: string; values: (string | number)[] } {
-  const clauses: string[] = [];
+  // The records of the probes never enter the report: filtered here, before every aggregation.
+  const clauses: string[] = ['is_probe = 0'];
   const values: (string | number)[] = [];
   if (scope.since !== undefined) {
     clauses.push('finished_at >= ?');
@@ -54,7 +55,7 @@ function where(scope: Scope): { sql: string; values: (string | number)[] } {
 }
 
 const ATTEMPT_COLUMNS = `run_id, group_slug, seq, kind, repository, pipeline, step_id, specialist, runtime,
-  model, status, reason, started_at, finished_at, duration_ms, input_tokens, output_tokens, author`;
+  model, status, reason, started_at, finished_at, duration_ms, input_tokens, output_tokens, author, is_probe`;
 
 function attemptOf(row: Row): AttemptRecord {
   return {
@@ -76,6 +77,7 @@ function attemptOf(row: Row): AttemptRecord {
     inputTokens: Number(row.input_tokens),
     outputTokens: Number(row.output_tokens),
     author: row.author === null ? null : String(row.author),
+    isProbe: Number(row.is_probe) !== 0,
   };
 }
 
@@ -89,6 +91,7 @@ function taskOf(row: Row): TaskRecord {
     wallMs: Number(row.wall_ms),
     outcome: String(row.outcome) as TaskOutcome,
     author: row.author === null ? null : String(row.author),
+    isProbe: Number(row.is_probe) !== 0,
   };
 }
 
@@ -116,7 +119,7 @@ export class StatsReportRepository {
     const { sql, values } = where(scope);
     return this.database
       .prepare(
-        `SELECT run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome, author
+        `SELECT run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome, author, is_probe
          FROM stats_runs${sql} ORDER BY finished_at, run_id`,
       )
       .all(...values)

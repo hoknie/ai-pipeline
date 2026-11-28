@@ -7,11 +7,19 @@ import type {
   RunState,
 } from '../../../src/feature/runs/types/index.ts';
 import {
+  MIN_DECIDING_PAIRS,
+  PROBE_LIMITS,
+  admissionProblem,
   compareExperiment,
+  inWindow,
   isSignificant,
+  limitsProblem,
   observeRun,
   planProbes,
   probeId,
+  probeInputKeys,
+  probeKey,
+  probeRootOf,
   scoreOf,
   signTestP,
   sourceSkip,
@@ -66,6 +74,7 @@ function observation(
     verdicts: { done: clean ? 1 : 0, rejected: clean ? 0 : 1, needs_human: 0 },
     tokens: 10,
     error: null,
+    input: { context: 'same', config: candidate },
     ...extra,
   };
 }
@@ -505,5 +514,180 @@ describe('the comparison of the probes', () => {
   it('keeps the experiment id free of the ids of runs', () => {
     expect(probeId(0, 0)).toMatch(/^pr[0-9a-z]{12}$/);
     expect(probeId(1, 2)).not.toBe(probeId(1, 3));
+  });
+});
+
+describe('the limits of the probe budget', () => {
+  it('accepts the shipped limits and refuses broken ones by name', () => {
+    expect(limitsProblem(PROBE_LIMITS)).toBeNull();
+    expect(limitsProblem({ taskRunsMax: 0, windowRunsMax: 24, windowMs: 1000 })).toContain(
+      'taskRunsMax',
+    );
+    expect(limitsProblem({ taskRunsMax: 12, windowRunsMax: 12.5, windowMs: 1000 })).toContain(
+      'windowRunsMax',
+    );
+    expect(limitsProblem({ taskRunsMax: 12, windowRunsMax: 24, windowMs: 0 })).toContain(
+      'windowMs',
+    );
+    expect(limitsProblem({ taskRunsMax: 30, windowRunsMax: 24, windowMs: 1000 })).toContain(
+      'windowRunsMax',
+    );
+    expect(limitsProblem({ taskRunsMax: 10, windowRunsMax: 24, windowMs: 1000 })).toContain(
+      `at least ${2 * MIN_DECIDING_PAIRS}`,
+    );
+    // NaN and a whole number above the safe range are integers to nobody: both refused.
+    expect(limitsProblem({ taskRunsMax: NaN, windowRunsMax: 24, windowMs: 1000 })).toContain(
+      'taskRunsMax',
+    );
+    expect(
+      limitsProblem({
+        taskRunsMax: 12,
+        windowRunsMax: Number.MAX_SAFE_INTEGER + 1,
+        windowMs: 1000,
+      }),
+    ).toContain('windowRunsMax');
+  });
+
+  it('names the task first when both limits are gone, and the numbers of the refusal', () => {
+    expect(admissionProblem(11, 0, 2, PROBE_LIMITS)).toBe(
+      'the probe budget of the task is exhausted: limit 12, used 11, requested 2',
+    );
+    expect(admissionProblem(5, 24, 1, PROBE_LIMITS)).toBe(
+      'the probe budget of the 24h window is exhausted: limit 24, used 24, requested 1',
+    );
+    expect(admissionProblem(12, 24, 1, PROBE_LIMITS)).toContain('of the task');
+    expect(admissionProblem(10, 20, 2, PROBE_LIMITS)).toBeNull();
+    // Reaching a limit exactly is the last admission, not a violation.
+    expect(admissionProblem(11, 23, 1, PROBE_LIMITS)).toBeNull();
+  });
+
+  it('counts the window as the day before the moment, not counting the earlier edge', () => {
+    expect(inWindow(0, 1000, 1000)).toBe(false);
+    expect(inWindow(1, 1000, 1000)).toBe(true);
+    expect(inWindow(1000, 1000, 1000)).toBe(true);
+    expect(inWindow(1001, 1000, 1000)).toBe(false);
+  });
+});
+
+describe('the root of a chain of probes', () => {
+  const lookupOf = (parents: Record<string, string | null>) => (id: string) =>
+    parents[id] === undefined ? undefined : { probeOf: parents[id] as string | null };
+
+  it('walks a probe of a probe back to the main run', () => {
+    const lookup = lookupOf({ p2: 'p1', p1: 'main', main: null });
+    expect(probeRootOf(lookup, 'p2')).toBe('main');
+    expect(probeRootOf(lookup, 'main')).toBe('main');
+  });
+
+  it('names a run whose parent is gone as the key of the places of its probes', () => {
+    const lookup = lookupOf({ p2: 'p1' });
+    expect(probeRootOf(lookup, 'p2')).toBe('p1');
+    expect(probeRootOf(lookupOf({}), 'gone')).toBe('gone');
+  });
+
+  it('stops at a cycle instead of walking it forever', () => {
+    // a names b and b names a: the walk stops where the cycle closes, deterministic either way.
+    expect(probeRootOf(lookupOf({ a: 'b', b: 'a' }), 'a')).toBe('b');
+    expect(probeRootOf(lookupOf({ a: 'b', b: 'a' }), 'b')).toBe('a');
+  });
+});
+
+describe('the keys of the input of a probe', () => {
+  it('gives the same key to the same value and different keys to different values', () => {
+    expect(probeKey({ a: 1 })).toBe(probeKey({ a: 1 }));
+    expect(probeKey({ a: 1 })).not.toBe(probeKey({ a: 2 }));
+  });
+
+  it('repeats the keys of the same input and separates the variant from the context', () => {
+    const left = probeInputKeys(run(1, { id: 'left' }));
+    const right = run(1, { id: 'right' });
+    expect(probeInputKeys(right)).toEqual(left);
+    right.run.baseCommit = 'other';
+    expect(probeInputKeys(right).context).not.toBe(left.context);
+    right.run.baseCommit = 'abc';
+    right.run.variant = 'lean';
+    expect(probeInputKeys(right).config).not.toBe(left.config);
+    expect(probeInputKeys(right).context).toBe(left.context);
+  });
+});
+
+describe('the input of a pair of probes', () => {
+  it('votes only when every finished probe repeats one context and each variant one configuration', () => {
+    const observations = [...cleanPair('default', 6, false), ...cleanPair('strong', 6, true)];
+    expect(versusOf('strong', 'default', observations, 6)).toMatchObject({
+      pairs: 6,
+      wins: 6,
+      losses: 0,
+      sameInput: true,
+    });
+  });
+
+  it('decides no pair and says so when the contexts differ', () => {
+    const observations = [...cleanPair('default', 6, false), ...cleanPair('strong', 6, true)];
+    observations[6] = { ...observations[6]!, input: { context: 'other', config: 'strong' } };
+    expect(versusOf('strong', 'default', observations, 6)).toMatchObject({
+      pairs: 0,
+      wins: 0,
+      losses: 0,
+      sameInput: false,
+    });
+    const comparison = compareExperiment(experiment(), observations);
+    expect(comparison.winner).toBeNull();
+    expect(comparison.reason).toContain(
+      'the probes of `strong` repeat different inputs and decided no pair',
+    );
+  });
+
+  it('decides no pair when a repetition of one variant changed the configuration', () => {
+    const observations = [...cleanPair('default', 6, true), ...cleanPair('strong', 6, false)];
+    observations[7] = {
+      ...observations[7]!,
+      input: { context: 'same', config: 'strong-edited' },
+    };
+    const versus = versusOf('strong', 'default', observations, 6);
+    expect(versus).toMatchObject({ pairs: 0, sameInput: false });
+    expect(signTestP(versus.wins, versus.losses)).toBe(1);
+  });
+
+  it('lets one probe, one pair and a 4:2 majority stay noise, and lets 6:0 speak', () => {
+    // A lone probe has nobody to pair with.
+    expect(versusOf('strong', 'default', cleanPair('strong', 1, true), 1)).toMatchObject({
+      pairs: 0,
+      wins: 0,
+      significant: false,
+    });
+    // One decided pair in favour of the candidate is a description, not a signal.
+    expect(
+      versusOf(
+        'strong',
+        'default',
+        [...cleanPair('default', 1, false), ...cleanPair('strong', 1, true)],
+        1,
+      ),
+    ).toMatchObject({ pairs: 1, wins: 1, losses: 0, significant: false });
+    // Four wins against two losses is a bare majority: p = 0.6875 decides nothing.
+    const majority = [
+      ...cleanPair('default', 4, false),
+      observation('default', 5, true),
+      observation('default', 6, true),
+      ...cleanPair('strong', 4, true),
+      observation('strong', 5, false),
+      observation('strong', 6, false),
+    ];
+    expect(versusOf('strong', 'default', majority, 6)).toMatchObject({
+      pairs: 6,
+      wins: 4,
+      losses: 2,
+      significant: false,
+    });
+    // Six wins without a loss reach the level: p = 1/32.
+    const sweep = versusOf(
+      'strong',
+      'default',
+      [...cleanPair('default', 6, false), ...cleanPair('strong', 6, true)],
+      6,
+    );
+    expect(sweep).toMatchObject({ pairs: 6, wins: 6, losses: 0, significant: true });
+    expect(signTestP(6, 0)).toBe(1 / 32);
   });
 });

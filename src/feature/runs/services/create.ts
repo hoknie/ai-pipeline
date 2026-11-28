@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 
+import { invalid } from '../../../platform/errors/index.ts';
 import type { Database } from '../../../platform/sqlite/index.ts';
 import type { AgentsService } from '../../agents/services/index.ts';
 import type { NetworkMonitor } from '../../network/services/index.ts';
@@ -27,6 +28,7 @@ import {
   FinishedRunRepository,
   LessonStorage,
   LessonsRepository,
+  ProbeAdmissionRepository,
   ProbeFiles,
   RunRepository,
 } from '../repositories/index.ts';
@@ -34,6 +36,7 @@ import {
 import { RunArchive } from './archive.ts';
 import { probeCheck } from './probes/check.ts';
 import { RunProbes } from './probes/service.ts';
+import type { ProbeAdmissions } from './probes/admission.ts';
 import type { EffectTimings } from './effects/context.ts';
 import { RunEffects } from './effects/effects.ts';
 import { RunCleanup } from './cleanup/index.ts';
@@ -43,6 +46,7 @@ import { RunReads } from './reads.ts';
 import { RunRequests } from './requests.ts';
 import { RunStates } from './states.ts';
 import { RunAttemptHistoryService } from './attempt-history.ts';
+import { limitsProblem, PROBE_LIMITS } from '../types/index.ts';
 
 export interface RunsDependencies {
   database: Database;
@@ -89,6 +93,9 @@ export interface RunsServices {
 
 export function createRunsServices(dependencies: RunsDependencies): RunsServices {
   const { database, now, timings } = dependencies;
+  // A broken constant of the probe budget stops the daemon here, before any repository reads it.
+  const limitsProblemText = limitsProblem(PROBE_LIMITS);
+  if (limitsProblemText !== null) throw invalid('probe.budget', limitsProblemText);
   const runs = new RunRepository(database);
   const states = new RunStates({
     database,
@@ -125,7 +132,11 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
   const effects = new RunEffects({ ...dependencies, lessons, context: engine });
   engine.attach(effects);
   const { registry, config, agents } = dependencies;
-  const requests = new RunRequests({ states, engine, effects, registry, config, now });
+  const admissions: ProbeAdmissions = {
+    repository: new ProbeAdmissionRepository(database, PROBE_LIMITS),
+    states,
+  };
+  const requests = new RunRequests({ states, engine, effects, registry, config, now, admissions });
   const probes = new RunProbes({
     states,
     launcher: requests,
@@ -135,6 +146,8 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
     engine,
     now,
     stats: dependencies.stats,
+    admissions,
+    probeRuns: () => runs.probes(),
   });
   engine.attachProbes(probes);
   return {

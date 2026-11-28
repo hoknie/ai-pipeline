@@ -9,7 +9,7 @@ import {
 import { TASK_LINKS_MIGRATION } from './links-migration.ts';
 import { AUTHORSHIP_MIGRATION } from './authorship-migration.ts';
 import { SAML_MIGRATION } from './saml-migration.ts';
-import { STATS_AUTHOR_MIGRATION } from './stats-migration.ts';
+import { STATS_AUTHOR_MIGRATION, STATS_PROBE_MIGRATION } from './stats-migration.ts';
 import { SSO_MIGRATION } from './sso-migration.ts';
 
 export { STATS_MIGRATION } from './stats-migration.ts';
@@ -82,4 +82,12 @@ export const LATER_MIGRATIONS: string[] = [
    ALTER TABLE runs ADD COLUMN delivery_branch_json TEXT;
    ALTER TABLE runs ADD COLUMN source_commit TEXT;
    ALTER TABLE runs ADD COLUMN source_branch TEXT;`,
+  // the places of the probe budget a plan or a single probe has taken; the row is the reservation
+  `CREATE TABLE probe_admissions (
+    id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL,
+    admitted_at INTEGER NOT NULL,
+    runs INTEGER NOT NULL
+  )`,
+  STATS_PROBE_MIGRATION,
 ];

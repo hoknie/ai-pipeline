@@ -1,13 +1,40 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { createApplication, startDaemon, type RunningDaemon } from '../../src/app/index.ts';
 import { RunRepository } from '../../src/feature/runs/repositories/index.ts';
+import { ProbeAdmissionRepository } from '../../src/feature/runs/repositories/index.ts';
+import { PROBE_LIMITS } from '../../src/feature/runs/types/index.ts';
 import type { Attempt } from '../../src/feature/runs/types/index.ts';
-import type { RunCreated, RunView } from '../../src/presentation/ipc/contract/index.ts';
+import type { ProbeView, RunCreated, RunView } from '../../src/presentation/ipc/contract/index.ts';
+import { request } from '../../src/presentation/ipc/client/index.ts';
+import { socketPath } from '../../src/platform/paths/index.ts';
 import { run as seedRun } from '../feature/runs/helpers.ts';
-import { git, harness, settle, startRun, until, type Harness } from './harness.ts';
+import { TEST_TIMINGS, git, harness, settle, startRun, until, type Harness } from './harness.ts';
+
+/** A pipeline with two variants of the code step: the candidates of a contrast experiment. */
+const VARIANTS_CONFIG = `swarm:
+  max: 3
+  specialists:
+    coder: { name: Coder }
+    reviewer: { name: Reviewer, permissions: read }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }
+      variants:
+        base:
+          name: Base
+          steps:
+            code: { model: sonnet }
+        strong:
+          name: Strong
+          steps:
+            code: { model: opus }
+`;
 
 let current: Harness | null = null;
 
@@ -285,5 +312,287 @@ describe('probes of another harness', () => {
     expect(existsSync(join(h.repo, 'probe-two.txt'))).toBe(false);
     for (const id of probes)
       expect((await h.status(id)).deliveryStage).toEqual({ status: 'pending' });
+  }, 60_000);
+
+  it('takes the places of the task by the shared key and refuses both exhausted areas', async () => {
+    const h = await harness(VARIANTS_CONFIG);
+    current = h;
+    h.script({
+      'code@Login@default': [{ write: { 'source.ts': 'source\n' } }],
+      'code@Login@sonnet': [{ write: { 'probe-base.ts': 'base\n' } }],
+      'code@Login@opus': [{ write: { 'probe-strong.ts': 'strong\n' } }],
+    });
+    const source = await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Login', task: 'budget' }],
+      autoDeliver: false,
+    });
+    await h.waitFor(source.runId, (view) => view.finished);
+
+    // The plan of the experiment takes its places first: two candidates of one repetition.
+    const contrast = (await h.call('run_contrast', {
+      runId: source.runId,
+      candidates: ['base', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    })) as ProbeView;
+    await Promise.all(
+      contrast.experiment.runs.map((run) => h.waitFor(run.runId, (view) => view.finished)),
+    );
+
+    const db = h.running.application.database;
+    const rows = () =>
+      db
+        .prepare('SELECT id, root_run_id AS root, runs FROM probe_admissions ORDER BY id')
+        .all() as { id: string; root: string; runs: number }[];
+    // The plan and a single probe share the key of the source task: the source run itself.
+    expect(rows()).toEqual([{ id: contrast.experiment.id, root: source.runId, runs: 2 }]);
+    await until('the experiment to settle', async () => {
+      const shown = (await h.call('contrast_show', { id: contrast.experiment.id })) as ProbeView;
+      return shown.status === 'ready';
+    });
+    const experimentBefore = (await h.call('contrast_show', {
+      id: contrast.experiment.id,
+    })) as ProbeView;
+    const admissions = new ProbeAdmissionRepository(db, PROBE_LIMITS);
+    const fillers = (prefix: string, count: number, runs: number, root?: string) => {
+      for (let index = 0; index < count; index += 1) {
+        admissions.restore({
+          id: `${prefix}-${index}`,
+          rootRunId: root ?? `other-${prefix}`,
+          runs,
+          now: Date.now(),
+        });
+      }
+    };
+    const snapshot = () => ({
+      refs: git(h.repo, 'for-each-ref', '--format=%(refname)', 'refs/aip/').split('\n').sort(),
+      admissions: rows(),
+      runs: (db.prepare('SELECT COUNT(*) AS n FROM runs').get() as { n: number }).n,
+      queue: (db.prepare('SELECT COUNT(*) AS n FROM queue_items').get() as { n: number }).n,
+    });
+
+    // The window of 24 hours holds 24 places: 2 of the experiment and 24 of other tasks.
+    fillers('window', 2, 12);
+    const filled = snapshot();
+    await expect(h.call('run_probe', { runId: source.runId })).rejects.toThrow(
+      'the probe budget of the 24h window is exhausted: limit 24, used 26, requested 1',
+    );
+    expect(snapshot()).toEqual(filled);
+    db.prepare("DELETE FROM probe_admissions WHERE id LIKE 'window-%'").run();
+
+    // The task itself has spent its 12 places: the refusal writes nothing again.
+    fillers('task', 10, 1, source.runId);
+    const taskFilled = snapshot();
+    await expect(h.call('run_probe', { runId: source.runId })).rejects.toThrow(
+      'the probe budget of the task is exhausted: limit 12, used 12, requested 1',
+    );
+    expect(snapshot()).toEqual(taskFilled);
+    db.prepare("DELETE FROM probe_admissions WHERE id LIKE 'task-%'").run();
+
+    // With the places free the probe is admitted: one more place of the same task.
+    const free = snapshot();
+    const admitted = (await h.call('run_probe', { runId: source.runId })) as RunCreated;
+    expect(admitted.probeOf).toBe(source.runId);
+    await h.waitFor(admitted.runId, (view) => view.finished);
+    const after = snapshot();
+    const added = after.refs.filter((ref) => !free.refs.includes(ref));
+    expect(added.sort()).toEqual([
+      `refs/aip/${admitted.runId}/groups/login`,
+      `refs/aip/${admitted.runId}/run`,
+    ]);
+    expect(after.runs).toBe(free.runs + 1);
+    expect(after.queue).toBe(free.queue);
+    const mine = after.admissions.filter((row) => row.root === source.runId);
+    expect(mine).toHaveLength(2);
+    expect(new Set(mine.map((row) => row.id))).toEqual(
+      new Set([contrast.experiment.id, admitted.runId]),
+    );
+    expect(mine.map((row) => row.runs).sort()).toEqual([1, 2]);
+
+    // The stored experiment survived the refusals untouched.
+    const experimentAfter = (await h.call('contrast_show', {
+      id: contrast.experiment.id,
+    })) as ProbeView;
+    expect(experimentAfter.experiment).toEqual(experimentBefore.experiment);
+  }, 60_000);
+
+  it('refuses a contrast experiment over the budget and leaves nothing behind', async () => {
+    const h = await harness(VARIANTS_CONFIG);
+    current = h;
+    h.script({ 'code@Login@base': [{ write: { 'source.ts': 'source\n' } }] });
+    const source = await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Login', task: 'budget' }],
+      autoDeliver: false,
+    });
+    await h.waitFor(source.runId, (view) => view.finished);
+
+    const db = h.running.application.database;
+    const admissions = new ProbeAdmissionRepository(db, PROBE_LIMITS);
+    const rows = () =>
+      db
+        .prepare('SELECT id, root_run_id AS root, runs FROM probe_admissions ORDER BY id')
+        .all() as { id: string; root: string; runs: number }[];
+    const probeFiles = (): string[] => {
+      try {
+        return readdirSync(join(h.state, 'probes')).sort();
+      } catch {
+        return [];
+      }
+    };
+    const snapshot = () => ({
+      refs: git(h.repo, 'for-each-ref', '--format=%(refname)', 'refs/aip/').split('\n').sort(),
+      runs: (db.prepare('SELECT COUNT(*) AS n FROM runs').get() as { n: number }).n,
+      queue: (db.prepare('SELECT COUNT(*) AS n FROM queue_items').get() as { n: number }).n,
+      admissions: rows(),
+      probes: probeFiles(),
+    });
+
+    // The task has eleven of its twelve places taken: a plan of two does not fit.
+    for (let index = 0; index < 11; index += 1) {
+      admissions.restore({
+        id: `earlier-${index}`,
+        rootRunId: source.runId,
+        runs: 1,
+        now: Date.now(),
+      });
+    }
+    const filled = snapshot();
+    await expect(
+      h.call('run_contrast', {
+        runId: source.runId,
+        candidates: ['base', 'strong'],
+        repetitions: 1,
+        maxRuns: 2,
+      }),
+    ).rejects.toThrow('the probe budget of the task is exhausted: limit 12, used 11, requested 2');
+    expect(snapshot()).toEqual(filled);
+
+    // The task places are free again, but 24 places of other tasks fill the window of 24 hours.
+    db.prepare("DELETE FROM probe_admissions WHERE id LIKE 'earlier-%'").run();
+    for (let index = 0; index < 24; index += 1) {
+      admissions.restore({
+        id: `window-${index}`,
+        rootRunId: `window-${index}`,
+        runs: 1,
+        now: Date.now(),
+      });
+    }
+    const windowFilled = snapshot();
+    await expect(
+      h.call('run_contrast', {
+        runId: source.runId,
+        candidates: ['base', 'strong'],
+        repetitions: 1,
+        maxRuns: 2,
+      }),
+    ).rejects.toThrow(
+      'the probe budget of the 24h window is exhausted: limit 24, used 24, requested 2',
+    );
+    expect(snapshot()).toEqual(windowFilled);
+
+    // Nothing was created by either refusal: no experiment carries a fresh id.
+    await expect(h.call('contrast_show', { id: 'prnone' })).rejects.toThrow(
+      /unknown probe experiment/,
+    );
+  }, 60_000);
+
+  it('restores the plan of an older experiment before the first request of a new daemon', async () => {
+    const h = await harness();
+    current = h;
+    h.script({ code: [{ write: { 'source.txt': 'source\n' } }] });
+    const source = await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'budget',
+      autoDeliver: false,
+    });
+    await h.waitFor(source.runId, (view) => view.finished);
+    const socket = h.running.application.socket;
+    const { environment, repo, state } = h;
+    await h.close();
+    current = null;
+
+    // The upgrade adds the table of admissions: it knows none of the places the plans before it
+    // took. The store keeps such a plan, an experiment of twelve runs with none created yet.
+    mkdirSync(join(state, 'probes'), { recursive: true });
+    writeFileSync(
+      join(state, 'probes', 'oldplan.json'),
+      JSON.stringify({
+        id: 'oldplan',
+        repository: repo,
+        sourceRun: source.runId,
+        sourceGroup: source.groups[0]!.slug,
+        groupTitle: source.groups[0]!.title,
+        split: false,
+        pipeline: 'feature',
+        task: 'budget',
+        baseCommit: 'base',
+        provider: null,
+        skip: [],
+        candidates: ['default', 'strong'],
+        repetitions: 6,
+        budget: { maxRuns: 12, maxTokens: null },
+        planned: 12,
+        stopped: null,
+        stopReason: null,
+        runs: [],
+        createdAt: Date.now(),
+        proposalPath: null,
+      }),
+    );
+
+    // The restore is the first synchronous step of the start: the table of admissions already
+    // holds the plan before the start waits for anything, so no request the socket serves can
+    // be admitted ahead of the places the plan took.
+    const application = createApplication({
+      stateDirectory: state,
+      entry: [process.execPath, join(import.meta.dirname, '..', '..', 'src', 'cli', 'main.ts')],
+      environment,
+      timings: TEST_TIMINGS,
+    });
+    const starting = application.start();
+    try {
+      const restored = application.database
+        .prepare('SELECT id, root_run_id AS root, runs FROM probe_admissions')
+        .get() as { id: string; root: string; runs: number } | undefined;
+      expect(restored).toEqual({ id: 'oldplan', root: source.runId, runs: 12 });
+      await starting;
+    } finally {
+      await application.stop();
+    }
+
+    // The daemon is asked while it is still starting: the socket exists from the listen on, and
+    // the request below is written the moment it does, so the daemon handles it while its start
+    // block still runs. The refusal must not wait for the end of the start, or the first probe
+    // would slip past the budget of its task.
+    const pendingDaemon = startDaemon({
+      stateDirectory: state,
+      entry: [process.execPath, join(import.meta.dirname, '..', '..', 'src', 'cli', 'main.ts')],
+      environment,
+      timings: TEST_TIMINGS,
+    });
+    let daemon: RunningDaemon | null = null;
+    try {
+      const deadline = Date.now() + 10_000;
+      while (!existsSync(socket)) {
+        if (Date.now() > deadline) throw new Error('timed out waiting for the socket to appear');
+      }
+      await expect(request(socket, 'run_probe', { runId: source.runId })).rejects.toThrow(
+        'the probe budget of the task is exhausted: limit 12, used 12, requested 1',
+      );
+      daemon = await pendingDaemon;
+      const admissions = daemon.application.database
+        .prepare('SELECT id, root_run_id AS root, runs FROM probe_admissions')
+        .all() as { id: string; root: string; runs: number }[];
+      expect(admissions).toEqual([{ id: 'oldplan', root: source.runId, runs: 12 }]);
+      expect(daemon.application.services.runs.states.lookup(source.runId)).toBeDefined();
+    } finally {
+      daemon ??= await pendingDaemon;
+      await daemon.close();
+    }
   }, 60_000);
 });

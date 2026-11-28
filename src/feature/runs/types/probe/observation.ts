@@ -1,5 +1,6 @@
 import type { Usage } from '../../../agents/types/index.ts';
 import { allGroups, isRunFinished, type RunState } from '../run.ts';
+import { probeInputKeys } from './probe.ts';
 import type { ProbeCheckResult, ProbeObservation, ProbeRun } from './experiment.ts';
 
 /** Tokens every attempt of a run has used so far, live attempts included. */
@@ -54,6 +55,7 @@ export function observeRun(
     verdicts: { done: 0, rejected: 0, needs_human: 0 },
     tokens: 0,
     error,
+    input: null,
   };
   if (state === null || !isRunFinished(state)) return empty;
   const groups = state.groups.length;
@@ -69,5 +71,6 @@ export function observeRun(
     clean,
     ...countsOf(state),
     tokens: probeTokens(state),
+    input: probeInputKeys(state),
   };
 }

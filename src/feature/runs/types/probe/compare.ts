@@ -67,6 +67,16 @@ function pairOutcome(
   return candidate.clean ? 'win' : 'loss';
 }
 
+/** Whether every finished probe of the list repeats one value of the key. */
+function repeatsOne(observations: ProbeObservation[], key: 'context' | 'config'): boolean {
+  const seen = new Set(
+    observations
+      .filter((observation) => observation.finished)
+      .map((observation) => observation.input?.[key] ?? ''),
+  );
+  return seen.size <= 1;
+}
+
 /** Compares a candidate with the baseline repetition by repetition: one bit per pair. */
 export function versusOf(
   candidate: string,
@@ -74,18 +84,20 @@ export function versusOf(
   observations: ProbeObservation[],
   repetitions: number,
 ): ProbeVersus {
+  const own = observations.filter((observation) => observation.candidate === candidate);
+  const base = observations.filter((observation) => observation.candidate === baseline);
+  // A pair votes only when every finished probe repeats one context and each variant repeats one
+  // configuration; otherwise the repetitions are not comparable and decide nothing.
+  const sameInput =
+    repeatsOne(observations, 'context') && repeatsOne(own, 'config') && repeatsOne(base, 'config');
   let pairs = 0;
   let wins = 0;
   let losses = 0;
   let ties = 0;
   for (let repetition = 1; repetition <= repetitions; repetition += 1) {
-    const own = observations.find(
-      (observation) => observation.candidate === candidate && observation.repetition === repetition,
-    );
-    const base = observations.find(
-      (observation) => observation.candidate === baseline && observation.repetition === repetition,
-    );
-    const outcome = pairOutcome(own, base);
+    const ownPair = own.find((observation) => observation.repetition === repetition);
+    const basePair = base.find((observation) => observation.repetition === repetition);
+    const outcome = sameInput ? pairOutcome(ownPair, basePair) : null;
     if (outcome === null) continue;
     pairs += 1;
     if (outcome === 'win') wins += 1;
@@ -101,6 +113,7 @@ export function versusOf(
     ties,
     pValue: signTestP(wins, losses),
     significant: isSignificant(wins, losses),
+    sameInput,
   };
 }
 
@@ -128,6 +141,12 @@ function decide(
     errors === 0
       ? ''
       : `; ${errors} probe(s) could not be checked and decided no pair${errors === 1 ? '' : 's'}`;
+  const mixed = versus
+    .filter((entry) => !entry.sameInput)
+    .map((entry) => `\`${entry.candidate}\``)
+    .join(', ');
+  const differentInputs =
+    mixed === '' ? '' : `; the probes of ${mixed} repeat different inputs and decided no pair`;
   const better = versus.filter((entry) => entry.significant && entry.wins > entry.losses);
   if (better.length > 0) {
     const winner = bestOf(
@@ -137,14 +156,14 @@ function decide(
     );
     return {
       winner,
-      reason: `variant \`${winner}\` would apply cleanly more often than \`${baseline}\`${unchecked}`,
+      reason: `variant \`${winner}\` would apply cleanly more often than \`${baseline}\`${unchecked}${differentInputs}`,
     };
   }
   const worse = versus.filter((entry) => entry.significant && entry.losses > entry.wins);
   if (versus.length > 0 && worse.length === versus.length) {
     return {
       winner: baseline,
-      reason: `every candidate is significantly worse than the baseline \`${baseline}\`${unchecked}`,
+      reason: `every candidate is significantly worse than the baseline \`${baseline}\`${unchecked}${differentInputs}`,
     };
   }
   return {
@@ -154,7 +173,9 @@ function decide(
         ? 'there is no candidate to compare with the baseline'
         : `no significant difference: ${versus
             .map((entry) => `\`${entry.candidate}\` p=${entry.pValue.toFixed(3)}`)
-            .join(', ')}${unchecked}; the budget allows at most ${experiment.budget.maxRuns} runs`,
+            .join(
+              ', ',
+            )}${unchecked}${differentInputs}; the budget allows at most ${experiment.budget.maxRuns} runs`,
   };
 }
 

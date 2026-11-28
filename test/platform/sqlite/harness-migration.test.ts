@@ -20,8 +20,8 @@ describe('migration that adds the harness of a run', () => {
   it('reads a run of an older database as a full main run and keeps the harness of a probe', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'aip-harness-')), 'aip.db');
     const old = new DatabaseSync(path);
-    MIGRATIONS.slice(0, -2).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    MIGRATIONS.slice(0, -4).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     expect(columns(old)).not.toContain('harness');
     expect(columns(old)).not.toContain('probe_of');
     old

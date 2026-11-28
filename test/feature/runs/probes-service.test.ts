@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { Database } from '../../../src/platform/sqlite/index.ts';
 import { RunProbes } from '../../../src/feature/runs/services/index.ts';
+import { ProbeAdmissionRepository } from '../../../src/feature/runs/repositories/index.ts';
 import {
   MIN_DECIDING_PAIRS,
+  PROBE_LIMITS,
   type ProbeCheck,
   type ProbeExperiment,
   type ProbeLauncher,
@@ -148,6 +151,15 @@ function setup(launcherOptions: LauncherOptions = {}, check?: ProbeCheck, stats?
       applied: state.run.id.includes('strong'),
       conflicts: [],
     }));
+  const database = new Database(':memory:');
+  const admissions = {
+    repository: new ProbeAdmissionRepository(database, PROBE_LIMITS),
+    states,
+  };
+  const rows = () =>
+    database
+      .prepare('SELECT id, root_run_id AS root, runs FROM probe_admissions ORDER BY id')
+      .all() as { id: string; root: string; runs: number }[];
   const probes = new RunProbes({
     states,
     launcher,
@@ -156,9 +168,20 @@ function setup(launcherOptions: LauncherOptions = {}, check?: ProbeCheck, stats?
     check: probeCheck,
     engine,
     now: () => 1000,
-    stats: stats ?? { capture: async () => {}, read: () => ({ attempts: [], wallMs: null }) },
+    stats: stats ?? fakeStats(),
+    admissions,
+    probeRuns: () => [],
   });
-  return { store, states, launcher, probes, engine };
+  return { store, states, launcher, probes, engine, admissions, rows };
+}
+
+function fakeStats(overrides: Partial<RunStatsPort> = {}): RunStatsPort {
+  return {
+    capture: async () => {},
+    read: () => ({ attempts: [], wallMs: null }),
+    markProbes: () => {},
+    ...overrides,
+  };
 }
 
 function finishProbes(states: FakeStates, launcher: FakeLauncher): void {
@@ -268,6 +291,64 @@ describe('the probes of a run', () => {
     expect(store.experiments.size).toBe(0);
   });
 
+  it('refuses a batch experiment above the exhausted budget of its task before anything exists', async () => {
+    const { probes, launcher, store, admissions, rows } = setup();
+    // Eleven places of the task are taken by the admissions of earlier requests.
+    admissions.repository.restore({ id: 'earlier', rootRunId: 'source', runs: 11, now: 1000 });
+    await expect(
+      probes.start({
+        runId: 'source',
+        candidates: ['default', 'strong'],
+        repetitions: 1,
+        maxRuns: 2,
+      }),
+    ).rejects.toThrow('the probe budget of the task is exhausted: limit 12, used 11, requested 2');
+    expect(launcher.requests).toHaveLength(0);
+    expect(store.experiments.size).toBe(0);
+    expect(rows()).toEqual([{ id: 'earlier', root: 'source', runs: 11 }]);
+  });
+
+  it('refuses a batch experiment above the budget of the window of 24 hours', async () => {
+    const { probes, launcher, store, admissions, rows } = setup();
+    for (let index = 0; index < 24; index += 1) {
+      admissions.repository.restore({
+        id: `other-${index}`,
+        rootRunId: `other-${index}`,
+        runs: 1,
+        now: 1000,
+      });
+    }
+    await expect(
+      probes.start({
+        runId: 'source',
+        candidates: ['default', 'strong'],
+        repetitions: 1,
+        maxRuns: 2,
+      }),
+    ).rejects.toThrow(
+      'the probe budget of the 24h window is exhausted: limit 24, used 24, requested 2',
+    );
+    expect(launcher.requests).toHaveLength(0);
+    expect(store.experiments.size).toBe(0);
+    expect(rows()).toHaveLength(24);
+  });
+
+  it('refuses a plan wider than the budget of any task, whatever the request asks for', async () => {
+    const { probes, launcher, store, rows } = setup();
+    // Two candidates of seven repetitions are fourteen runs: more than a task ever holds.
+    await expect(
+      probes.start({
+        runId: 'source',
+        candidates: ['default', 'strong'],
+        repetitions: 7,
+        maxRuns: 40,
+      }),
+    ).rejects.toThrow('the probe budget of the task is exhausted: limit 12, used 0, requested 14');
+    expect(launcher.requests).toHaveLength(0);
+    expect(store.experiments.size).toBe(0);
+    expect(rows()).toEqual([]);
+  });
+
   it('refuses a variant the pipeline does not have', async () => {
     const { probes, launcher } = setup();
     await expect(
@@ -330,12 +411,33 @@ describe('the probes of a run', () => {
     expect(view.comparison.winner).toBe('strong');
     expect(view.comparison.versus[0]).toMatchObject({ wins: 6, losses: 0, significant: true });
     expect(view.proposalPath).toBe(`/state/probes/${started.experiment.id}.md`);
+    expect(store.proposals.get(started.experiment.id)).toContain('use variant `strong`');
     expect(store.proposals.get(started.experiment.id)).toContain('probes never apply anything');
     // A second look reuses the written proposal instead of writing it again.
     const again = await probes.show(started.experiment.id);
     expect(again.proposalPath).toBe(view.proposalPath);
     expect(store.proposals.size).toBe(1);
     expect(store.proposalWrites).toBe(1);
+  });
+
+  it('offers no change when a single pair favors the candidate', async () => {
+    const { probes, launcher, store, states } = setup();
+    const started = await probes.start({
+      runId: 'source',
+      candidates: ['default', 'strong'],
+      repetitions: 1,
+      maxRuns: 2,
+    });
+    finishProbes(states, launcher);
+    const view = await probes.show(started.experiment.id);
+    expect(view.status).toBe('ready');
+    expect(view.comparison.winner).toBeNull();
+    expect(view.comparison.versus[0]).toMatchObject({ pairs: 1, wins: 1, significant: false });
+    const markdown = store.proposals.get(started.experiment.id)!;
+    expect(markdown).toContain('no change');
+    expect(markdown).not.toContain('use variant');
+    // The proposal never claims that anything was delivered or applied.
+    expect(markdown).toContain('probes never apply anything');
   });
 
   it('publishes only once when two views check the same experiment concurrently', async () => {
@@ -403,6 +505,7 @@ describe('the probes of a run', () => {
           : [],
         wallMs: ready ? 2345 : null,
       }),
+      markProbes: () => {},
     };
     const { probes, launcher, store, states } = setup({}, undefined, stats);
     const started = await probes.start({
@@ -453,6 +556,7 @@ describe('the probes of a run', () => {
         ],
         wallMs: 100,
       }),
+      markProbes: () => {},
     };
     const { probes, launcher, store, states } = setup(
       {},
@@ -503,6 +607,7 @@ describe('the probes of a run', () => {
         ],
         wallMs: 100,
       }),
+      markProbes: () => {},
     };
     const { probes, launcher, store, states } = setup({}, undefined, stats);
     const started = await probes.start({
@@ -544,6 +649,7 @@ describe('the probes of a run', () => {
         })),
         wallMs: 200,
       }),
+      markProbes: () => {},
     };
     const { probes, launcher, store, states } = setup({}, undefined, stats);
     const started = await probes.start({
@@ -585,6 +691,7 @@ describe('the probes of a run', () => {
       read: () => {
         throw new Error('unexpected read');
       },
+      markProbes: () => {},
     };
     const { probes, launcher, store, states } = setup({}, undefined, stats);
     const started = await probes.start({
@@ -804,5 +911,123 @@ describe('the probes of a run', () => {
     expect(markdown).toContain('conflicts unknown');
     expect(markdown).toContain('clean 0/0 (unknown; checked probes only)');
     expect(markdown).not.toMatch(/conflicts 0|clean 0\/0 \(0%|use variant/);
+  });
+});
+
+describe('the reservations of an older daemon', () => {
+  /** The stored experiment of a daemon before this change, with its first repetition created. */
+  function olderWorld() {
+    const database = new Database(':memory:');
+    const rows = () =>
+      database
+        .prepare(
+          'SELECT id, root_run_id AS root, runs, admitted_at AS at FROM probe_admissions ORDER BY id',
+        )
+        .all() as { id: string; root: string; runs: number; at: number }[];
+    const states = new FakeStates();
+    const source = run(1, {
+      id: 'source',
+      configText: CONFIGURED_TEXT,
+      provider: 'anthropic',
+      attachments: [ATTACHMENT],
+    });
+    source.run.skippedSteps = ['review'];
+    states.states.set('source', source);
+    const members = ['member-default-1', 'member-strong-1'];
+    for (const id of members) {
+      const state = run(1, { id, configText: CONFIGURED_TEXT });
+      const work = group(state);
+      work.status = 'merged';
+      work.mergeCommit = 'merge';
+      states.states.set(id, state);
+    }
+    const store = new MemoryStore();
+    store.save({
+      id: 'old',
+      repository: '/repo',
+      sourceRun: 'source',
+      sourceGroup: 'group-1',
+      groupTitle: 'Group 1',
+      split: false,
+      pipeline: 'feature',
+      task: 'task 1',
+      baseCommit: 'abc',
+      provider: 'anthropic',
+      skip: ['review'],
+      candidates: ['default', 'strong'],
+      repetitions: 2,
+      budget: { maxRuns: 4, maxTokens: null },
+      planned: 4,
+      stopped: null,
+      stopReason: null,
+      runs: [
+        { candidate: 'default', repetition: 1, runId: 'member-default-1' },
+        { candidate: 'strong', repetition: 1, runId: 'member-strong-1' },
+      ],
+      createdAt: 500,
+      proposalPath: null,
+    });
+    return { database, rows, states, store, members };
+  }
+
+  it('restores the reserves and the origin once and continues the old experiment', async () => {
+    const { database, rows, states, store, members } = olderWorld();
+    const launcher = new FakeLauncher(states);
+    const marked: string[][] = [];
+    const stats = fakeStats({ markProbes: (ids) => marked.push([...ids]) });
+    const admissions = {
+      repository: new ProbeAdmissionRepository(database, PROBE_LIMITS),
+      states,
+    };
+    const probeRuns = [{ id: 'lone-probe', probeOf: 'source', createdAt: 700 }];
+    const build = () =>
+      new RunProbes({
+        states,
+        launcher,
+        store,
+        config: { load: () => parse(CONFIGURED_TEXT) } as unknown as ConfigService,
+        check: async () => ({ applied: true, conflicts: [] }),
+        engine: new FakeQueue(),
+        now: () => 1000,
+        stats,
+        admissions,
+        probeRuns: () => probeRuns,
+      });
+
+    // The first start of the new daemon restores the plan of the older store and the lone probe
+    // of the table of runs, and tells the journal which runs belong to probes.
+    await build().advance();
+    expect(rows()).toEqual([
+      { id: 'lone-probe', root: 'source', runs: 1, at: 700 },
+      { id: 'old', root: 'source', runs: 4, at: 500 },
+    ]);
+    expect(marked).toEqual([members]);
+    // The old experiment goes on: the second repetition repeats the configuration of the first
+    // run of its variant and belongs to the source run from the moment of creation.
+    expect(launcher.requests.map((request) => request.title)).toEqual([
+      'probe default 2',
+      'probe strong 2',
+    ]);
+    for (const request of launcher.requests) {
+      expect(request.probeOf).toBe('source');
+      expect(request.config).toEqual(
+        states.lookup(request.title.includes('default') ? members[0]! : members[1]!)!.run.config,
+      );
+    }
+    // The next repetition spends no new places: the plan took them all at admission.
+    expect(rows()).toHaveLength(2);
+
+    // The restart of the daemon writes the same reservations again: no places and no records twice.
+    await build().advance();
+    expect(rows()).toEqual([
+      { id: 'lone-probe', root: 'source', runs: 1, at: 700 },
+      { id: 'old', root: 'source', runs: 4, at: 500 },
+    ]);
+    // The members of the repetition the restart took over are named too; writing it again
+    // changes nothing in the journal.
+    expect(marked[0]).toEqual(members);
+    expect(marked[1]).toEqual([...members, 'probe-default-1', 'probe-strong-2']);
+    expect(launcher.requests).toHaveLength(2);
+    database.close();
   });
 });

@@ -74,6 +74,18 @@ export class RunRepository {
     return Number(row.max);
   }
 
+  /** Every run that is a probe in the table of runs: the restore of the places its admission took. */
+  probes(): { id: string; probeOf: string; createdAt: number }[] {
+    const rows = this.database
+      .prepare('SELECT id, probe_of, created_at FROM runs WHERE probe_of IS NOT NULL')
+      .all() as Row[];
+    return rows.map((row) => ({
+      id: String(row.id),
+      probeOf: String(row.probe_of),
+      createdAt: Number(row.created_at),
+    }));
+  }
+
   /**
    * The id of the main run of the repository with this task number; null when there is none. A
    * probe copies the number of its base, and `#N` names the run the task was started as.

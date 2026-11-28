@@ -32,6 +32,10 @@ export function createLifecycle(
   const skillCachePruner = createSkillCachePruner(services, log);
   return {
     async start() {
+      // Synchronously, before the socket can process a request: the listening socket accepts a
+      // probe before this method reaches its first `await`, and the first admission must see the
+      // places of the plans of an earlier daemon.
+      runs.probes.restore();
       network.start();
       // Operations on secrets a stop cut short are finished before anything can use a connection.
       await integrations.secrets.recover();

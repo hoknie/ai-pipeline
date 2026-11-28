@@ -81,6 +81,21 @@ describe('records of a saved run', () => {
     expect(recordsOf(settle(runWith('r7', []), 'cancelled', 9000)).task?.outcome).toBe('cancelled');
   });
 
+  it('marks the records of a probe run with its origin', () => {
+    const state = settle(runWith('p1', [{ startedAt: 1000, finishedAt: 2000 }]), 'merged', 3000);
+    state.run.probeOf = 'source';
+    const { attempts, task } = recordsOf(state);
+    expect(attempts.map((record) => record.isProbe)).toEqual([true]);
+    expect(task?.isProbe).toBe(true);
+    const named = runWith('p2', [], { createdAt: 777 });
+    named.run.probeOf = 'source';
+    named.run.namingUsage = usage(800, 40);
+    expect(recordsOf(named).attempts[0]).toMatchObject({ kind: 'naming', isProbe: true });
+    const plain = settle(runWith('p3', [{ startedAt: 1000, finishedAt: 2000 }]), 'merged', 3000);
+    expect(recordsOf(plain).attempts.map((record) => record.isProbe)).toEqual([false]);
+    expect(recordsOf(plain).task?.isProbe).toBe(false);
+  });
+
   it('gives a task a new finish when the run finishes again', () => {
     const state = settle(runWith('r8', []), 'failed', 5000);
     const first = recordsOf(state).task;

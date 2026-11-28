@@ -20,8 +20,8 @@ describe('migration that adds the cleanup time of a run', () => {
   it('reads a run of an older database as not cleaned up and keeps a written time', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'aip-cleaned-')), 'aip.db');
     const old = new DatabaseSync(path);
-    MIGRATIONS.slice(0, -4).forEach((sql) => old.exec(sql));
-    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    MIGRATIONS.slice(0, -6).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
     expect(columns(old)).not.toContain('cleaned_at');
     old
       .prepare(

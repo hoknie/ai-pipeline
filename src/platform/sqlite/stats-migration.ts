@@ -48,3 +48,9 @@ export const STATS_AUTHOR_MIGRATION = `
   CREATE INDEX IF NOT EXISTS stats_attempts_by_author ON stats_attempts (author, finished_at);
   CREATE INDEX IF NOT EXISTS stats_runs_by_author ON stats_runs (author, finished_at);
   `;
+
+/** Whether the recorded attempt or task belongs to a probe run: the report leaves probes out, the read by id does not. */
+export const STATS_PROBE_MIGRATION = `
+  ALTER TABLE stats_attempts ADD COLUMN is_probe INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE stats_runs ADD COLUMN is_probe INTEGER NOT NULL DEFAULT 0;
+  `;

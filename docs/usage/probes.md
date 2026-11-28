@@ -72,12 +72,25 @@ one of:
 
 ## The budget
 
-`max-runs` is the hard stop: the plan is checked against it before any run starts, and a plan above
-it is refused. `max-tokens` is checked before each next repetition: the repetitions of one round
-run together, and only after every probe of that round settled does the next round start. Once the
-tokens of the created probes reach the limit, no further probe is created. The probes that exist
-keep running and are not cancelled, so the experiment may finish above the limit; in that case it
-reports `budget_exhausted` and names no winner.
+Every probe takes a place of a shared budget before it is created: at most 12 probe runs per source
+task over its whole life, and at most 24 probe runs admitted in the last 24 hours by this daemon. A
+single probe takes one place, an experiment takes the places of its whole plan at once, and a probe
+of a probe counts for the task of the original run. A request that does not fit is refused with the
+area, the limit, the used and the requested number — for example `the probe budget of the task is
+exhausted: limit 12, used 11, requested 2` — and nothing is created. A place is never returned: a
+failed start and a stopped experiment keep their places, and the window forgets them only after a
+day.
+
+`max-runs` is the hard stop of the plan: the plan is checked against it before any run starts, and a
+plan above it is refused. `--max-runs` and `--max-tokens` may narrow the shared budget, never widen
+it. `max-tokens` is checked before each next repetition: the repetitions of one round run together,
+and only after every probe of that round settled does the next round start. Once the tokens of the
+created probes reach the limit, no further probe is created. The probes that exist keep running and
+are not cancelled, so the experiment may finish above the limit; in that case it reports
+`budget_exhausted` and names no winner.
+
+The repetitions of a variant repeat the resolved configuration of its first run: editing
+`swarm.yaml` while an experiment runs does not change it.
 
 ## The proposal
 

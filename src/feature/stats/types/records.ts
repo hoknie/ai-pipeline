@@ -23,6 +23,8 @@ export interface AttemptRecord {
   outputTokens: number;
   /** Id of the user who created the run; null: none. */
   author: string | null;
+  /** The run is a probe: the report leaves the record out, the read by id keeps it. */
+  isProbe: boolean;
 }
 
 export type NamingRecord = AttemptRecord & { kind: 'naming' };
@@ -38,6 +40,8 @@ export interface TaskRecord {
   outcome: TaskOutcome;
   /** Id of the user who created the run; null: none. */
   author: string | null;
+  /** The run is a probe: the report leaves the record out, the read by id keeps it. */
+  isProbe: boolean;
 }
 
 /** Key of an attempt record inside a run. */

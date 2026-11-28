@@ -19,8 +19,9 @@ export interface RunRecords {
 /** What the journal can record from one saved state of a run. */
 export function recordsOf(state: RunState): RunRecords {
   const { run } = state;
+  const isProbe = run.probeOf !== null;
   const attempts: AttemptRecord[] = [];
-  if (run.namingUsage !== null) attempts.push(namingRecord(state));
+  if (run.namingUsage !== null) attempts.push(namingRecord(state, isProbe));
   for (const group of allGroups(state)) {
     for (const attempt of group.attempts) {
       if (attempt.status === 'running' || attempt.finishedAt === null) continue;
@@ -43,13 +44,14 @@ export function recordsOf(state: RunState): RunRecords {
         inputTokens: attempt.usage?.inputTokens ?? 0,
         outputTokens: attempt.usage?.outputTokens ?? 0,
         author: run.author,
+        isProbe,
       });
     }
   }
   return { attempts, task: taskOf(state) };
 }
 
-function namingRecord(state: RunState): NamingRecord {
+function namingRecord(state: RunState, isProbe: boolean): NamingRecord {
   const { run } = state;
   const usage = run.namingUsage;
   return {
@@ -71,6 +73,7 @@ function namingRecord(state: RunState): NamingRecord {
     inputTokens: usage?.inputTokens ?? 0,
     outputTokens: usage?.outputTokens ?? 0,
     author: run.author,
+    isProbe,
   };
 }
 
@@ -88,5 +91,6 @@ function taskOf(state: RunState): TaskRecord | null {
     wallMs: Math.max(0, run.finishedAt - run.createdAt),
     outcome: phase,
     author: run.author,
+    isProbe: run.probeOf !== null,
   };
 }

@@ -17,8 +17,12 @@ export function combinations(n: number, k: number): number {
 
 /**
  * Two-sided exact sign test of `wins` against `losses`: the chance that an unbiased coin would
- * split `wins + losses` decided pairs at least this unevenly. One bit per repetition, as the
- * epic says, so the count must be large enough before a difference counts.
+ * split `wins + losses` decided pairs at least this unevenly. With `d = wins + losses`,
+ * `p = min(1, 2 · Σ[k = 0..min(wins, losses)] C(d, k) / 2^d)`, and `p = 1` when `d = 0`.
+ *
+ * This is the only place the numbers of the comparison and the proposal come from. Ties,
+ * unfinished probes and checks that failed or never ran do not increase `d`. One bit per
+ * repetition, as the epic says, so the count must be large enough before a difference counts.
  */
 export function signTestP(wins: number, losses: number): number {
   const decided = wins + losses;
@@ -30,7 +34,7 @@ export function signTestP(wins: number, losses: number): number {
   return Math.min(1, p);
 }
 
-/** Whether a difference is a signal: enough decided pairs and a p-value below the level. */
+/** Whether a difference is a signal: `d = wins + losses` of at least `MIN_DECIDING_PAIRS` and p below the level. */
 export function isSignificant(wins: number, losses: number): boolean {
   return wins + losses >= MIN_DECIDING_PAIRS && signTestP(wins, losses) < SIGNIFICANCE_LEVEL;
 }

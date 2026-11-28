@@ -1,4 +1,5 @@
 import type { RunCreated } from '../create.ts';
+import type { ResolvedConfig } from '../../../swarm-config/types/index.ts';
 import type { ProbeSummary } from './harness-comparison.ts';
 import { runId } from '../create.ts';
 import type { RunAttachment, RunState } from '../run.ts';
@@ -89,6 +90,14 @@ export interface ProbeRunRequest {
   number: number;
   /** The title of the probe run itself; the group title stays the title of the source group. */
   title: string;
+  /** The main run the probe belongs to: it makes the probe a probe from the moment of creation. */
+  probeOf: string;
+  /**
+   * The resolved configuration to repeat; absent: the first repetition reads `swarm.yaml` as the
+   * source did. A repetition takes the configuration of the first run of its variant, so an edit
+   * of the file cannot change the input of a running experiment.
+   */
+  config?: ResolvedConfig | undefined;
 }
 
 /** Creates a probe run; the runs feature implements it. */
@@ -154,6 +163,11 @@ export interface ProbeObservation {
   tokens: number;
   /** Why the isolated check of the result could not run; null when it did. */
   error: string | null;
+  /**
+   * The keys of the input the probe repeated; null while the run has no state. A pair votes only
+   * when the contexts of the experiment match and each variant repeats one configuration.
+   */
+  input: { context: string; config: string } | null;
   /** Detailed per-run evidence, when the comparison is built by the probe service. */
   summary?: ProbeSummary;
 }
@@ -190,6 +204,8 @@ export interface ProbeVersus {
   pValue: number;
   /** Enough decided pairs and p below the level: only then the difference is a signal. */
   significant: boolean;
+  /** False when the finished probes repeat different inputs: the pairs decided nothing. */
+  sameInput: boolean;
 }
 
 export type ProbeStatus = 'running' | 'ready' | 'budget_exhausted' | 'failed';

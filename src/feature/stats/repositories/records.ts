@@ -6,6 +6,9 @@ type ProbeRecord = Pick<
   'runId' | 'group' | 'seq' | 'durationMs' | 'inputTokens' | 'outputTokens'
 >;
 
+/** The most run ids one statement of `markProbes` names. */
+const CHUNK = 400;
+
 /** Writes of the journal: the rows of `stats_attempts` and `stats_runs`. */
 export class StatsRecordRepository {
   private readonly database: Database;
@@ -39,8 +42,8 @@ export class StatsRecordRepository {
     const statement = this.database.prepare(
       `INSERT OR IGNORE INTO stats_attempts (run_id, group_slug, seq, kind, repository, pipeline, step_id,
          specialist, runtime, model, status, reason, started_at, finished_at, duration_ms,
-         input_tokens, output_tokens, author)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         input_tokens, output_tokens, author, is_probe)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     let added = 0;
     for (const record of records) {
@@ -63,6 +66,7 @@ export class StatsRecordRepository {
         record.inputTokens,
         record.outputTokens,
         record.author,
+        record.isProbe ? 1 : 0,
       );
       added += Number(result.changes);
     }
@@ -73,12 +77,12 @@ export class StatsRecordRepository {
   upsertTask(task: TaskRecord): void {
     this.database
       .prepare(
-        `INSERT INTO stats_runs (run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome, author)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO stats_runs (run_id, repository, pipeline, created_at, finished_at, wall_ms, outcome, author, is_probe)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (run_id) DO UPDATE SET repository = excluded.repository,
            pipeline = excluded.pipeline, created_at = excluded.created_at,
            finished_at = excluded.finished_at, wall_ms = excluded.wall_ms, outcome = excluded.outcome,
-           author = excluded.author`,
+           author = excluded.author, is_probe = excluded.is_probe`,
       )
       .run(
         task.runId,
@@ -89,12 +93,13 @@ export class StatsRecordRepository {
         task.wallMs,
         task.outcome,
         task.author,
+        task.isProbe ? 1 : 0,
       );
   }
 
   /**
    * Fills the author of the records written before the journal had one, from the author of their
-   * run. The one place the journal reads the table of the runs; used once.
+   * run. A read of the table of the runs, like `fillProbeRuns`; used once, when collection is on.
    */
   fillAuthors(): void {
     for (const table of ['stats_attempts', 'stats_runs']) {
@@ -102,6 +107,35 @@ export class StatsRecordRepository {
         `UPDATE ${table} SET author = (SELECT runs.author_id FROM runs WHERE runs.id = ${table}.run_id)
          WHERE author IS NULL`,
       );
+    }
+  }
+
+  /**
+   * Marks the records of the runs the table of runs names a probe: the single probes of the time
+   * before the journal knew the origin. The other read of the table of the runs; written on every
+   * start, and writing it again changes nothing.
+   */
+  fillProbeRuns(): void {
+    for (const table of ['stats_attempts', 'stats_runs']) {
+      this.database.exec(
+        `UPDATE ${table} SET is_probe = 1
+         WHERE is_probe = 0 AND run_id IN (SELECT id FROM runs WHERE probe_of IS NOT NULL)`,
+      );
+    }
+  }
+
+  /** Marks the records of the given runs as probes: the members of the experiments of older stores. */
+  markProbes(runIds: string[]): void {
+    for (let start = 0; start < runIds.length; start += CHUNK) {
+      const chunk = runIds.slice(start, start + CHUNK);
+      for (const table of ['stats_attempts', 'stats_runs']) {
+        this.database
+          .prepare(
+            `UPDATE ${table} SET is_probe = 1
+             WHERE is_probe = 0 AND run_id IN (${chunk.map(() => '?').join(', ')})`,
+          )
+          .run(...chunk);
+      }
     }
   }
 

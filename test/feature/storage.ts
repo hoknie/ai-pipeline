@@ -81,8 +81,12 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
   }
 }
 
-/** Takes away the columns of the newest migrations (the harness of a run, the tag inheritance and the cleanup time), when they are there. */
+/** Takes away the columns of the newest migrations (the probe budget, the origin of a record in the journal, the harness of a run, the tag inheritance and the cleanup time), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
+  // The newest migrations add the table of the probe admissions and the origin of a record.
+  database.exec('DROP TABLE IF EXISTS probe_admissions');
+  dropColumn(database, 'stats_attempts', 'is_probe');
+  dropColumn(database, 'stats_runs', 'is_probe');
   dropColumn(database, 'queue_items', 'delivery_branch_json');
   dropColumn(database, 'runs', 'delivery_branch_json');
   dropColumn(database, 'runs', 'source_commit');

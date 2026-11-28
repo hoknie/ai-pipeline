@@ -30,6 +30,8 @@ An attempt that is still running is not recorded. A run that finishes again afte
 
 An attempt that ended while collection was off, or in an excluded project, is never recorded later: not when collection is turned on again, not when the project is no longer excluded, not after a restart.
 
+A run created as a probe (a single probe of another run and every member of a contrast experiment) is recorded like any run and keeps its real outcome: its measurements stay available by the run id, but they are left out of every report, so they do not distort the figures of ordinary tasks.
+
 ## History from before
 
 The first time the daemon sees collection on, it moves the history already in its database into the journal: finished attempts, run naming and finished runs of all projects that are not excluded. This happens once. Turning collection off and on, clearing a project and restarting do not repeat it. If collection is off at the first start, the move waits for the first moment it is on.
